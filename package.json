@@ -14,7 +14,10 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.1",
+    "jose": "^6.2.1",
+    "jsonwebtoken": "^9.0.3",
     "next": "16.1.7",
     "postgres": "^3.4.8",
     "react": "19.2.3",
@@ -25,6 +28,8 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

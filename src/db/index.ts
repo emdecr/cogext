@@ -21,7 +21,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error(
     "DATABASE_URL is not set. Add it to .env.local:\n" +
-      "DATABASE_URL=postgres://brain:brain@localhost:5435/brain_extension"
+      "DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DATABASE"
   );
 }
 
