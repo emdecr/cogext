@@ -1,0 +1,57 @@
+services:
+  db:
+    # The container image to use. pgvector/pgvector is Postgres with the
+    # vector extension pre-installed (needed for semantic search later).
+    # The :pg17 tag pins us to Postgres 17.
+    # Prod: same image — pgvector works identically in production.
+    image: pgvector/pgvector:pg17
+
+    # Map a port on your machine (left) to the port inside the container (right).
+    # Postgres always listens on 5432 internally. We expose it on 5435 locally
+    # to avoid collisions with other Postgres containers on your machine.
+    # Prod: you'd typically remove this entirely — the app container talks to
+    # the db container over Docker's internal network, so no port needs to be
+    # exposed to the host machine. Exposing Postgres to the internet is a
+    # security risk.
+    ports:
+      - "5435:5432"
+
+    # These env vars are read by the Postgres image on FIRST BOOT ONLY.
+    # It creates the user, sets the password, and creates the database.
+    # On subsequent starts, it uses the existing data in the volume.
+    # Prod: use strong, unique values. Never commit prod secrets to the repo —
+    # use a .env file (gitignored) or Docker secrets instead.
+    environment:
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: brain_extension
+
+    # Persist database files outside the container. Without this, every
+    # `docker compose down` would wipe your data.
+    # Left side: a named volume called "pgdata" (declared at the bottom).
+    # Right side: where Postgres stores data inside the container.
+    # Prod: same concept. For extra safety, you'd also set up regular
+    # pg_dump backups to external storage (S3, etc).
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    # Polls the database to check if it's actually ready to accept connections.
+    # pg_isready is a Postgres utility built for this purpose.
+    # Other services that depend on the db can use `depends_on: db: condition:
+    # service_healthy` to wait for this check to pass before starting.
+    # Prod: same config works fine. You might increase retries for slower
+    # hardware or add restart: unless-stopped so Docker auto-restarts it
+    # if it crashes.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain -d brain_extension"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Top-level declaration of named volumes. Docker manages where these live
+# on disk (usually somewhere in /var/lib/docker/volumes/).
+# The service above references "pgdata" — this block is what tells Docker
+# to actually create and manage it.
+# Prod: same. You can optionally configure a specific driver or mount point.
+volumes:
+  pgdata:
