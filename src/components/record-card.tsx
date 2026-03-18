@@ -31,6 +31,7 @@ type Record = {
   title: string | null;
   content: string;
   sourceUrl: string | null;
+  imagePath: string | null;
   note: string | null;
   createdAt: Date;
 };
@@ -90,7 +91,18 @@ export default function RecordCard({ record }: { record: Record }) {
   }
 
   return (
-    <div className="group rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+      {/* Image preview — shown above the card content for image records */}
+      {record.imagePath && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={record.imagePath}
+          alt={record.title || "Uploaded image"}
+          className="h-48 w-full object-cover"
+        />
+      )}
+
+      <div className="p-4">
       {/* Header: type badge + delete button */}
       <div className="mb-2 flex items-start justify-between">
         <span
@@ -142,6 +154,7 @@ export default function RecordCard({ record }: { record: Record }) {
 
       {/* Timestamp */}
       <p className="text-xs text-gray-400">{timeAgo(new Date(record.createdAt))}</p>
+      </div>
     </div>
   );
 }

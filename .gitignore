@@ -59,7 +59,7 @@ next-env.d.ts
 pgdata/
 
 # uploaded files (local dev file storage for images etc.)
-/uploads/
+/public/uploads/
 
 # claude code (personal AI context, memory files)
 .claude/

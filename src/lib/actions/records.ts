@@ -124,6 +124,7 @@ export async function createRecord(
       // correct than an empty string for "no value."
       sourceUrl: parsed.data.sourceUrl || null,
       note: parsed.data.note || null,
+      imagePath: parsed.data.imagePath || null,
     });
   } catch (error) {
     console.error("Failed to create record:", error);

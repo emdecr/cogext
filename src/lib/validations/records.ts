@@ -74,6 +74,11 @@ export const createRecordSchema = z.object({
 
   // User's personal note/annotation on the record.
   note: z.string().trim().optional(),
+
+  // Path to uploaded image in storage (e.g., "/uploads/abc-123.jpg").
+  // Set by the upload API route, not by the user directly.
+  // Optional because only image-type records have this.
+  imagePath: z.string().optional(),
 });
 
 // Infer the TypeScript type from the schema.

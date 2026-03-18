@@ -18,22 +18,28 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createRecord } from "@/lib/actions/records";
 import { RECORD_TYPES } from "@/lib/validations/records";
 
 export default function CreateRecordForm() {
   // ---- State ----
   // We track form fields, submission state, and errors separately.
-  // In a larger app you might use a form library (react-hook-form),
-  // but for learning purposes, managing state manually shows what's
-  // actually happening.
 
   const [type, setType] = useState<(typeof RECORD_TYPES)[number]>("note");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [note, setNote] = useState("");
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // useRef gives us a reference to the hidden file input element
+  // so we can trigger it programmatically (click it from our custom button).
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track whether the form is currently submitting (for loading state)
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,32 +55,108 @@ export default function CreateRecordForm() {
   // Controls whether the form is expanded/visible
   const [isOpen, setIsOpen] = useState(false);
 
+  // ---- Image handling ----
+  // When the user selects a file, we:
+  //   1. Store the File object in state (for uploading later)
+  //   2. Create a preview URL using URL.createObjectURL
+  //
+  // URL.createObjectURL creates a temporary browser-only URL that points
+  // to the file in memory. It looks like "blob:http://localhost:3000/abc123".
+  // This lets us show a preview WITHOUT uploading the file yet.
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Basic client-side validation (the server validates too)
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please select a JPEG, PNG, GIF, or WebP image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be under 5MB");
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setError(null);
+  }
+
+  function clearImage() {
+    setImageFile(null);
+    // Clean up the blob URL to free memory.
+    // Without this, the browser holds the file data in memory
+    // until the page is closed.
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    // Reset the file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   // ---- Form submission ----
   async function handleSubmit(e: React.FormEvent) {
-    // Prevent the browser's default form submission (which would reload
-    // the page). We handle submission ourselves with the server action.
     e.preventDefault();
-
-    // Clear previous errors and set loading state
     setError(null);
     setFieldErrors(undefined);
     setIsSubmitting(true);
 
-    // Call the server action. This sends the data to the server,
-    // runs the action function, and returns the result — all handled
-    // by Next.js behind the scenes.
+    let imagePath: string | undefined;
+
+    // If this is an image record, upload the file first
+    if (type === "image" && imageFile) {
+      setIsUploading(true);
+
+      // Create a FormData object — this is the standard way to send
+      // files over HTTP. It encodes the data as multipart/form-data,
+      // which supports binary file data (unlike JSON).
+      const formData = new FormData();
+      formData.append("file", imageFile);
+
+      try {
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+          // NOTE: Don't set Content-Type header manually when sending
+          // FormData — the browser sets it automatically with the
+          // correct boundary string. Setting it yourself breaks the upload.
+        });
+
+        if (!uploadRes.ok) {
+          const data = await uploadRes.json();
+          setError(data.error || "Failed to upload image");
+          setIsSubmitting(false);
+          setIsUploading(false);
+          return;
+        }
+
+        const data = await uploadRes.json();
+        imagePath = data.path;
+      } catch {
+        setError("Failed to upload image. Please try again.");
+        setIsSubmitting(false);
+        setIsUploading(false);
+        return;
+      }
+
+      setIsUploading(false);
+    }
+
+    // Now create the record (with imagePath if we uploaded an image)
     const result = await createRecord({
       type,
-      title: title || undefined, // Convert empty string to undefined
-      content,
+      title: title || undefined,
+      content: content || (type === "image" ? "Image" : ""),
       sourceUrl: sourceUrl || undefined,
       note: note || undefined,
+      imagePath,
     });
 
     setIsSubmitting(false);
 
     if (!result.success) {
-      // Show errors from the server action
       setError(result.error || "Something went wrong");
       setFieldErrors(result.fieldErrors);
       return;
@@ -86,12 +168,11 @@ export default function CreateRecordForm() {
     setSourceUrl("");
     setNote("");
     setType("note");
+    clearImage();
     setIsOpen(false);
   }
 
   // ---- Render ----
-  // When collapsed, show just the "+" button.
-  // When expanded, show the full form.
 
   if (!isOpen) {
     return (
@@ -130,8 +211,6 @@ export default function CreateRecordForm() {
       )}
 
       {/* ---- Record Type Selector ---- */}
-      {/* We use buttons styled as pills instead of a <select> dropdown.
-          This gives users a visual preview of all options at once. */}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">
           Type
@@ -140,8 +219,12 @@ export default function CreateRecordForm() {
           {RECORD_TYPES.map((t) => (
             <button
               key={t}
-              type="button" // "button" not "submit" — prevents form submission on click
-              onClick={() => setType(t)}
+              type="button"
+              onClick={() => {
+                setType(t);
+                // Clear image when switching away from image type
+                if (t !== "image") clearImage();
+              }}
               className={`rounded-full px-3 py-1 text-sm capitalize transition-colors ${
                 type === t
                   ? "bg-gray-900 text-white"
@@ -153,6 +236,59 @@ export default function CreateRecordForm() {
           ))}
         </div>
       </div>
+
+      {/* ---- Image Upload (shown only for image type) ---- */}
+      {/* We hide the native file input and use a custom styled button
+          that triggers it via ref. Native file inputs are notoriously
+          hard to style consistently across browsers. */}
+      {type === "image" && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Image
+          </label>
+
+          {/* Hidden file input — triggered by the button below */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {imagePreview ? (
+            // Show preview when an image is selected
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="max-h-48 w-full rounded-md border border-gray-200 object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearImage}
+                className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-white hover:bg-black/70"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            // Show upload button when no image is selected
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full rounded-md border-2 border-dashed border-gray-300 px-4 py-8 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-600"
+            >
+              Click to select an image
+              <br />
+              <span className="text-xs text-gray-400">
+                JPEG, PNG, GIF, or WebP • Max 5MB
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ---- Title (optional) ---- */}
       <div className="mb-4">
@@ -176,28 +312,39 @@ export default function CreateRecordForm() {
         )}
       </div>
 
-      {/* ---- Content (required) ---- */}
+      {/* ---- Content ---- */}
+      {/* For image type, content is optional (defaults to "Image").
+          For all other types, it's the main body text. */}
       <div className="mb-4">
         <label
           htmlFor="content"
           className="mb-1 block text-sm font-medium text-gray-700"
         >
-          Content
+          {type === "image" ? (
+            <>
+              Description{" "}
+              <span className="font-normal text-gray-400">(optional)</span>
+            </>
+          ) : (
+            "Content"
+          )}
         </label>
         <textarea
           id="content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder={
-            type === "quote"
-              ? "Paste the quote..."
-              : type === "link"
-                ? "What is this link about?"
-                : type === "article"
-                  ? "Paste an excerpt or summary..."
-                  : "Write your note..."
+            type === "image"
+              ? "Describe the image..."
+              : type === "quote"
+                ? "Paste the quote..."
+                : type === "link"
+                  ? "What is this link about?"
+                  : type === "article"
+                    ? "Paste an excerpt or summary..."
+                    : "Write your note..."
           }
-          rows={4}
+          rows={type === "image" ? 2 : 4}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
         />
         {fieldErrors?.content && (
@@ -208,8 +355,6 @@ export default function CreateRecordForm() {
       </div>
 
       {/* ---- Source URL (shown for link and article types) ---- */}
-      {/* Conditional rendering: only show this field when it's relevant.
-          Notes and quotes don't usually have source URLs. */}
       {(type === "link" || type === "article") && (
         <div className="mb-4">
           <label
@@ -264,10 +409,14 @@ export default function CreateRecordForm() {
         </button>
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (type === "image" && !imageFile)}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {isSubmitting ? "Saving..." : "Save Record"}
+          {isUploading
+            ? "Uploading..."
+            : isSubmitting
+              ? "Saving..."
+              : "Save Record"}
         </button>
       </div>
     </form>
