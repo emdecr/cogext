@@ -82,7 +82,7 @@ export default function TagInput({
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 tag.isAi
                   ? "bg-violet-100 text-violet-700" // AI tags get a distinct color
-                  : "bg-gray-100 text-gray-700"
+                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
             >
               {tag.name}
@@ -108,7 +108,7 @@ export default function TagInput({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={tags.length > 0 ? "Add another tag..." : "Type a tag and press Enter"}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
       />
     </div>
   );

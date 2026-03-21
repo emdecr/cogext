@@ -43,15 +43,15 @@ export default function FilterBar({
     <div className="mt-6 space-y-3">
       {/* ---- Type filters ---- */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-gray-500">Type:</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Type:</span>
 
         {/* "All" button — clears the type filter */}
         <button
           onClick={() => onTypeChange(null)}
           className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
             activeType === null
-              ? "bg-gray-900 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           }`}
         >
           All
@@ -79,7 +79,7 @@ export default function FilterBar({
       {/* Only show if there are tags to filter by */}
       {availableTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-500">Tags:</span>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Tags:</span>
 
           {/* "All" button for tags */}
           <button

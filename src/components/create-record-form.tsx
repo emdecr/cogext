@@ -197,7 +197,7 @@ export default function CreateRecordForm() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-2xl text-white shadow-lg hover:bg-gray-700 transition-colors"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-2xl text-white shadow-lg hover:bg-gray-700 transition-colors dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
         aria-label="Create new record"
       >
         +
@@ -208,10 +208,10 @@ export default function CreateRecordForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-lg rounded-lg border border-gray-200 bg-white p-6 shadow-lg"
+      className="w-full max-w-lg rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900"
     >
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">New Record</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Record</h2>
         <button
           type="button"
           onClick={() => setIsOpen(false)}
@@ -231,7 +231,7 @@ export default function CreateRecordForm() {
 
       {/* ---- Record Type Selector ---- */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Type
         </label>
         <div className="flex flex-wrap gap-2">
@@ -262,7 +262,7 @@ export default function CreateRecordForm() {
           hard to style consistently across browsers. */}
       {type === "image" && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Image
           </label>
 
@@ -313,7 +313,7 @@ export default function CreateRecordForm() {
       <div className="mb-4">
         <label
           htmlFor="title"
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Title{" "}
           <span className="font-normal text-gray-400">(optional)</span>
@@ -324,7 +324,7 @@ export default function CreateRecordForm() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Give it a name, or let AI suggest one later"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
         />
         {fieldErrors?.title && (
           <p className="mt-1 text-sm text-red-500">{fieldErrors.title[0]}</p>
@@ -337,7 +337,7 @@ export default function CreateRecordForm() {
       <div className="mb-4">
         <label
           htmlFor="content"
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           {type === "image" ? (
             <>
@@ -364,7 +364,7 @@ export default function CreateRecordForm() {
                     : "Write your note..."
           }
           rows={type === "image" ? 2 : 4}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
         />
         {fieldErrors?.content && (
           <p className="mt-1 text-sm text-red-500">
@@ -378,7 +378,7 @@ export default function CreateRecordForm() {
         <div className="mb-4">
           <label
             htmlFor="sourceUrl"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Source URL
           </label>
@@ -388,7 +388,7 @@ export default function CreateRecordForm() {
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
           />
           {fieldErrors?.sourceUrl && (
             <p className="mt-1 text-sm text-red-500">
@@ -402,7 +402,7 @@ export default function CreateRecordForm() {
       <div className="mb-4">
         <label
           htmlFor="note"
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Note{" "}
           <span className="font-normal text-gray-400">(optional)</span>
@@ -413,13 +413,13 @@ export default function CreateRecordForm() {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Your personal annotation..."
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
         />
       </div>
 
       {/* ---- Tags ---- */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Tags{" "}
           <span className="font-normal text-gray-400">(optional)</span>
         </label>
@@ -452,7 +452,7 @@ export default function CreateRecordForm() {
         <button
           type="submit"
           disabled={isSubmitting || (type === "image" && !imageFile)}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+          className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
         >
           {isUploading
             ? "Uploading..."

@@ -24,8 +24,8 @@ export default function AuthLayout({
   return (
     // Full viewport height, centered both horizontally and vertically.
     // This gives us the classic "form floating in the middle of the page" look.
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8">{children}</div>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="w-full max-w-md p-4 md:p-8">{children}</div>
     </div>
   );
 }

@@ -61,10 +61,10 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold text-gray-900">Welcome back</h1>
+      <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-gray-100">Welcome back</h1>
 
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">
           {error}
         </div>
       )}
@@ -73,7 +73,7 @@ export default function LoginPage() {
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Email
           </label>
@@ -83,7 +83,7 @@ export default function LoginPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="you@example.com"
           />
         </div>
@@ -91,7 +91,7 @@ export default function LoginPage() {
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Password
           </label>
@@ -101,7 +101,7 @@ export default function LoginPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="Your password"
           />
         </div>
@@ -115,11 +115,11 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-600">
+      <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
         Don&apos;t have an account?{" "}
         <Link
           href="/register"
-          className="text-blue-600 hover:text-blue-500"
+          className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Register
         </Link>

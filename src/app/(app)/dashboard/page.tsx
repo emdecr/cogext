@@ -28,6 +28,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import CreateRecordForm from "@/components/create-record-form";
 import RecordGrid from "@/components/record-grid";
+import ThemeToggle from "@/components/theme-toggle";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -47,22 +48,24 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 md:p-8">
       <div className="mx-auto max-w-6xl">
         {/* ---- Header ---- */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Logged in as {user.email}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Record count */}
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {records.length} record{records.length !== 1 ? "s" : ""}
             </span>
+
+            <ThemeToggle />
 
             {/* Logout — using a server action inline */}
             <form
@@ -74,7 +77,7 @@ export default async function DashboardPage() {
             >
               <button
                 type="submit"
-                className="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+                className="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Log out
               </button>
@@ -85,7 +88,7 @@ export default async function DashboardPage() {
         {/* ---- Create Record Form ---- */}
         {/* Fixed position in the bottom-right corner of the screen.
             Starts as a "+" button, expands into the full form on click. */}
-        <div className="fixed bottom-8 right-8 z-50">
+        <div className="fixed bottom-4 right-4 z-50 md:bottom-8 md:right-8">
           <CreateRecordForm />
         </div>
 

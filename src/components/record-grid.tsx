@@ -104,7 +104,7 @@ export default function RecordGrid({
 
       {/* Results count when filtering */}
       {(activeType || activeTag) && (
-        <p className="mt-3 text-sm text-gray-500">
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
           Showing {filteredRecords.length} of {records.length} record
           {records.length !== 1 ? "s" : ""}
           {activeType && (
@@ -124,7 +124,7 @@ export default function RecordGrid({
 
       {/* Record grid */}
       {filteredRecords.length === 0 ? (
-        <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center text-gray-500">
+        <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center text-gray-500 dark:border-gray-700 dark:text-gray-400">
           {records.length === 0 ? (
             <>
               <p className="text-lg">No records yet</p>
@@ -143,7 +143,7 @@ export default function RecordGrid({
           )}
         </div>
       ) : (
-        <div className="mt-4 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
+        <div className="mt-4 columns-1 gap-3 sm:columns-2 sm:gap-4 lg:columns-3 xl:columns-4">
           {filteredRecords.map((record) => (
             <RecordCard key={record.id} record={record} />
           ))}
