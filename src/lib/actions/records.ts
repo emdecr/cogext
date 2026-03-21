@@ -72,6 +72,7 @@ type ActionResult = {
   success: boolean;
   error?: string;                           // General error message
   fieldErrors?: Record<string, string[]>;   // Per-field validation errors
+  recordId?: string;                        // ID of created/updated record
 };
 
 // ============================================================================
@@ -114,18 +115,28 @@ export async function createRecord(
   // Step 3: Insert into database
   // parsed.data is the validated, typed input — safe to use.
   try {
-    await db.insert(records).values({
-      userId,
-      type: parsed.data.type,
-      title: parsed.data.title || null,
-      content: parsed.data.content,
-      // Convert empty string to null for optional URL field.
-      // The database column is nullable, and null is more semantically
-      // correct than an empty string for "no value."
-      sourceUrl: parsed.data.sourceUrl || null,
-      note: parsed.data.note || null,
-      imagePath: parsed.data.imagePath || null,
-    });
+    // .returning() gives us the inserted row back, including the
+    // auto-generated ID. We need the ID to link tags to the record.
+    const [created] = await db
+      .insert(records)
+      .values({
+        userId,
+        type: parsed.data.type,
+        title: parsed.data.title || null,
+        content: parsed.data.content,
+        sourceUrl: parsed.data.sourceUrl || null,
+        note: parsed.data.note || null,
+        imagePath: parsed.data.imagePath || null,
+      })
+      .returning();
+
+    // Step 4: Revalidate the dashboard
+    // Next.js caches rendered pages. When we add a new record, the cached
+    // dashboard is stale. revalidatePath() tells Next.js to re-render
+    // the page on the next request so it includes the new record.
+    revalidatePath("/dashboard");
+
+    return { success: true, recordId: created.id };
   } catch (error) {
     console.error("Failed to create record:", error);
     return {
@@ -133,14 +144,6 @@ export async function createRecord(
       error: "Failed to create record. Please try again.",
     };
   }
-
-  // Step 4: Revalidate the dashboard
-  // Next.js caches rendered pages. When we add a new record, the cached
-  // dashboard is stale. revalidatePath() tells Next.js to re-render
-  // the page on the next request so it includes the new record.
-  revalidatePath("/dashboard");
-
-  return { success: true };
 }
 
 // ============================================================================
@@ -157,14 +160,30 @@ export async function createRecord(
 export async function getRecords() {
   const userId = await requireUserId();
 
-  // Drizzle query: SELECT * FROM records WHERE user_id = ? ORDER BY created_at DESC
-  // The `and()` function combines multiple conditions with AND.
-  // `desc()` sorts newest first.
-  const userRecords = await db
-    .select()
-    .from(records)
-    .where(eq(records.userId, userId))
-    .orderBy(desc(records.createdAt));
+  // Using the relational query API here instead of .select().from()
+  // because we need to include tags through the join table.
+  //
+  // This generates a query like:
+  //   SELECT records.*, record_tags.*, tags.*
+  //   FROM records
+  //   LEFT JOIN record_tags ON records.id = record_tags.record_id
+  //   LEFT JOIN tags ON record_tags.tag_id = tags.id
+  //   WHERE records.user_id = ?
+  //   ORDER BY records.created_at DESC
+  //
+  // The `with` option follows the relations we defined in schema.ts,
+  // nesting the results automatically.
+  const userRecords = await db.query.records.findMany({
+    where: eq(records.userId, userId),
+    orderBy: desc(records.createdAt),
+    with: {
+      recordTags: {
+        with: {
+          tag: true, // follow through join table to the actual tag
+        },
+      },
+    },
+  });
 
   return userRecords;
 }

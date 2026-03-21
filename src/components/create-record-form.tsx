@@ -20,7 +20,9 @@
 
 import { useState, useRef } from "react";
 import { createRecord } from "@/lib/actions/records";
+import { addTagToRecord } from "@/lib/actions/tags";
 import { RECORD_TYPES } from "@/lib/validations/records";
+import TagInput from "@/components/tag-input";
 
 export default function CreateRecordForm() {
   // ---- State ----
@@ -31,6 +33,13 @@ export default function CreateRecordForm() {
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [note, setNote] = useState("");
+
+  // Tags — stored locally during creation, then linked to the record
+  // after it's saved. Each tag gets a temporary ID (for the UI key)
+  // that gets replaced by the real database ID on save.
+  const [pendingTags, setPendingTags] = useState<
+    { id: string; name: string; isAi: boolean }[]
+  >([]);
 
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -162,12 +171,22 @@ export default function CreateRecordForm() {
       return;
     }
 
+    // Add tags to the newly created record.
+    // We do this after creation because tags need a record ID to link to.
+    // Promise.all runs all tag additions in parallel for speed.
+    if (result.recordId && pendingTags.length > 0) {
+      await Promise.all(
+        pendingTags.map((tag) => addTagToRecord(result.recordId!, tag.name)),
+      );
+    }
+
     // Success — reset the form
     setTitle("");
     setContent("");
     setSourceUrl("");
     setNote("");
     setType("note");
+    setPendingTags([]);
     clearImage();
     setIsOpen(false);
   }
@@ -395,6 +414,29 @@ export default function CreateRecordForm() {
           onChange={(e) => setNote(e.target.value)}
           placeholder="Your personal annotation..."
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+        />
+      </div>
+
+      {/* ---- Tags ---- */}
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Tags{" "}
+          <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <TagInput
+          tags={pendingTags}
+          onAdd={(name) => {
+            // Generate a temporary ID for the UI. This gets replaced
+            // by the real database ID when we save.
+            setPendingTags((prev) => [
+              ...prev,
+              { id: `temp-${Date.now()}`, name, isAi: false },
+            ]);
+          }}
+          onRemove={(id) => {
+            setPendingTags((prev) => prev.filter((t) => t.id !== id));
+          }}
+          disabled={isSubmitting}
         />
       </div>
 

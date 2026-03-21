@@ -100,10 +100,21 @@ export default async function DashboardPage() {
             </p>
           </div>
         ) : (
-          // Record grid — simple CSS grid for now.
-          // We'll replace this with a proper masonry layout later
-          // (masonry needs JS for variable-height cards).
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          // Masonry layout using CSS columns.
+          //
+          // How CSS columns work:
+          //   - `columns-1 sm:columns-2 lg:columns-3` sets the number of
+          //     columns at different breakpoints (responsive).
+          //   - Content flows top-to-bottom in the first column, then
+          //     top-to-bottom in the second, etc. — like newspaper columns.
+          //   - Each card takes its natural height, so short cards pack
+          //     tightly next to tall ones (the masonry effect).
+          //
+          // `gap-4` sets spacing between columns.
+          // Each card gets `break-inside-avoid` to prevent a card from
+          // being split across two columns, and `mb-4` for vertical spacing
+          // (CSS columns don't have a row-gap, so we use margin instead).
+          <div className="mt-8 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
             {records.map((record) => (
               <RecordCard key={record.id} record={record} />
             ))}
