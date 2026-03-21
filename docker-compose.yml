@@ -48,10 +48,43 @@ services:
       timeout: 5s
       retries: 5
 
-# Top-level declaration of named volumes. Docker manages where these live
-# on disk (usually somewhere in /var/lib/docker/volumes/).
-# The service above references "pgdata" — this block is what tells Docker
-# to actually create and manage it.
-# Prod: same. You can optionally configure a specific driver or mount point.
+  # ======================================================================
+  # OLLAMA — Local AI inference server
+  # ======================================================================
+  # Ollama runs LLMs and embedding models locally. We use it for:
+  #   1. nomic-embed-text — generates embeddings for semantic search
+  #   2. llama3.2:1b — small LLM for auto-tagging records
+  #
+  # First start will be slow — it downloads the Ollama image (~1GB).
+  # Models are downloaded on first use (when the app calls them).
+  #
+  # The container exposes port 11434. Your Next.js app (running on your
+  # machine, not in Docker) calls http://localhost:11434/api/...
+  #
+  # Prod: same setup if your VPS has enough RAM. Otherwise, swap to
+  # API-based providers (OpenAI, Voyage, Claude) via the provider
+  # abstraction — no app code changes needed.
+  ollama:
+    image: ollama/ollama:latest
+
+    ports:
+      - "11434:11434"
+
+    # Persist downloaded models so they survive container restarts.
+    # Without this, you'd re-download ~1.5GB of models every time.
+    volumes:
+      - ollama_data:/root/.ollama
+
+    # Healthcheck: use `ollama list` which returns 0 if the server is up.
+    # The Ollama image doesn't include curl or wget, but the ollama
+    # CLI is always available.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Top-level declaration of named volumes.
 volumes:
   pgdata:
+  ollama_data:
