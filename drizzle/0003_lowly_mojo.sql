@@ -1,0 +1,1 @@
+CREATE INDEX "records_embedding_idx" ON "records" USING hnsw ("embedding" vector_cosine_ops);

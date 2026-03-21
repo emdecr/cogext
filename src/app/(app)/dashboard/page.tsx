@@ -29,6 +29,7 @@ import { eq } from "drizzle-orm";
 import CreateRecordForm from "@/components/create-record-form";
 import RecordGrid from "@/components/record-grid";
 import ThemeToggle from "@/components/theme-toggle";
+import CommandPalette from "@/components/command-palette";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -60,6 +61,11 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Search hint */}
+            <kbd className="hidden rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-400 sm:inline-block dark:border-gray-700">
+              ⌘K to search
+            </kbd>
+
             {/* Record count */}
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {records.length} record{records.length !== 1 ? "s" : ""}
@@ -84,6 +90,11 @@ export default async function DashboardPage() {
             </form>
           </div>
         </div>
+
+        {/* ---- Command Palette (⌘K) ---- */}
+        {/* Always mounted but hidden until ⌘K is pressed.
+            Renders null when closed so it costs nothing. */}
+        <CommandPalette />
 
         {/* ---- Create Record Form ---- */}
         {/* Fixed position in the bottom-right corner of the screen.

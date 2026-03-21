@@ -28,6 +28,7 @@ import {
   jsonb,      // JSON stored in binary format (queryable, indexable)
   primaryKey, // composite primary key (for join tables)
   vector,     // pgvector column — stores embeddings as arrays of floats
+  index,      // database index for query performance
 } from "drizzle-orm/pg-core";
 
 // ============================================================================
@@ -157,7 +158,23 @@ export const records = pgTable("records", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  // HNSW index for fast cosine similarity search on embeddings.
+  //
+  // Without an index, pgvector scans EVERY row and computes distance —
+  // fine for hundreds of records, slow for thousands+.
+  //
+  // HNSW (Hierarchical Navigable Small World) is a graph-based index
+  // that trades a bit of accuracy for much faster search. It finds
+  // approximate nearest neighbors, which is good enough for search
+  // (we don't need the mathematically perfect top-10, just good results).
+  //
+  // vector_cosine_ops tells pgvector to use cosine distance, which
+  // measures angle between vectors (ignoring magnitude). This is the
+  // standard for text embeddings.
+  index("records_embedding_idx")
+    .using("hnsw", table.embedding.op("vector_cosine_ops")),
+]);
 
 // ============================================================================
 // TAGS
