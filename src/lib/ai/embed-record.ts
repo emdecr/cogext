@@ -39,6 +39,7 @@ import { getEmbeddingProvider } from "@/lib/ai";
 function prepareTextForEmbedding(record: {
   title: string | null;
   content: string;
+  sourceAuthor: string | null;
   note: string | null;
   type: string;
 }): string {
@@ -52,6 +53,10 @@ function prepareTextForEmbedding(record: {
   }
 
   parts.push(`Content: ${record.content}`);
+
+  if (record.sourceAuthor) {
+    parts.push(`Author: ${record.sourceAuthor}`);
+  }
 
   if (record.note) {
     parts.push(`Note: ${record.note}`);

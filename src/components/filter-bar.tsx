@@ -2,15 +2,12 @@
 // FILTER BAR
 // ============================================================================
 //
-// Horizontal bar with filter controls:
-//   - Type filters (pills for each record type)
-//   - Tag filters (pills for each tag in use)
+// Slim horizontal bar with:
+//   - Type filter pills (All, Note, Quote, etc.)
+//   - Active tag pill (if a tag filter is set, shown as a dismissable chip)
+//   - "Filters" button with active count badge to open the drawer
 //
-// Filtering is CLIENT-SIDE — we have all records already, so filtering
-// an array in memory is instant. No server round-trip needed.
-//
-// The filter state lives in the parent (RecordGrid) and is passed down.
-// This component just renders the controls and calls callbacks.
+// Tags and collections live in the FilterDrawer — this bar stays clean.
 // ============================================================================
 
 "use client";
@@ -18,18 +15,19 @@
 import { RECORD_TYPES } from "@/lib/validations/records";
 
 type FilterBarProps = {
-  // Currently selected type filter (null = show all types)
+  // Type filter
   activeType: string | null;
   onTypeChange: (type: string | null) => void;
 
-  // Currently selected tag filter (null = show all tags)
+  // Tag filter (set via drawer, displayed here as active pill)
   activeTag: string | null;
   onTagChange: (tag: string | null) => void;
 
-  // All tags that exist across the user's records — so we know
-  // which tag pills to show. We derive this from the records data
-  // rather than making a separate database query.
-  availableTags: { name: string; count: number }[];
+  // How many filters are active (for the badge on the Filters button)
+  activeFilterCount: number;
+
+  // Open the filter drawer
+  onOpenDrawer: () => void;
 };
 
 export default function FilterBar({
@@ -37,79 +35,70 @@ export default function FilterBar({
   onTypeChange,
   activeTag,
   onTagChange,
-  availableTags,
+  activeFilterCount,
+  onOpenDrawer,
 }: FilterBarProps) {
   return (
-    <div className="mt-6 space-y-3">
+    <div className="mt-6 flex flex-wrap items-center gap-2">
       {/* ---- Type filters ---- */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Type:</span>
+      <button
+        onClick={() => onTypeChange(null)}
+        className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+          activeType === null
+            ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+        }`}
+      >
+        All
+      </button>
 
-        {/* "All" button — clears the type filter */}
+      {RECORD_TYPES.map((type) => (
         <button
-          onClick={() => onTypeChange(null)}
+          key={type}
+          onClick={() => onTypeChange(activeType === type ? null : type)}
           className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-            activeType === null
+            activeType === type
               ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           }`}
         >
-          All
+          {type}
         </button>
+      ))}
 
-        {RECORD_TYPES.map((type) => (
-          <button
-            key={type}
-            onClick={() =>
-              // Toggle: clicking the active type clears it
-              onTypeChange(activeType === type ? null : type)
-            }
-            className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-              activeType === type
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {type}
-          </button>
-        ))}
-      </div>
+      {/* ---- Separator ---- */}
+      <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
 
-      {/* ---- Tag filters ---- */}
-      {/* Only show if there are tags to filter by */}
-      {availableTags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Tags:</span>
-
-          {/* "All" button for tags */}
+      {/* ---- Active tag pill ---- */}
+      {/* When a tag filter is active (set via the drawer), show it here
+          so the user knows what's filtering without opening the drawer.
+          The ✕ button clears the tag filter. */}
+      {activeTag && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+          {activeTag}
           <button
             onClick={() => onTagChange(null)}
-            className={`rounded-full px-3 py-1 text-xs transition-colors ${
-              activeTag === null
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+            className="ml-0.5 hover:text-violet-900 dark:hover:text-violet-100"
+            aria-label={`Remove ${activeTag} filter`}
           >
-            All
+            ✕
           </button>
-
-          {availableTags.map(({ name, count }) => (
-            <button
-              key={name}
-              onClick={() => onTagChange(activeTag === name ? null : name)}
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                activeTag === name
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {/* Show the tag name and how many records have it */}
-              {name}
-              <span className="ml-1 opacity-60">{count}</span>
-            </button>
-          ))}
-        </div>
+        </span>
       )}
+
+      {/* ---- Filters button ---- */}
+      {/* Opens the drawer. Badge shows count of active filters. */}
+      <button
+        onClick={onOpenDrawer}
+        className="relative ml-auto rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+      >
+        Filters
+        {activeFilterCount > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[10px] text-white">
+            {activeFilterCount}
+          </span>
+        )}
+      </button>
     </div>
   );
 }

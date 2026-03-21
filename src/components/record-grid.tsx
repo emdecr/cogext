@@ -2,19 +2,15 @@
 // RECORD GRID
 // ============================================================================
 //
-// Client component that wraps the filter bar + masonry grid.
+// Client component that wraps the filter bar + filter drawer + masonry grid.
 // Receives ALL records from the server component (dashboard page),
 // manages filter state, and renders only the matching records.
 //
-// Why client-side filtering?
-//   - All records are already loaded (server component fetched them)
-//   - Filtering an array in memory is instant (no loading state needed)
-//   - No server round-trip = no flicker, no spinner
-//   - Works fine for our target size (< 50k records)
-//
-// If we had millions of records, we'd filter server-side with query
-// params and pagination. But for a personal knowledge base, client-side
-// is simpler and faster.
+// Filter state lives here because:
+//   - FilterBar needs to show active filters
+//   - FilterDrawer needs to set tag filters
+//   - The grid needs to apply filters
+//   - All three share the same state, so it lives in their common parent
 // ============================================================================
 
 "use client";
@@ -22,6 +18,7 @@
 import { useState, useMemo } from "react";
 import RecordCard from "@/components/record-card";
 import FilterBar from "@/components/filter-bar";
+import FilterDrawer from "@/components/filter-drawer";
 
 // Type matches what getRecords() returns (with tags included)
 type Tag = {
@@ -36,6 +33,7 @@ type RecordWithTags = {
   title: string | null;
   content: string;
   sourceUrl: string | null;
+  sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
   createdAt: Date;
@@ -49,16 +47,9 @@ export default function RecordGrid({
 }) {
   const [activeType, setActiveType] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // ---- Derive available tags from the records ----
-  // useMemo caches this computation so it only re-runs when `records` changes,
-  // not on every render (e.g., when filter state changes).
-  //
-  // We count how many records use each tag, then sort by count (most used first).
-  // This is a common "aggregate" pattern:
-  //   1. Build a map of { tagName → count }
-  //   2. Convert to an array of { name, count }
-  //   3. Sort descending by count
   const availableTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
 
@@ -74,16 +65,18 @@ export default function RecordGrid({
       .sort((a, b) => b.count - a.count);
   }, [records]);
 
+  // Count active filters (for the badge on the Filters button)
+  const activeFilterCount = (activeTag ? 1 : 0);
+
   // ---- Filter records ----
-  // Apply both filters (type AND tag). Both must match if both are active.
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
-      // Type filter: if active, only show records of that type
       if (activeType && record.type !== activeType) return false;
 
-      // Tag filter: if active, only show records that have that tag
       if (activeTag) {
-        const hasTag = record.recordTags.some((rt) => rt.tag.name === activeTag);
+        const hasTag = record.recordTags.some(
+          (rt) => rt.tag.name === activeTag,
+        );
         if (!hasTag) return false;
       }
 
@@ -99,6 +92,20 @@ export default function RecordGrid({
         onTypeChange={setActiveType}
         activeTag={activeTag}
         onTagChange={setActiveTag}
+        activeFilterCount={activeFilterCount}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+      />
+
+      {/* Filter drawer */}
+      <FilterDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        activeTag={activeTag}
+        onTagChange={(tag) => {
+          setActiveTag(tag);
+          // Close drawer after selecting a filter for a clean UX
+          setIsDrawerOpen(false);
+        }}
         availableTags={availableTags}
       />
 
@@ -110,13 +117,15 @@ export default function RecordGrid({
           {activeType && (
             <span>
               {" "}
-              &middot; type: <span className="font-medium">{activeType}</span>
+              &middot; type:{" "}
+              <span className="font-medium">{activeType}</span>
             </span>
           )}
           {activeTag && (
             <span>
               {" "}
-              &middot; tag: <span className="font-medium">{activeTag}</span>
+              &middot; tag:{" "}
+              <span className="font-medium">{activeTag}</span>
             </span>
           )}
         </p>
@@ -136,9 +145,7 @@ export default function RecordGrid({
           ) : (
             <>
               <p className="text-lg">No matching records</p>
-              <p className="mt-2 text-sm">
-                Try adjusting your filters.
-              </p>
+              <p className="mt-2 text-sm">Try adjusting your filters.</p>
             </>
           )}
         </div>

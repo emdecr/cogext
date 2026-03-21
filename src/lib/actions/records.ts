@@ -128,6 +128,7 @@ export async function createRecord(
         title: parsed.data.title || null,
         content: parsed.data.content,
         sourceUrl: parsed.data.sourceUrl || null,
+        sourceAuthor: parsed.data.sourceAuthor || null,
         note: parsed.data.note || null,
         imagePath: parsed.data.imagePath || null,
       })
@@ -293,6 +294,7 @@ export async function updateRecord(
         ...updates,
         // Convert empty strings to null for optional fields
         sourceUrl: updates.sourceUrl || null,
+        sourceAuthor: updates.sourceAuthor || null,
         note: updates.note || null,
         title: updates.title || null,
         // Manually set updatedAt since Postgres doesn't auto-update it

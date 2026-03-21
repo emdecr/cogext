@@ -72,6 +72,9 @@ export const createRecordSchema = z.object({
     .optional()
     .or(z.literal("")),
 
+  // Who created the original content (quote author, article writer, etc.)
+  sourceAuthor: z.string().trim().optional(),
+
   // User's personal note/annotation on the record.
   note: z.string().trim().optional(),
 

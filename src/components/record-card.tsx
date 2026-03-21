@@ -29,6 +29,7 @@ type RecordWithTags = {
   title: string | null;
   content: string;
   sourceUrl: string | null;
+  sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
   createdAt: Date;
@@ -129,6 +130,13 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
               <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">{preview}</p>
             )}
 
+            {/* Author attribution — styled as "— Author Name" for quotes */}
+            {record.sourceAuthor && (
+              <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                — {record.sourceAuthor}
+              </p>
+            )}
+
             {/* Source URL */}
             {record.sourceUrl && (
               <p className="mb-2 truncate text-xs text-blue-500 dark:text-blue-400">
@@ -209,6 +217,14 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           <div className="mb-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
             {record.content}
           </div>
+
+          {/* Author attribution */}
+          {record.sourceAuthor && (
+            <div className="mb-4">
+              <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">Author</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{record.sourceAuthor}</p>
+            </div>
+          )}
 
           {/* Source URL */}
           {record.sourceUrl && (

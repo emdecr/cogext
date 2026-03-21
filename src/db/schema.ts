@@ -113,6 +113,13 @@ export const records = pgTable("records", {
   // everything has a source (like a note you type yourself).
   sourceUrl: text("source_url"),
 
+  // Who created the original content. Useful for:
+  //   - Quotes: "Marcus Aurelius", "Maya Angelou"
+  //   - Articles: "Jane Smith", "The New York Times"
+  //   - Links: the author of the page
+  // Nullable because notes and images typically don't have an author.
+  sourceAuthor: text("source_author"),
+
   // Path to the image in object storage (local filesystem or S3/MinIO).
   // Nullable because only image-type records have this.
   imagePath: text("image_path"),

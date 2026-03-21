@@ -15,6 +15,13 @@
       "when": 1774124882038,
       "tag": "0001_glossy_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774126484391,
+      "tag": "0002_modern_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }
