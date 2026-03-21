@@ -43,10 +43,29 @@ export interface EmbeddingProvider {
 }
 
 // ============================================================================
+// CHAT MESSAGE
+// ============================================================================
+// Represents a single message in a conversation thread.
+// This mirrors the shape used by most LLM APIs (OpenAI, Anthropic, Ollama)
+// so any provider can map to its native format easily.
+//
+// Note: "system" messages are NOT part of this type. System prompts
+// (RAG context, user profile, instructions) are passed separately via
+// the `context` parameter on chat methods. This keeps the conversation
+// history clean and gives us explicit control over what context is injected.
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// ============================================================================
 // LLM PROVIDER
 // ============================================================================
 // A language model that can analyze content and generate structured output.
-// Used for auto-tagging and (later) conversations.
+// Split into two concerns:
+//   1. generateTags — structured output (JSON), used for auto-tagging
+//   2. chat / chatStream — conversational, used for the AI sidebar
 //
 // We keep this interface narrow on purpose — each method does ONE thing.
 // Adding new capabilities means adding new methods, not changing existing ones.
@@ -57,4 +76,35 @@ export interface LLMProvider {
   // The `type` parameter helps the LLM understand context
   // (a "quote" gets different tags than a "link").
   generateTags(content: string, type: string): Promise<string[]>;
+
+  // --------------------------------------------------------------------------
+  // CHAT METHODS (Phase 3)
+  // --------------------------------------------------------------------------
+  // Both methods take the same inputs:
+  //   - messages: the conversation history (user/assistant turns)
+  //   - context:  optional system prompt — this is where we inject RAG results,
+  //               the user's AI profile, and instructions. Kept separate from
+  //               messages so the caller controls what context the LLM sees.
+  //
+  // Why two methods instead of a "streaming" flag?
+  //   - Different return types (string vs AsyncGenerator) make the caller's
+  //     code cleaner — you know at the call site whether you're getting
+  //     a full response or a stream, no type-narrowing needed.
+  // --------------------------------------------------------------------------
+
+  // Get a complete response (waits for the full answer).
+  // Good for background tasks like profile generation where streaming
+  // doesn't help.
+  chat(messages: ChatMessage[], context?: string): Promise<string>;
+
+  // Get a streaming response, yielding text chunks as they arrive.
+  // AsyncGenerator is the simplest streaming primitive in JS:
+  //   for await (const chunk of provider.chatStream(messages)) {
+  //     process.stdout.write(chunk);  // each chunk is a few tokens
+  //   }
+  // No ReadableStream, no event emitters, no callbacks — just a for loop.
+  chatStream(
+    messages: ChatMessage[],
+    context?: string
+  ): AsyncGenerator<string, void, unknown>;
 }

@@ -105,4 +105,27 @@ Return ONLY a JSON object with a "tags" key containing an array of tag strings. 
       return [];
     }
   }
+
+  // ==========================================================================
+  // CHAT METHODS (interface compliance)
+  // ==========================================================================
+  // The Ollama provider is used for tagging, not chat. These methods exist
+  // to satisfy the LLMProvider interface. In our split setup, the factory
+  // routes chat calls to the Claude provider instead.
+  //
+  // If someone wanted to use Ollama for chat (e.g., with a larger local
+  // model like llama3.1:8b), they could flesh these out — the Ollama
+  // /api/chat endpoint supports multi-turn conversations and streaming.
+
+  async chat(): Promise<string> {
+    throw new Error(
+      "OllamaLLMProvider.chat() is not implemented. Use the Claude provider for chat."
+    );
+  }
+
+  async *chatStream(): AsyncGenerator<string, void, unknown> {
+    throw new Error(
+      "OllamaLLMProvider.chatStream() is not implemented. Use the Claude provider for chat."
+    );
+  }
 }
