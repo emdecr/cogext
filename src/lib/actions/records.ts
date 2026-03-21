@@ -33,6 +33,9 @@ import { eq, desc, and } from "drizzle-orm";
 import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
+import { embedRecord } from "@/lib/ai/embed-record";
+import { getLLMProvider } from "@/lib/ai";
+import { addTagToRecord } from "@/lib/actions/tags";
 import {
   createRecordSchema,
   updateRecordSchema,
@@ -130,7 +133,50 @@ export async function createRecord(
       })
       .returning();
 
-    // Step 4: Revalidate the dashboard
+    // Step 4: AI processing (async, non-blocking)
+    // We kick off embedding and auto-tagging in the background.
+    // These run AFTER we return success to the user — the record is
+    // already saved, so the user sees it immediately. The AI features
+    // enhance it asynchronously.
+    //
+    // We don't await these — they run as "fire and forget" promises.
+    // If they fail, the record still exists, it just won't have an
+    // embedding or AI tags. The errors are logged in each function.
+    //
+    // Why not await? Embedding takes 100-500ms, auto-tagging takes 1-5s.
+    // Making the user wait that long to see "Record saved" feels sluggish.
+
+    // Generate embedding for semantic search
+    embedRecord(created.id).catch((err) =>
+      console.error("Background embed failed:", err),
+    );
+
+    // Generate AI tags
+    (async () => {
+      try {
+        const llm = await getLLMProvider();
+        const aiTags = await llm.generateTags(
+          parsed.data.content,
+          parsed.data.type,
+        );
+
+        // Add each AI-generated tag to the record
+        // The `isAi: true` flag is set inside addTagToRecord when
+        // we add the tag creation logic there
+        await Promise.all(
+          aiTags.map((tagName) =>
+            addTagToRecord(created.id, tagName, true),
+          ),
+        );
+
+        // Revalidate again so AI tags appear
+        revalidatePath("/dashboard");
+      } catch (err) {
+        console.error("Background AI tagging failed:", err);
+      }
+    })();
+
+    // Step 5: Revalidate the dashboard
     // Next.js caches rendered pages. When we add a new record, the cached
     // dashboard is stale. revalidatePath() tells Next.js to re-render
     // the page on the next request so it includes the new record.

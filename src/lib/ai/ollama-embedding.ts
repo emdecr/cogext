@@ -33,8 +33,8 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions = 768;
 
   constructor() {
-    this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    this.model = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+    this.baseUrl = process.env.AI_BASE_URL || "http://localhost:11434";
+    this.model = process.env.EMBED_MODEL || "nomic-embed-text";
   }
 
   // ---- Single text embedding ----

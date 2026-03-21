@@ -8,6 +8,13 @@
       "when": 1773796489607,
       "tag": "0000_petite_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774124882038,
+      "tag": "0001_glossy_namor",
+      "breakpoints": true
     }
   ]
 }

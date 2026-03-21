@@ -28,8 +28,8 @@ export class OllamaLLMProvider implements LLMProvider {
   private model: string;
 
   constructor() {
-    this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    this.model = process.env.OLLAMA_LLM_MODEL || "llama3.2:1b";
+    this.baseUrl = process.env.AI_BASE_URL || "http://localhost:11434";
+    this.model = process.env.LLM_MODEL || "llama3.2:1b";
   }
 
   // ---- Generate tags for a record ----

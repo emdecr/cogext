@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 CREATE TYPE "public"."message_role" AS ENUM('user', 'assistant');--> statement-breakpoint
 CREATE TYPE "public"."record_type" AS ENUM('image', 'quote', 'article', 'link', 'note');--> statement-breakpoint
 CREATE TYPE "public"."scope_type" AS ENUM('all', 'collection', 'tag', 'date_range');--> statement-breakpoint

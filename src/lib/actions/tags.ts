@@ -42,7 +42,11 @@ async function requireUserId(): Promise<string> {
 // Returns the tag object so the UI can immediately show it without
 // waiting for a full page refresh.
 
-export async function addTagToRecord(recordId: string, tagName: string) {
+export async function addTagToRecord(
+  recordId: string,
+  tagName: string,
+  isAi: boolean = false,
+) {
   const userId = await requireUserId();
 
   // Normalize the tag name: lowercase, trimmed, no extra spaces.
@@ -75,7 +79,7 @@ export async function addTagToRecord(recordId: string, tagName: string) {
       // so we don't need a separate SELECT query.
       const [newTag] = await db
         .insert(tags)
-        .values({ name: normalized, isAi: false })
+        .values({ name: normalized, isAi })
         .returning();
       tag = newTag;
     }
