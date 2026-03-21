@@ -165,12 +165,9 @@ export async function createRecord(
         // we add the tag creation logic there
         await Promise.all(
           aiTags.map((tagName) =>
-            addTagToRecord(created.id, tagName, true),
+            addTagToRecord(created.id, tagName, true, true),
           ),
         );
-
-        // Revalidate again so AI tags appear
-        revalidatePath("/dashboard");
       } catch (err) {
         console.error("Background AI tagging failed:", err);
       }

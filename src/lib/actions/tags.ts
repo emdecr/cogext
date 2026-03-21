@@ -46,6 +46,11 @@ export async function addTagToRecord(
   recordId: string,
   tagName: string,
   isAi: boolean = false,
+  // Skip revalidation when called from background async contexts
+  // (e.g., AI auto-tagging). Next.js only allows revalidatePath
+  // during the original server action request — calling it from a
+  // detached promise throws an error.
+  skipRevalidate: boolean = false,
 ) {
   const userId = await requireUserId();
 
@@ -93,7 +98,9 @@ export async function addTagToRecord(
       .values({ recordId, tagId: tag.id })
       .onConflictDoNothing();
 
-    revalidatePath("/dashboard");
+    if (!skipRevalidate) {
+      revalidatePath("/dashboard");
+    }
 
     return { success: true, tag };
   } catch (error) {
