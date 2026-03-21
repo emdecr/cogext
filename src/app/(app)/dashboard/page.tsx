@@ -27,7 +27,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import CreateRecordForm from "@/components/create-record-form";
-import RecordCard from "@/components/record-card";
+import RecordGrid from "@/components/record-grid";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -89,37 +89,11 @@ export default async function DashboardPage() {
           <CreateRecordForm />
         </div>
 
-        {/* ---- Records Grid ---- */}
-        {records.length === 0 ? (
-          // Empty state — shown when user has no records yet
-          <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center text-gray-500">
-            <p className="text-lg">No records yet</p>
-            <p className="mt-2 text-sm">
-              Click the + button to save your first note, quote, link, or
-              article.
-            </p>
-          </div>
-        ) : (
-          // Masonry layout using CSS columns.
-          //
-          // How CSS columns work:
-          //   - `columns-1 sm:columns-2 lg:columns-3` sets the number of
-          //     columns at different breakpoints (responsive).
-          //   - Content flows top-to-bottom in the first column, then
-          //     top-to-bottom in the second, etc. — like newspaper columns.
-          //   - Each card takes its natural height, so short cards pack
-          //     tightly next to tall ones (the masonry effect).
-          //
-          // `gap-4` sets spacing between columns.
-          // Each card gets `break-inside-avoid` to prevent a card from
-          // being split across two columns, and `mb-4` for vertical spacing
-          // (CSS columns don't have a row-gap, so we use margin instead).
-          <div className="mt-8 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
-            {records.map((record) => (
-              <RecordCard key={record.id} record={record} />
-            ))}
-          </div>
-        )}
+        {/* ---- Filter Bar + Records Grid ---- */}
+        {/* RecordGrid is a client component that handles filtering
+            and rendering. The dashboard passes all records down,
+            and RecordGrid filters them in the browser. */}
+        <RecordGrid records={records} />
       </div>
     </div>
   );
