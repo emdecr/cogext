@@ -30,6 +30,7 @@ import CreateRecordForm from "@/components/create-record-form";
 import RecordGrid from "@/components/record-grid";
 import ThemeToggle from "@/components/theme-toggle";
 import CommandPalette from "@/components/command-palette";
+import ChatToggle from "@/components/chat-toggle";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -72,6 +73,9 @@ export default async function DashboardPage() {
             </span>
 
             <ThemeToggle />
+
+            {/* AI Chat — opens the conversation sidebar */}
+            <ChatToggle />
 
             {/* Logout — using a server action inline */}
             <form
