@@ -1,0 +1,422 @@
+// ============================================================================
+// CHAT API ROUTE — RAG PIPELINE
+// ============================================================================
+//
+// POST /api/chat
+//
+// This is the heart of Phase 3: the Retrieval-Augmented Generation (RAG)
+// pipeline. It connects the user's question to their saved records via AI.
+//
+// RAG in plain English:
+//   Instead of asking the AI to answer from its own knowledge, we first
+//   SEARCH the user's records for relevant content, then GIVE that content
+//   to the AI as context, and ask it to answer BASED ON that content.
+//   This means the AI's answers are grounded in the user's actual data.
+//
+// The full flow:
+//   1. User sends a message from the chat sidebar
+//   2. We authenticate the request and load the conversation
+//   3. RETRIEVE: embed the question → semantic search for relevant records
+//   4. AUGMENT: build a system prompt with the retrieved records as context
+//   5. GENERATE: send conversation history + context to Claude
+//   6. STREAM: pipe Claude's response back to the client chunk by chunk
+//
+// Why an API route instead of a server action?
+//   Server actions return a single value when done. They can't stream.
+//   We need to send chunks of text as Claude generates them, which requires
+//   a real HTTP response stream. API routes give us that control.
+//
+// The response is a ReadableStream of plain text — no JSON, no SSE framing,
+// just raw text chunks. The client reads them with response.body.getReader().
+// ============================================================================
+
+import { NextRequest } from "next/server";
+import { eq, and, sql, isNotNull, desc } from "drizzle-orm";
+
+import { db } from "@/db";
+import { records, conversations, messages, recordTags, tags } from "@/db/schema";
+import { getSession } from "@/lib/auth/session";
+import { getEmbeddingProvider, getChatProvider } from "@/lib/ai";
+import type { ChatMessage } from "@/lib/ai/types";
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// How many records to retrieve for context. More = more context for the AI
+// but also more tokens (cost) and potential for confusion. 5-8 is the sweet
+// spot for a personal knowledge base.
+const TOP_K_RECORDS = 6;
+
+// Maximum characters of content to include per record in the context.
+// Long articles would blow up the context window if included in full.
+// 800 chars is roughly 200 tokens — enough to capture the key idea.
+const MAX_CONTENT_LENGTH = 800;
+
+// Maximum conversation history messages to include.
+// Including the full history of a 100-message conversation would be
+// wasteful. The most recent messages give the AI enough conversational
+// context. Older context is captured in the AI's own earlier responses.
+const MAX_HISTORY_MESSAGES = 20;
+
+// ============================================================================
+// POST HANDLER
+// ============================================================================
+
+export async function POST(request: NextRequest) {
+  // ---- Step 1: Auth check ----
+  const session = await getSession();
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const userId = session.userId;
+
+  // ---- Step 2: Parse and validate the request body ----
+  let conversationId: string;
+  let message: string;
+
+  try {
+    const body = await request.json();
+    conversationId = body.conversationId;
+    message = body.message?.trim();
+
+    if (!conversationId || !message) {
+      return new Response(
+        JSON.stringify({ error: "conversationId and message are required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ---- Step 3: Verify conversation ownership ----
+  const conversation = await db.query.conversations.findFirst({
+    where: and(
+      eq(conversations.id, conversationId),
+      eq(conversations.userId, userId)
+    ),
+  });
+
+  if (!conversation) {
+    return new Response(
+      JSON.stringify({ error: "Conversation not found" }),
+      { status: 404, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // ---- Step 4: Load conversation history ----
+  // We need the recent messages to give the AI conversational context.
+  // Without this, every message would be treated independently — the AI
+  // wouldn't know what "it" refers to in "tell me more about it."
+  const recentMessages = await db
+    .select({
+      role: messages.role,
+      content: messages.content,
+    })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.createdAt))
+    .limit(MAX_HISTORY_MESSAGES);
+
+  // Reverse because we fetched DESC (newest first) but need chronological
+  // order for the AI to follow the conversation naturally.
+  const history: ChatMessage[] = recentMessages.reverse().map((msg) => ({
+    role: msg.role,
+    content: msg.content,
+  }));
+
+  // Add the current user message to the history
+  history.push({ role: "user", content: message });
+
+  // ---- Step 5: RETRIEVE — find relevant records ----
+  // This is the "R" in RAG. We embed the user's question and find
+  // records with similar embeddings (= similar meaning).
+  const relevantRecords = await retrieveRelevantRecords(
+    userId,
+    message,
+    conversation.scope,
+    conversation.scopeValue
+  );
+
+  // ---- Step 6: AUGMENT — build the system prompt with context ----
+  // This is the "A" in RAG. We format the retrieved records into a
+  // structured context block and prepend it to the system prompt.
+  const systemPrompt = buildSystemPrompt(relevantRecords);
+
+  // ---- Step 7: GENERATE + STREAM — call Claude and pipe the response ----
+  // This is the "G" in RAG. We send everything to Claude and stream
+  // the response back to the client.
+  try {
+    const chatProvider = await getChatProvider();
+
+    // Convert the AsyncGenerator from chatStream() into a ReadableStream
+    // that the HTTP response can send to the browser.
+    //
+    // Why the conversion? The provider returns an AsyncGenerator (simplest
+    // streaming primitive), but HTTP responses need a ReadableStream
+    // (browser API). This bridge is where the two meet.
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const encoder = new TextEncoder();
+
+          // Consume the AsyncGenerator chunk by chunk.
+          // Each chunk is a few tokens of text from Claude.
+          // We encode it to bytes and enqueue it into the stream.
+          for await (const chunk of chatProvider.chatStream(
+            history,
+            systemPrompt
+          )) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+
+          // Signal that we're done streaming
+          controller.close();
+        } catch (error) {
+          console.error("Streaming error:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    // Return the stream as the response body.
+    // Content-Type is text/plain because we're sending raw text, not JSON.
+    // The client reads this with response.body.getReader().
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        // Disable response buffering. Without this, some proxies (nginx,
+        // Cloudflare) might buffer the entire response before sending it,
+        // defeating the purpose of streaming.
+        "Cache-Control": "no-cache",
+        "Transfer-Encoding": "chunked",
+      },
+    });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to generate response" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// ============================================================================
+// RETRIEVE RELEVANT RECORDS
+// ============================================================================
+// Embeds the user's question and finds the most semantically similar records.
+// Optionally scoped to a specific collection, tag, or date range.
+//
+// This is similar to the semantic search in search.ts, but:
+//   1. Returns full record data (not just IDs + scores)
+//   2. Supports conversation scoping (collection/tag/date_range)
+//   3. Includes tags for each record (useful for the system prompt)
+
+async function retrieveRelevantRecords(
+  userId: string,
+  query: string,
+  scope: string,
+  scopeValue: string | null
+): Promise<RetrievedRecord[]> {
+  try {
+    // Step 1: Embed the user's question
+    const embeddingProvider = await getEmbeddingProvider();
+    const queryEmbedding = await embeddingProvider.embed(query);
+    const embeddingStr = `[${queryEmbedding.join(",")}]`;
+
+    // Step 2: Build the WHERE clause based on scope
+    // Start with the base conditions (ownership + has embedding)
+    const conditions = [
+      eq(records.userId, userId),
+      isNotNull(records.embedding),
+    ];
+
+    // Add scope-specific filtering
+    // These narrow the search to only the records the user cares about
+    // in this conversation.
+    if (scope === "tag" && scopeValue) {
+      // Scope to records with a specific tag.
+      // This requires joining through the record_tags table.
+      // We use a subquery: "records whose ID is in the set of record_ids
+      // that have this tag."
+      conditions.push(
+        sql`${records.id} IN (
+          SELECT rt.record_id FROM record_tags rt
+          JOIN tags t ON rt.tag_id = t.id
+          WHERE t.name = ${scopeValue}
+        )`
+      );
+    } else if (scope === "collection" && scopeValue) {
+      // Scope to records in a specific collection.
+      conditions.push(
+        sql`${records.id} IN (
+          SELECT cr.record_id FROM collection_records cr
+          WHERE cr.collection_id = ${scopeValue}
+        )`
+      );
+    } else if (scope === "date_range" && scopeValue) {
+      // Scope to records within a date range.
+      // Expected format: "2026-01-01,2026-03-01"
+      const [start, end] = scopeValue.split(",");
+      if (start && end) {
+        conditions.push(
+          sql`${records.createdAt} >= ${start}::timestamptz`,
+          sql`${records.createdAt} <= ${end}::timestamptz`
+        );
+      }
+    }
+    // scope === "all" → no additional filtering
+
+    // Step 3: Run the cosine similarity search
+    const results = await db
+      .select({
+        id: records.id,
+        type: records.type,
+        title: records.title,
+        content: records.content,
+        sourceAuthor: records.sourceAuthor,
+        sourceUrl: records.sourceUrl,
+        note: records.note,
+        createdAt: records.createdAt,
+        score: sql<number>`1 - (${records.embedding} <=> ${embeddingStr}::vector)`,
+      })
+      .from(records)
+      .where(and(...conditions))
+      .orderBy(sql`${records.embedding} <=> ${embeddingStr}::vector`)
+      .limit(TOP_K_RECORDS);
+
+    // Step 4: Fetch tags for each retrieved record
+    // We do this in a separate query rather than a JOIN because the
+    // main query already has a complex WHERE clause + ORDER BY.
+    // For 6 records, this is fast.
+    const recordIds = results.map((r) => r.id);
+
+    if (recordIds.length === 0) return [];
+
+    const recordTagRows = await db
+      .select({
+        recordId: recordTags.recordId,
+        tagName: tags.name,
+      })
+      .from(recordTags)
+      .innerJoin(tags, eq(recordTags.tagId, tags.id))
+      .where(
+        sql`${recordTags.recordId} IN (${sql.join(
+          recordIds.map((id) => sql`${id}`),
+          sql`, `
+        )})`
+      );
+
+    // Group tags by record ID
+    const tagsByRecord = new Map<string, string[]>();
+    for (const row of recordTagRows) {
+      const existing = tagsByRecord.get(row.recordId) || [];
+      existing.push(row.tagName);
+      tagsByRecord.set(row.recordId, existing);
+    }
+
+    // Combine record data with tags
+    return results.map((record) => ({
+      ...record,
+      tags: tagsByRecord.get(record.id) || [],
+    }));
+  } catch (error) {
+    console.error("Record retrieval failed:", error);
+    return [];
+  }
+}
+
+// Type for a record retrieved for RAG context
+type RetrievedRecord = {
+  id: string;
+  type: string;
+  title: string | null;
+  content: string;
+  sourceAuthor: string | null;
+  sourceUrl: string | null;
+  note: string | null;
+  createdAt: Date;
+  score: number;
+  tags: string[];
+};
+
+// ============================================================================
+// BUILD SYSTEM PROMPT
+// ============================================================================
+// Constructs the system prompt that tells Claude:
+//   1. What it is (a knowledge base assistant)
+//   2. What records it has access to (the retrieved context)
+//   3. How to behave (cite sources, stay grounded, admit uncertainty)
+//
+// This is where the "Augmented" in RAG happens — we augment the AI's
+// knowledge with the user's actual data.
+
+function buildSystemPrompt(relevantRecords: RetrievedRecord[]): string {
+  // Start with the base instructions
+  let prompt = `You are a helpful assistant for a personal knowledge base called "Brain Extension." The user saves records (notes, quotes, articles, links, images) and you help them find connections, answer questions, and explore their saved content.
+
+IMPORTANT RULES:
+- Base your answers on the retrieved records provided below. These are the user's own saved content.
+- When referencing a specific record, mention its title or a brief description so the user knows which one you mean.
+- If the retrieved records don't contain enough information to answer the question, say so honestly. Don't make things up.
+- Be conversational but concise. The user is chatting, not reading an essay.
+- You can make connections between records that the user might not have noticed — that's one of your key values.`;
+
+  // Add the retrieved records as context
+  if (relevantRecords.length > 0) {
+    prompt += `\n\n--- RETRIEVED RECORDS ---\n`;
+    prompt += `The following records from the user's knowledge base are most relevant to their question:\n\n`;
+
+    relevantRecords.forEach((record, index) => {
+      // Truncate long content to stay within token budget.
+      // We keep enough to capture the main idea without blowing
+      // up the context window (and the API bill).
+      const truncatedContent =
+        record.content.length > MAX_CONTENT_LENGTH
+          ? record.content.slice(0, MAX_CONTENT_LENGTH) + "..."
+          : record.content;
+
+      prompt += `[Record ${index + 1}]\n`;
+      prompt += `Type: ${record.type}\n`;
+
+      if (record.title) {
+        prompt += `Title: ${record.title}\n`;
+      }
+
+      prompt += `Content: ${truncatedContent}\n`;
+
+      if (record.sourceAuthor) {
+        prompt += `Author: ${record.sourceAuthor}\n`;
+      }
+
+      if (record.sourceUrl) {
+        prompt += `Source: ${record.sourceUrl}\n`;
+      }
+
+      if (record.note) {
+        prompt += `User's note: ${record.note}\n`;
+      }
+
+      if (record.tags.length > 0) {
+        prompt += `Tags: ${record.tags.join(", ")}\n`;
+      }
+
+      prompt += `Saved: ${record.createdAt.toLocaleDateString()}\n`;
+      prompt += `\n`;
+    });
+
+    prompt += `--- END RETRIEVED RECORDS ---`;
+  } else {
+    prompt += `\n\nNo relevant records were found for this question. Let the user know and suggest they try rephrasing or that the answer might not be in their saved content.`;
+  }
+
+  return prompt;
+}
