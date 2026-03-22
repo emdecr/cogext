@@ -31,7 +31,7 @@ import { redirect } from "next/navigation";
 import { eq, desc, and } from "drizzle-orm";
 
 import { db } from "@/db";
-import { records } from "@/db/schema";
+import { records, recordTags, collectionRecords } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { getLLMProvider } from "@/lib/ai";
@@ -338,6 +338,16 @@ export async function deleteRecord(id: string): Promise<ActionResult> {
   }
 
   try {
+    // Delete join table rows first — Postgres enforces foreign keys,
+    // so we can't delete the record while record_tags or
+    // collection_records still reference it.
+    await db
+      .delete(recordTags)
+      .where(eq(recordTags.recordId, parsed.data.id));
+    await db
+      .delete(collectionRecords)
+      .where(eq(collectionRecords.recordId, parsed.data.id));
+
     const result = await db
       .delete(records)
       .where(and(eq(records.id, parsed.data.id), eq(records.userId, userId)))
