@@ -302,13 +302,24 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
                 </div>
               )}
 
-              {/* Conversation list */}
+              {/* Conversation list — each row is a <div role="button"> rather
+                  than a <button> because it contains a nested delete button.
+                  HTML forbids <button> inside <button> (causes hydration errors).
+                  tabIndex + onKeyDown preserve keyboard accessibility. */}
               {!isLoading &&
                 conversationList.map((convo) => (
-                  <button
+                  <div
                     key={convo.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openConversation(convo.id)}
-                    className="group flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openConversation(convo.id);
+                      }
+                    }}
+                    className="group flex w-full cursor-pointer items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
                   >
                     {/* Chat bubble icon */}
                     <svg
@@ -372,7 +383,7 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
                         </span>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
             </div>
           )}
