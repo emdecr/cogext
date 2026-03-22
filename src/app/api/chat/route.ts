@@ -17,9 +17,10 @@
 //   1. User sends a message from the chat sidebar
 //   2. We authenticate the request and load the conversation
 //   3. RETRIEVE: embed the question → semantic search for relevant records
-//   4. AUGMENT: build a system prompt with the retrieved records as context
-//   5. GENERATE: send conversation history + context to Claude
-//   6. STREAM: pipe Claude's response back to the client chunk by chunk
+//   4. LOAD: fetch the user's AI profile (interests, patterns)
+//   5. AUGMENT: build a system prompt with profile + retrieved records
+//   6. GENERATE: send conversation history + context to Claude
+//   7. STREAM: pipe Claude's response back to the client chunk by chunk
 //
 // Why an API route instead of a server action?
 //   Server actions return a single value when done. They can't stream.
@@ -38,6 +39,7 @@ import { records, conversations, messages, recordTags, tags } from "@/db/schema"
 import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider, getChatProvider } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/ai/types";
+import { getProfile, type UserProfile } from "@/lib/ai/profile";
 
 // ============================================================================
 // CONFIGURATION
@@ -112,19 +114,37 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ---- Step 4: Load conversation history ----
-  // We need the recent messages to give the AI conversational context.
-  // Without this, every message would be treated independently — the AI
-  // wouldn't know what "it" refers to in "tell me more about it."
-  const recentMessages = await db
-    .select({
-      role: messages.role,
-      content: messages.content,
-    })
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(desc(messages.createdAt))
-    .limit(MAX_HISTORY_MESSAGES);
+  // ---- Step 4: Load conversation history, relevant records, and profile ----
+  // Three independent data fetches — run them all in parallel.
+  // Each takes ~50-200ms, so parallel = ~200ms vs sequential = ~600ms.
+  const [recentMessages, relevantRecords, userProfile] = await Promise.all([
+    // Conversation history: recent messages for conversational context.
+    // Without this, every message would be treated independently — the AI
+    // wouldn't know what "it" refers to in "tell me more about it."
+    db
+      .select({
+        role: messages.role,
+        content: messages.content,
+      })
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(MAX_HISTORY_MESSAGES),
+
+    // RETRIEVE: embed the question → semantic search for relevant records.
+    // This is the "R" in RAG.
+    retrieveRelevantRecords(
+      userId,
+      message,
+      conversation.scope,
+      conversation.scopeValue
+    ),
+
+    // User profile: the AI's pre-built understanding of who this user is.
+    // Loaded in parallel — if no profile exists yet, returns null and
+    // the system prompt just won't include it. No blocking.
+    getProfile(userId),
+  ]);
 
   // Reverse because we fetched DESC (newest first) but need chronological
   // order for the AI to follow the conversation naturally.
@@ -136,22 +156,17 @@ export async function POST(request: NextRequest) {
   // Add the current user message to the history
   history.push({ role: "user", content: message });
 
-  // ---- Step 5: RETRIEVE — find relevant records ----
-  // This is the "R" in RAG. We embed the user's question and find
-  // records with similar embeddings (= similar meaning).
-  const relevantRecords = await retrieveRelevantRecords(
-    userId,
-    message,
-    conversation.scope,
-    conversation.scopeValue
-  );
+  // ---- Step 5: AUGMENT — build the system prompt with context ----
+  // This is the "A" in RAG. We combine three layers of context:
+  //   1. Base instructions (what the AI is, how to behave)
+  //   2. User profile (who they are, what they care about)
+  //   3. Retrieved records (specific content relevant to this question)
+  //
+  // The profile gives the AI the "forest" (broad understanding),
+  // while retrieved records give it the "trees" (specific details).
+  const systemPrompt = buildSystemPrompt(relevantRecords, userProfile);
 
-  // ---- Step 6: AUGMENT — build the system prompt with context ----
-  // This is the "A" in RAG. We format the retrieved records into a
-  // structured context block and prepend it to the system prompt.
-  const systemPrompt = buildSystemPrompt(relevantRecords);
-
-  // ---- Step 7: GENERATE + STREAM — call Claude and pipe the response ----
+  // ---- Step 6: GENERATE + STREAM — call Claude and pipe the response ----
   // This is the "G" in RAG. We send everything to Claude and stream
   // the response back to the client.
   try {
@@ -353,13 +368,24 @@ type RetrievedRecord = {
 // ============================================================================
 // Constructs the system prompt that tells Claude:
 //   1. What it is (a knowledge base assistant)
-//   2. What records it has access to (the retrieved context)
-//   3. How to behave (cite sources, stay grounded, admit uncertainty)
+//   2. Who the user is (from the AI profile — interests, patterns)
+//   3. What records it has access to (the retrieved context)
+//   4. How to behave (cite sources, stay grounded, admit uncertainty)
 //
-// This is where the "Augmented" in RAG happens — we augment the AI's
-// knowledge with the user's actual data.
+// The prompt has three layers, from broadest to most specific:
+//   - Base instructions: always the same
+//   - User profile: stable background knowledge (regenerated periodically)
+//   - Retrieved records: specific to THIS question (changes every message)
+//
+// This layering is intentional. The profile is ~200-500 tokens and stays
+// the same across a conversation. The retrieved records change per message
+// but are capped at ~1200 tokens (6 records × 200 tokens). Together,
+// the full system prompt stays under ~2000 tokens — efficient and focused.
 
-function buildSystemPrompt(relevantRecords: RetrievedRecord[]): string {
+function buildSystemPrompt(
+  relevantRecords: RetrievedRecord[],
+  userProfile: UserProfile | null
+): string {
   // Start with the base instructions
   let prompt = `You are a helpful assistant for a personal knowledge base called "Brain Extension." The user saves records (notes, quotes, articles, links, images) and you help them find connections, answer questions, and explore their saved content.
 
@@ -370,6 +396,43 @@ IMPORTANT RULES:
 - Be conversational but concise. The user is chatting, not reading an essay.
 - You can make connections between records that the user might not have noticed — that's one of your key values.`;
 
+  // ---- Layer 2: User profile ----
+  // If we have a profile, include it so the AI "knows" the user.
+  // This helps in several ways:
+  //   - More relevant follow-up questions ("Since you're into X, have you considered...")
+  //   - Better connection-making (links retrieved records to known interests)
+  //   - More natural tone (doesn't treat every question as if from a stranger)
+  //
+  // The profile is optional — conversations work fine without it,
+  // they're just less personalized.
+  if (userProfile && userProfile.topInterests.length > 0) {
+    prompt += `\n\n--- USER PROFILE ---\n`;
+    prompt += `${userProfile.summary}\n\n`;
+    prompt += `Key interests: ${userProfile.topInterests.join(", ")}\n`;
+
+    if (userProfile.patterns.length > 0) {
+      prompt += `\nPatterns noticed in their saved content:\n`;
+      userProfile.patterns.forEach((pattern) => {
+        prompt += `- ${pattern}\n`;
+      });
+    }
+
+    // Include content breakdown so the AI knows the user's saving habits
+    const breakdownParts = Object.entries(userProfile.contentBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .map(([type, count]) => `${count} ${type}s`);
+
+    if (breakdownParts.length > 0) {
+      prompt += `\nSaved content: ${breakdownParts.join(", ")} (${userProfile.recordCount} total)\n`;
+    }
+
+    prompt += `--- END USER PROFILE ---`;
+
+    // Remind the AI how to use the profile
+    prompt += `\n\nUse this profile as background context. Don't explicitly say "according to your profile" — just let it naturally inform your responses.`;
+  }
+
+  // ---- Layer 3: Retrieved records ----
   // Add the retrieved records as context
   if (relevantRecords.length > 0) {
     prompt += `\n\n--- RETRIEVED RECORDS ---\n`;
