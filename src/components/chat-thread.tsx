@@ -26,6 +26,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Markdown from "react-markdown";
 import {
   addMessage,
   type ConversationWithMessages,
@@ -281,6 +282,9 @@ export default function ChatThread({
 // Renders a single message. User messages are right-aligned with a dark
 // background; assistant messages are left-aligned with a light background.
 // This mirrors familiar chat app patterns (iMessage, WhatsApp, etc.).
+//
+// Assistant messages use react-markdown to render formatted responses.
+// User messages stay as plain text — you typed it, no need to parse it.
 
 function MessageBubble({
   role,
@@ -304,9 +308,18 @@ function MessageBubble({
               "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
         }`}
       >
-        {/* Render content with preserved whitespace (for multi-line messages).
-            whitespace-pre-wrap keeps newlines and wraps long lines. */}
-        <p className="whitespace-pre-wrap">{content}</p>
+        {isUser ? (
+          // User messages: plain text with whitespace preserved
+          <p className="whitespace-pre-wrap">{content}</p>
+        ) : (
+          // Assistant messages: render markdown so bold, lists, code, etc.
+          // show up formatted. The `prose` class from Tailwind Typography
+          // gives us sensible defaults for all HTML elements markdown produces.
+          // We constrain it with prose-sm and max-w-none so it fits the bubble.
+          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <Markdown>{content}</Markdown>
+          </div>
+        )}
 
         {/* Streaming indicator — a blinking cursor after the text */}
         {isStreaming && (
