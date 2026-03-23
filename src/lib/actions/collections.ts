@@ -19,6 +19,7 @@
 //   - deleteCollection(id)                      → delete collection + join rows
 //   - addRecordToCollection(collectionId, recordId)    → link a record
 //   - removeRecordFromCollection(collectionId, recordId) → unlink a record
+//   - reorderCollectionRecords(collectionId, orderedRecordIds) → update positions
 // ============================================================================
 
 "use server";
@@ -520,5 +521,63 @@ export async function removeRecordFromCollection(
       success: false,
       error: "Failed to remove record from collection.",
     };
+  }
+}
+
+// ============================================================================
+// REORDER RECORDS IN COLLECTION
+// ============================================================================
+// Updates the position of every record in a collection based on the new order.
+// Called after a drag-and-drop reorder.
+//
+// We receive the full list of record IDs in their new order and assign
+// fresh positions with gaps of 10. This is simpler than calculating a
+// single insertion point, and since it only runs on user-initiated reorder
+// (not high-frequency), the extra updates are fine.
+//
+// Why gaps of 10? So future single-item insertions (addRecordToCollection)
+// can slot in between without a full renumber. But after a reorder we
+// renumber everything cleanly anyway.
+
+export async function reorderCollectionRecords(
+  collectionId: string,
+  orderedRecordIds: string[]
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+
+  // Verify the collection belongs to this user.
+  const collection = await db.query.collections.findFirst({
+    where: and(
+      eq(collections.id, collectionId),
+      eq(collections.userId, userId)
+    ),
+  });
+
+  if (!collection) {
+    return { success: false, error: "Collection not found." };
+  }
+
+  try {
+    // Update each record's position. Position = index * 10.
+    // We run these in parallel since they're independent updates.
+    await Promise.all(
+      orderedRecordIds.map((recordId, index) =>
+        db
+          .update(collectionRecords)
+          .set({ position: index * 10 })
+          .where(
+            and(
+              eq(collectionRecords.collectionId, collectionId),
+              eq(collectionRecords.recordId, recordId)
+            )
+          )
+      )
+    );
+
+    revalidatePath(`/collections/${collectionId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to reorder collection records:", error);
+    return { success: false, error: "Failed to reorder records." };
   }
 }

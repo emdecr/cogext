@@ -19,7 +19,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { getCollection } from "@/lib/actions/collections";
 import CollectionHeader from "./collection-header";
-import CollectionRecordCard from "./collection-record-card";
+import SortableRecordGrid from "./sortable-record-grid";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -64,15 +64,13 @@ export default async function CollectionDetailPage({ params }: Props) {
             </p>
           </div>
         ) : (
-          <div className="mt-6 columns-1 gap-3 sm:columns-2 sm:gap-4 lg:columns-3 xl:columns-4">
-            {collection.records.map((record) => (
-              <CollectionRecordCard
-                key={record.id}
-                record={record}
-                collectionId={collection.id}
-              />
-            ))}
-          </div>
+          /* SortableRecordGrid is a client component that wraps each card
+             with dnd-kit's sortable hooks. It manages local order state
+             and persists reorder via server action on drop. */
+          <SortableRecordGrid
+            collectionId={collection.id}
+            initialRecords={collection.records}
+          />
         )}
       </div>
     </div>
