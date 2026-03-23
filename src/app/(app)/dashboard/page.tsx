@@ -35,6 +35,7 @@ import ChatToggle from "@/components/chat-toggle";
 import ReflectionIndicator from "@/components/reflection-indicator";
 import { getReflections } from "@/lib/actions/reflections";
 import { getCollections } from "@/lib/actions/collections";
+import KeyboardShortcuts from "@/components/keyboard-shortcuts";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -74,10 +75,17 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Search hint */}
-            <kbd className="hidden rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-400 sm:inline-block dark:border-gray-700">
-              ⌘K to search
-            </kbd>
+            {/* Keyboard shortcut hints */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <kbd className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-400 dark:border-gray-700">
+                ⌘K
+              </kbd>
+              <span className="text-xs text-gray-400">search</span>
+              <kbd className="ml-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-400 dark:border-gray-700">
+                N
+              </kbd>
+              <span className="text-xs text-gray-400">new</span>
+            </div>
 
             {/* Record count */}
             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -134,6 +142,11 @@ export default async function DashboardPage() {
             </form>
           </div>
         </div>
+
+        {/* ---- Keyboard Shortcuts ---- */}
+        {/* Mounts the global shortcut listener. Renders nothing.
+            N → open create form, Esc → close open panels. */}
+        <KeyboardShortcuts />
 
         {/* ---- Command Palette (⌘K) ---- */}
         {/* Always mounted but hidden until ⌘K is pressed.

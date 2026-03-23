@@ -54,28 +54,26 @@ export default function ReflectionIndicator({ unreadReflections }: Props) {
       {/* ---- Trigger: sparkle icon with optional notification dot ---- */}
       <Popover.Trigger asChild>
         <button
-          className="relative rounded-md bg-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          className="relative flex h-9 items-center rounded-md bg-gray-200 px-3 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           title={
             hasUnread
               ? `${unreadReflections.length} new reflection${unreadReflections.length > 1 ? "s" : ""}`
               : "Weekly reflections"
           }
         >
-          {/* Sparkle icon (inline SVG — matches the project's pattern) */}
+          {/* Lightbulb icon — represents insights and reflections */}
           <svg
             className="h-4 w-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            {/* A 4-point sparkle shape */}
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 3v1.5M12 19.5V21M4.22 4.22l1.06 1.06M17.72 17.72l1.06 1.06M3 12h1.5M19.5 12H21M4.22 19.78l1.06-1.06M17.72 6.28l1.06-1.06"
+              d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
             />
-            <circle cx="12" cy="12" r="3" strokeWidth={2} />
           </svg>
 
           {/* Notification dot — only visible when there are unread reflections.

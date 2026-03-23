@@ -18,7 +18,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createRecord } from "@/lib/actions/records";
 import { addTagToRecord } from "@/lib/actions/tags";
 import { RECORD_TYPES } from "@/lib/validations/records";
@@ -64,6 +64,30 @@ export default function CreateRecordForm() {
 
   // Controls whether the form is expanded/visible
   const [isOpen, setIsOpen] = useState(false);
+
+  // ---- Keyboard shortcut listeners ----
+  // Listen for custom events dispatched by the global keyboard shortcuts hook.
+  // "N" opens the form, "Esc" closes it.
+  useEffect(() => {
+    function handleNewRecord() {
+      setIsOpen(true);
+    }
+    function handleClose() {
+      // Only close if the form is open — don't interfere with other
+      // components that also listen for Esc (command palette, modals, etc.)
+      setIsOpen((prev) => {
+        if (prev) return false;
+        return prev; // No change if already closed
+      });
+    }
+
+    window.addEventListener("shortcut:new-record", handleNewRecord);
+    window.addEventListener("shortcut:close", handleClose);
+    return () => {
+      window.removeEventListener("shortcut:new-record", handleNewRecord);
+      window.removeEventListener("shortcut:close", handleClose);
+    };
+  }, []);
 
   // ---- Image handling ----
   // When the user selects a file, we:
