@@ -31,6 +31,8 @@ import RecordGrid from "@/components/record-grid";
 import ThemeToggle from "@/components/theme-toggle";
 import CommandPalette from "@/components/command-palette";
 import ChatToggle from "@/components/chat-toggle";
+import ReflectionIndicator from "@/components/reflection-indicator";
+import { getReflections } from "@/lib/actions/reflections";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -40,12 +42,19 @@ export default async function DashboardPage() {
   // Fetch user and records in parallel using Promise.all.
   // This runs both queries at the same time instead of one after the other.
   // If each takes 50ms, sequential = 100ms, parallel = ~50ms.
-  const [user, records] = await Promise.all([
+  // Fetch user, records, and reflections in parallel.
+  // getReflections() returns all reflections; we filter to unread client-side
+  // for the indicator. This single query also powers "View all" later.
+  const [user, records, allReflections] = await Promise.all([
     db.query.users.findFirst({
       where: eq(users.id, session.userId),
     }),
     getRecords(),
+    getReflections(),
   ]);
+
+  // Filter to unread for the notification popover
+  const unreadReflections = allReflections.filter((r) => !r.isRead);
 
   if (!user) redirect("/login");
 
@@ -73,6 +82,9 @@ export default async function DashboardPage() {
             </span>
 
             <ThemeToggle />
+
+            {/* Reflections — sparkle icon with unread notification dot */}
+            <ReflectionIndicator unreadReflections={unreadReflections} />
 
             {/* AI Chat — opens the conversation sidebar */}
             <ChatToggle />
