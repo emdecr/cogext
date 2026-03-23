@@ -106,7 +106,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           CARD VIEW (trigger)
           ================================================================ */}
       <Dialog.Trigger asChild>
-        <div className="group mb-4 cursor-pointer break-inside-avoid overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+        <div className="group mb-4 cursor-pointer break-inside-avoid overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
           {record.imagePath && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -187,10 +187,10 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           DETAIL MODAL
           ================================================================ */}
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]" />
 
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-4 shadow-xl focus:outline-none dark:bg-gray-900 md:p-6"
+          className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-4 shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 md:p-6"
           // Reset edit mode when the modal closes so it always opens in view mode.
           onCloseAutoFocus={() => setIsEditing(false)}
         >

@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { searchRecords } from "@/lib/actions/search";
+import Skeleton from "@/components/skeleton";
 
 // Type for search results (matches what the server action returns)
 type SearchResult = {
@@ -125,14 +126,14 @@ export default function CommandPalette() {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — fades in for a smooth appearance */}
       <div
-        className="fixed inset-0 z-50 bg-black/50"
+        className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]"
         onClick={() => setIsOpen(false)}
       />
 
-      {/* Palette */}
-      <div className="fixed left-1/2 top-[15%] z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-900">
+      {/* Palette — slides down from slightly above its resting position */}
+      <div className="fixed left-1/2 top-[15%] z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl bg-white shadow-2xl animate-[slideDownFadeIn_200ms_ease-out] dark:bg-gray-900">
         {/* Search input */}
         <div className="flex items-center border-b border-gray-200 px-4 dark:border-gray-700">
           {/* Search icon */}
@@ -165,10 +166,19 @@ export default function CommandPalette() {
 
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto">
-          {/* Loading state */}
+          {/* Loading state — skeleton placeholders instead of "Searching..." text.
+              Shows the shape of results so the layout doesn't jump when they arrive. */}
           {isSearching && (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">
-              Searching...
+            <div className="space-y-1 p-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start gap-3 px-2 py-2.5">
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

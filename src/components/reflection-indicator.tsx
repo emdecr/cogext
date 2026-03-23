@@ -98,7 +98,7 @@ export default function ReflectionIndicator({ unreadReflections }: Props) {
           // sideOffset adds spacing between the trigger and the popover.
           align="end"
           sideOffset={8}
-          className="z-50 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="z-50 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-lg animate-[popoverIn_150ms_ease-out] dark:border-gray-700 dark:bg-gray-900"
         >
           {/* Header */}
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">

@@ -188,7 +188,7 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
           Same pattern as FilterDrawer. */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 transition-opacity"
+          className="fixed inset-0 z-40 bg-black/30 animate-[fadeIn_150ms_ease-out]"
           onClick={handleClose}
         />
       )}

@@ -36,3 +36,82 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ============================================================================
+   MICRO-INTERACTION ANIMATIONS
+   ============================================================================
+   Custom keyframes for modals, popovers, and page transitions.
+
+   We define the keyframes in CSS and reference them via Tailwind's
+   arbitrary animation syntax: animate-[fadeIn_200ms_ease-out]
+
+   Tailwind v4 doesn't include tailwindcss-animate by default, so we
+   define our own animations here. This gives us full control over
+   timing and easing.
+   ============================================================================ */
+
+/* Fade in — used for backdrops and overlays */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fade out — for closing animations */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Slide down + fade — for command palette, popovers dropping from top.
+   Only animates opacity and translateY. The horizontal centering (translateX)
+   is handled by Tailwind classes and must NOT be overridden here — CSS
+   animations replace the entire transform property, which would break
+   Tailwind's -translate-x-1/2 positioning. Using a separate approach
+   with opacity only + a subtle vertical movement via margin. */
+@keyframes slideDownFadeIn {
+  from {
+    opacity: 0;
+    margin-top: -8px;
+  }
+  to {
+    opacity: 1;
+    margin-top: 0;
+  }
+}
+
+/* Scale + fade — for centered modals (Dialog, AlertDialog).
+   IMPORTANT: We only animate opacity here, not transform. The centering
+   (translate -50%, -50%) lives in Tailwind classes. If we animated
+   transform here, the animation's "from" state would override Tailwind's
+   translate, snapping the modal to the wrong position on mount. */
+@keyframes scaleFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide up + fade — for popovers appearing below a trigger */
+@keyframes popoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Gentle pulse for skeleton loading — softer than Tailwind's animate-pulse */
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Card lift — used on hover for record cards */
+@keyframes cardLift {
+  to {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1),
+                0 4px 10px -5px rgba(0, 0, 0, 0.05);
+  }
+}

@@ -90,7 +90,7 @@ export default function AddToCollection({
         <Popover.Content
           align="end"
           sideOffset={4}
-          className="z-[60] w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="z-[60] w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg animate-[popoverIn_150ms_ease-out] dark:border-gray-700 dark:bg-gray-900"
         >
           <p className="mb-1.5 px-1 text-xs font-medium text-gray-500 dark:text-gray-400">
             Add to collection
