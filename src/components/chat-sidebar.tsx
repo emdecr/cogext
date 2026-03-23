@@ -35,6 +35,7 @@ import {
 } from "@/lib/actions/conversations";
 import ChatThread from "./chat-thread";
 import ConfirmDialog from "@/components/confirm-dialog";
+import EmptyState from "@/components/empty-state";
 
 type ChatSidebarProps = {
   isOpen: boolean;
@@ -296,20 +297,20 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
 
               {/* Empty state */}
               {!isLoading && conversationList.length === 0 && (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    No conversations yet.
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    Start a new chat to ask questions about your records.
-                  </p>
-                  <button
-                    onClick={handleNewChat}
-                    className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
-                  >
-                    New chat
-                  </button>
-                </div>
+                <EmptyState
+                  icon="conversations"
+                  title="No conversations yet"
+                  description="Ask questions about your records."
+                  compact
+                  action={
+                    <button
+                      onClick={handleNewChat}
+                      className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
+                    >
+                      New chat
+                    </button>
+                  }
+                />
               )}
 
               {/* Conversation list — each row is a <div role="button"> rather

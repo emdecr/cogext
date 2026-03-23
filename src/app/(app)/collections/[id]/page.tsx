@@ -20,6 +20,7 @@ import { getSession } from "@/lib/auth/session";
 import { getCollection } from "@/lib/actions/collections";
 import CollectionHeader from "./collection-header";
 import SortableRecordGrid from "./sortable-record-grid";
+import EmptyState from "@/components/empty-state";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -55,13 +56,12 @@ export default async function CollectionDetailPage({ params }: Props) {
 
         {/* Record grid */}
         {collection.records.length === 0 ? (
-          <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
-            <p className="text-lg text-gray-500 dark:text-gray-400">
-              No records in this collection
-            </p>
-            <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">
-              Open a record on the dashboard and add it to this collection.
-            </p>
+          <div className="mt-8">
+            <EmptyState
+              icon="collections"
+              title="No records in this collection"
+              description="Open a record on the dashboard and use the + Collection button to add it here."
+            />
           </div>
         ) : (
           /* SortableRecordGrid is a client component that wraps each card

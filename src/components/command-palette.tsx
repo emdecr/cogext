@@ -22,6 +22,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { searchRecords } from "@/lib/actions/search";
 import Skeleton from "@/components/skeleton";
+import EmptyState from "@/components/empty-state";
 
 // Type for search results (matches what the server action returns)
 type SearchResult = {
@@ -184,16 +185,22 @@ export default function CommandPalette() {
 
           {/* No results */}
           {!isSearching && query.trim() && results.length === 0 && (
-            <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-              No results found for &ldquo;{query}&rdquo;
-            </div>
+            <EmptyState
+              icon="search"
+              title={`No results for "${query}"`}
+              description="Try different keywords or a broader search."
+              compact
+            />
           )}
 
           {/* Empty state (no query yet) */}
           {!query.trim() && !isSearching && (
-            <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-              Type to search by meaning or keywords
-            </div>
+            <EmptyState
+              icon="search"
+              title="Search your records"
+              description="Type to search by meaning or keywords."
+              compact
+            />
           )}
 
           {/* Result list */}

@@ -19,6 +19,7 @@ import { useState, useMemo } from "react";
 import RecordCard from "@/components/record-card";
 import FilterBar from "@/components/filter-bar";
 import FilterDrawer from "@/components/filter-drawer";
+import EmptyState from "@/components/empty-state";
 
 // Type matches what getRecords() returns (with tags included)
 type Tag = {
@@ -146,20 +147,19 @@ export default function RecordGrid({
 
       {/* Record grid */}
       {filteredRecords.length === 0 ? (
-        <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center text-gray-500 dark:border-gray-700 dark:text-gray-400">
+        <div className="mt-8">
           {records.length === 0 ? (
-            <>
-              <p className="text-lg">No records yet</p>
-              <p className="mt-2 text-sm">
-                Click the + button to save your first note, quote, link, or
-                article.
-              </p>
-            </>
+            <EmptyState
+              icon="records"
+              title="No records yet"
+              description="Click the + button to save your first note, quote, link, or article."
+            />
           ) : (
-            <>
-              <p className="text-lg">No matching records</p>
-              <p className="mt-2 text-sm">Try adjusting your filters.</p>
-            </>
+            <EmptyState
+              icon="filter"
+              title="No matching records"
+              description="Try adjusting your filters or clearing them to see all records."
+            />
           )}
         </div>
       ) : (

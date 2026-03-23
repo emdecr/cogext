@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
 import { markReflectionAsRead } from "@/lib/actions/reflections";
 import type { ReflectionSummary } from "@/lib/actions/reflections";
+import EmptyState from "@/components/empty-state";
 
 type Props = {
   // Unread reflections to show in the dropdown.
@@ -130,10 +131,12 @@ export default function ReflectionIndicator({ unreadReflections }: Props) {
               </ul>
             </>
           ) : (
-            // Empty state — no unread reflections
-            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-              No new reflections
-            </p>
+            <EmptyState
+              icon="reflections"
+              title="No new reflections"
+              description="You're all caught up."
+              compact
+            />
           )}
 
           {/* "View all" link — always shown, takes you to the full archive */}

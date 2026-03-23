@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { getReflections } from "@/lib/actions/reflections";
+import EmptyState from "@/components/empty-state";
 
 export default async function ReflectionsPage() {
   // Auth guard (defense in depth — middleware already checks this)
@@ -53,13 +54,11 @@ export default async function ReflectionsPage() {
 
         {/* ---- Reflection list ---- */}
         {reflections.length === 0 ? (
-          // Empty state — no reflections generated yet
-          <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No reflections yet. They&apos;re generated weekly based on your
-              saved records.
-            </p>
-          </div>
+          <EmptyState
+            icon="reflections"
+            title="No reflections yet"
+            description="Reflections are generated weekly based on your saved records. Keep saving and one will appear soon."
+          />
         ) : (
           <ul className="space-y-3">
             {reflections.map((reflection) => (
