@@ -34,6 +34,7 @@ import {
   type ConversationWithMessages,
 } from "@/lib/actions/conversations";
 import ChatThread from "./chat-thread";
+import ConfirmDialog from "@/components/confirm-dialog";
 
 type ChatSidebarProps = {
   isOpen: boolean;
@@ -52,6 +53,10 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   const [activeConversation, setActiveConversation] =
     useState<ConversationWithMessages | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Track which conversation the user wants to delete (for ConfirmDialog).
+  // null = no confirmation showing, string = confirming that conversation.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // ---- Load conversation list when sidebar opens ----
   // We refetch every time the sidebar opens because conversations may
@@ -118,30 +123,35 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   }, [openConversation, loadConversations]);
 
   // ---- Delete a conversation ----
-  const handleDelete = useCallback(
-    async (id: string, e: React.MouseEvent) => {
-      // Stop the click from also triggering openConversation
+  // Two-step: clicking the delete button sets pendingDeleteId (opens the
+  // confirm dialog), then confirming calls performDelete.
+  const handleDeleteClick = useCallback(
+    (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
+      setPendingDeleteId(id);
+    },
+    []
+  );
 
-      // TODO (Phase 4): Replace with Radix AlertDialog confirmation modal
-      if (!window.confirm("Delete this conversation?")) return;
+  const performDelete = useCallback(
+    async () => {
+      if (!pendingDeleteId) return;
 
       try {
-        const result = await deleteConversation(id);
+        const result = await deleteConversation(pendingDeleteId);
         if (result.success) {
-          // If we deleted the active conversation, go back to list
-          if (activeConversationId === id) {
+          if (activeConversationId === pendingDeleteId) {
             setActiveConversationId(null);
             setActiveConversation(null);
           }
-          // Refresh the list
           loadConversations();
         }
       } catch (error) {
         console.error("Failed to delete conversation:", error);
       }
+      setPendingDeleteId(null);
     },
-    [activeConversationId, loadConversations]
+    [pendingDeleteId, activeConversationId, loadConversations]
   );
 
   // ---- Go back to conversation list ----
@@ -344,7 +354,7 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
 
                         {/* Delete button (visible on hover) */}
                         <button
-                          onClick={(e) => handleDelete(convo.id, e)}
+                          onClick={(e) => handleDeleteClick(convo.id, e)}
                           className="ml-2 flex-shrink-0 rounded p-0.5 text-gray-300 opacity-0 hover:text-red-500 group-hover:opacity-100 dark:text-gray-600 dark:hover:text-red-400"
                           title="Delete conversation"
                         >
@@ -389,6 +399,19 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
           )}
         </div>
       </div>
+
+      {/* Delete conversation confirmation */}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="Delete this conversation?"
+        description="The conversation and all its messages will be permanently removed."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={performDelete}
+      />
     </>
   );
 }

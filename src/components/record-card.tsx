@@ -16,6 +16,7 @@ import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
 import TagInput from "@/components/tag-input";
 import EditRecordForm from "@/components/edit-record-form";
 import AddToCollection from "@/components/add-to-collection";
+import ConfirmDialog from "@/components/confirm-dialog";
 
 // TypeScript type for the record prop, now including tags
 // from the relational query.
@@ -61,6 +62,7 @@ function timeAgo(date: Date): string {
 
 export default function RecordCard({ record }: { record: RecordWithTags }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Toggle between viewing the record detail and editing it.
   // When isEditing is true, the modal shows the EditRecordForm instead.
   const [isEditing, setIsEditing] = useState(false);
@@ -81,13 +83,12 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
       (record.content.length > 50 ? "..." : "");
 
   async function handleDelete() {
-    if (!window.confirm("Delete this record? This can't be undone.")) return;
-
     setIsDeleting(true);
     const result = await deleteRecord(record.id);
     if (!result.success) {
       alert(result.error || "Failed to delete");
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }
 
@@ -306,7 +307,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                   </button>
 
                   <button
-                    onClick={handleDelete}
+                    onClick={() => setShowDeleteConfirm(true)}
                     disabled={isDeleting}
                     className="rounded-md px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950"
                   >
@@ -316,6 +317,18 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
               </div>
             </>
           )}
+
+          {/* Delete confirmation — Radix AlertDialog, replaces window.confirm */}
+          <ConfirmDialog
+            open={showDeleteConfirm}
+            onOpenChange={setShowDeleteConfirm}
+            title="Delete this record?"
+            description="This can't be undone. The record and all its tags will be permanently removed."
+            confirmLabel="Delete"
+            variant="danger"
+            onConfirm={handleDelete}
+            isConfirming={isDeleting}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

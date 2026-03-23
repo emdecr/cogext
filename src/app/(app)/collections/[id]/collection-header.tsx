@@ -19,6 +19,7 @@ import {
   renameCollection,
   deleteCollection,
 } from "@/lib/actions/collections";
+import ConfirmDialog from "@/components/confirm-dialog";
 
 type Props = {
   id: string;
@@ -37,6 +38,7 @@ export default function CollectionHeader({
   const [isRenaming, setIsRenaming] = useState(false);
   const [editName, setEditName] = useState(name);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   async function handleRename(e: React.FormEvent) {
     e.preventDefault();
@@ -54,10 +56,6 @@ export default function CollectionHeader({
   }
 
   async function handleDelete() {
-    if (!window.confirm("Delete this collection? Records won't be deleted.")) {
-      return;
-    }
-
     setIsDeleting(true);
     const result = await deleteCollection(id);
     if (result.success) {
@@ -65,6 +63,7 @@ export default function CollectionHeader({
     } else {
       alert(result.error || "Failed to delete collection");
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }
 
@@ -93,9 +92,9 @@ export default function CollectionHeader({
             {name}
           </h1>
 
-          {/* Delete button */}
+          {/* Delete button — opens confirm dialog */}
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
             className="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950"
             title="Delete collection"
@@ -116,6 +115,18 @@ export default function CollectionHeader({
       <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
         {recordCount} record{recordCount !== 1 ? "s" : ""}
       </p>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete this collection?"
+        description="The collection will be removed. Records inside it won't be deleted."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        isConfirming={isDeleting}
+      />
     </div>
   );
 }
