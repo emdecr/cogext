@@ -40,10 +40,22 @@ type RecordWithTags = {
   recordTags: { tag: Tag }[];
 };
 
+// Collection summary — matches what getCollections() returns
+type CollectionSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  coverImage: string | null;
+  recordCount: number;
+  createdAt: Date;
+};
+
 export default function RecordGrid({
   records,
+  collections = [],
 }: {
   records: RecordWithTags[];
+  collections?: CollectionSummary[];
 }) {
   const [activeType, setActiveType] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -107,6 +119,7 @@ export default function RecordGrid({
           setIsDrawerOpen(false);
         }}
         availableTags={availableTags}
+        collections={collections}
       />
 
       {/* Results count when filtering */}

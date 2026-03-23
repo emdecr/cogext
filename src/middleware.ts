@@ -32,7 +32,7 @@ const COOKIE_NAME = "brain-session";
 // Routes that require authentication.
 // If the user visits any of these without a valid session, they're
 // redirected to /login.
-const PROTECTED_ROUTES = ["/dashboard", "/reflections"];
+const PROTECTED_ROUTES = ["/dashboard", "/reflections", "/collections"];
 
 // Routes that are for unauthenticated users only.
 // If a logged-in user visits these, redirect them to /dashboard

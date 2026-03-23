@@ -3,17 +3,32 @@
 // ============================================================================
 //
 // A slide-out panel from the right side of the screen. Houses tag filters
-// (and eventually collection filters) — things that would clutter the
-// main filter bar if shown inline.
+// and collections — things that would clutter the main filter bar if inline.
 //
 // The drawer overlays the grid with a semi-transparent backdrop.
 // Clicking the backdrop or the close button dismisses it.
 //
-// Filter state is still owned by RecordGrid (the parent). This component
+// Filter state is owned by RecordGrid (the parent). This component
 // just renders the controls and calls callbacks — same pattern as FilterBar.
+//
+// Collections are shown as links to their detail pages. A "New collection"
+// input lets you create one inline without leaving the drawer.
 // ============================================================================
 
 "use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createCollection } from "@/lib/actions/collections";
+
+type CollectionSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  coverImage: string | null;
+  recordCount: number;
+  createdAt: Date;
+};
 
 type FilterDrawerProps = {
   isOpen: boolean;
@@ -23,6 +38,9 @@ type FilterDrawerProps = {
   activeTag: string | null;
   onTagChange: (tag: string | null) => void;
   availableTags: { name: string; count: number }[];
+
+  // Collections
+  collections: CollectionSummary[];
 };
 
 export default function FilterDrawer({
@@ -31,12 +49,50 @@ export default function FilterDrawer({
   activeTag,
   onTagChange,
   availableTags,
+  collections,
 }: FilterDrawerProps) {
+  const router = useRouter();
+
+  // ---- New collection inline creation ----
+  // Instead of a separate page/modal, we let you type a name and create
+  // right here. Keeps the flow fast — you're already in the drawer.
+  const [isCreating, setIsCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleCreateCollection(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    setCreateError(null);
+    setIsSubmitting(true);
+
+    // createCollection expects FormData (server action convention).
+    const formData = new FormData();
+    formData.append("name", newName.trim());
+
+    const result = await createCollection(formData);
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setCreateError(result.error || "Failed to create collection");
+      return;
+    }
+
+    // Reset the form and navigate to the new collection
+    setNewName("");
+    setIsCreating(false);
+    onClose();
+
+    if (result.data?.id) {
+      router.push(`/collections/${result.data.id}`);
+    }
+  }
+
   return (
     <>
       {/* ---- Backdrop ---- */}
-      {/* Semi-transparent overlay behind the drawer. Clicking it closes
-          the drawer. The transition classes handle the fade in/out. */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 transition-opacity"
@@ -45,9 +101,6 @@ export default function FilterDrawer({
       )}
 
       {/* ---- Drawer panel ---- */}
-      {/* translate-x-full moves it completely off-screen to the right.
-          translate-x-0 slides it into view. The transition class animates
-          between these states. */}
       <div
         className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col bg-white shadow-xl transition-transform duration-200 ease-in-out dark:bg-gray-900 ${
           isOpen ? "translate-x-0" : "translate-x-full"
@@ -109,14 +162,84 @@ export default function FilterDrawer({
             )}
           </div>
 
-          {/* ---- Collections section (placeholder for later) ---- */}
+          {/* ---- Collections section ---- */}
           <div className="mb-6">
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Collections
-            </h3>
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              Coming soon
-            </p>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Collections
+              </h3>
+              {/* Toggle the inline creation form */}
+              {!isCreating && (
+                <button
+                  onClick={() => setIsCreating(true)}
+                  className="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  + New
+                </button>
+              )}
+            </div>
+
+            {/* Inline create form — appears when "+ New" is clicked */}
+            {isCreating && (
+              <form onSubmit={handleCreateCollection} className="mb-3">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Collection name..."
+                  autoFocus
+                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+                />
+                {createError && (
+                  <p className="mt-1 text-xs text-red-500">{createError}</p>
+                )}
+                <div className="mt-1.5 flex gap-1.5">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !newName.trim()}
+                    className="rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
+                  >
+                    {isSubmitting ? "Creating..." : "Create"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreating(false);
+                      setNewName("");
+                      setCreateError(null);
+                    }}
+                    className="rounded-md px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Collection list */}
+            {collections.length === 0 && !isCreating ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                No collections yet. Create one to organize your records.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {collections.map((collection) => (
+                  <button
+                    key={collection.id}
+                    onClick={() => {
+                      onClose();
+                      router.push(`/collections/${collection.id}`);
+                    }}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    <span className="truncate">{collection.name}</span>
+                    <span className="ml-2 flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                      {collection.recordCount}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

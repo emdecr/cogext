@@ -33,6 +33,7 @@ import CommandPalette from "@/components/command-palette";
 import ChatToggle from "@/components/chat-toggle";
 import ReflectionIndicator from "@/components/reflection-indicator";
 import { getReflections } from "@/lib/actions/reflections";
+import { getCollections } from "@/lib/actions/collections";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -45,12 +46,13 @@ export default async function DashboardPage() {
   // Fetch user, records, and reflections in parallel.
   // getReflections() returns all reflections; we filter to unread client-side
   // for the indicator. This single query also powers "View all" later.
-  const [user, records, allReflections] = await Promise.all([
+  const [user, records, allReflections, collections] = await Promise.all([
     db.query.users.findFirst({
       where: eq(users.id, session.userId),
     }),
     getRecords(),
     getReflections(),
+    getCollections(),
   ]);
 
   // Filter to unread for the notification popover
@@ -123,7 +125,7 @@ export default async function DashboardPage() {
         {/* RecordGrid is a client component that handles filtering
             and rendering. The dashboard passes all records down,
             and RecordGrid filters them in the browser. */}
-        <RecordGrid records={records} />
+        <RecordGrid records={records} collections={collections} />
       </div>
     </div>
   );

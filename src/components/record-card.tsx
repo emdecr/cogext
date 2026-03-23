@@ -15,6 +15,7 @@ import { deleteRecord } from "@/lib/actions/records";
 import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
 import TagInput from "@/components/tag-input";
 import EditRecordForm from "@/components/edit-record-form";
+import AddToCollection from "@/components/add-to-collection";
 
 // TypeScript type for the record prop, now including tags
 // from the relational query.
@@ -293,6 +294,9 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                 </p>
 
                 <div className="flex items-center gap-2">
+                  {/* Add to collection — popover with checklist */}
+                  <AddToCollection recordId={record.id} />
+
                   {/* Edit button — switches to edit mode */}
                   <button
                     onClick={() => setIsEditing(true)}
