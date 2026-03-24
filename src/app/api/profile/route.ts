@@ -18,6 +18,7 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { generateProfile, getProfile } from "@/lib/ai/profile";
+import { aiGenerationLimiter, rateLimitResponse } from "@/lib/rate-limit";
 
 // ============================================================================
 // GET — Retrieve the current profile
@@ -67,6 +68,11 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Rate limit — profile generation calls Claude. Shared limiter with
+  // reflections (aiGenerationLimiter) since both are expensive AI calls.
+  const rl = aiGenerationLimiter(session.userId);
+  if (!rl.success) return rateLimitResponse(rl);
 
   try {
     const profile = await generateProfile(session.userId);

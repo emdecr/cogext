@@ -17,8 +17,15 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
+import { registerLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  // Rate limit by IP — prevents mass account creation from a single source.
+  // 5 registrations per hour is generous for a real user, tight for a bot.
+  const ip = getClientIp(request);
+  const rl = registerLimiter(ip);
+  if (!rl.success) return rateLimitResponse(rl);
+
   try {
     // ---- 1. Parse the request body ----
     // The client sends JSON: { email: "...", password: "..." }

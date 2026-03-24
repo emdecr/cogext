@@ -17,11 +17,19 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
+import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // Generic error message — intentionally vague for security.
 const INVALID_CREDENTIALS = "Invalid email or password";
 
 export async function POST(request: NextRequest) {
+  // Rate limit by IP — no user ID available yet (unauthenticated request).
+  // 10 attempts per 15 minutes prevents brute force while allowing
+  // a user who genuinely forgot their password to keep trying.
+  const ip = getClientIp(request);
+  const rl = loginLimiter(ip);
+  if (!rl.success) return rateLimitResponse(rl);
+
   try {
     // ---- 1. Parse and validate ----
     const body = await request.json();

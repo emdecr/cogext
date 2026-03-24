@@ -40,6 +40,7 @@ import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider, getChatProvider } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/ai/types";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
+import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 
 // ============================================================================
 // CONFIGURATION
@@ -76,6 +77,13 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId;
+
+  // ---- Rate limit by user ID ----
+  // Rate limit AFTER auth so we use user ID (more accurate than IP).
+  // 30 messages/hour is generous for real usage; prevents runaway costs
+  // if the account is compromised or someone is scripting requests.
+  const rl = chatLimiter(userId);
+  if (!rl.success) return rateLimitResponse(rl);
 
   // ---- Step 2: Parse and validate the request body ----
   let conversationId: string;

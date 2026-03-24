@@ -24,22 +24,50 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { generateWeeklyReflection } from "@/lib/ai/reflection";
+import { aiGenerationLimiter, rateLimitResponse } from "@/lib/rate-limit";
+import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
-  // For now, we use session auth (same as the chat route).
-  // In Phase 5, you might add a secret-based auth for cron jobs:
-  //   if (request.headers.get("x-cron-secret") === process.env.CRON_SECRET)
+  // Two valid callers: the UI (session cookie) or a cron job (secret header).
+  // Cron jobs can't carry session cookies, so we check for a shared secret.
+  // The secret is set in CRON_SECRET env var — include it as a Bearer token:
+  //   Authorization: Bearer <CRON_SECRET>
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : null;
+  const isCronCall =
+    config.app.cronSecret && bearerToken === config.app.cronSecret;
+
   const session = await getSession();
-  if (!session) {
+
+  if (!session && !isCronCall) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
 
+  // Rate limit authenticated users (cron calls bypass — they're already trusted).
+  // 5 per day is more than enough; the job runs once a week.
+  if (session && !isCronCall) {
+    const rl = aiGenerationLimiter(session.userId);
+    if (!rl.success) return rateLimitResponse(rl);
+  }
+
+  // Cron calls operate on all users; session calls operate on the current user.
+  // For now, both paths generate for the session user (cron per-user is TODO).
+  const userId = session?.userId;
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "No user context for generation" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   try {
-    const result = await generateWeeklyReflection(session.userId);
+    const result = await generateWeeklyReflection(userId);
 
     if (!result) {
       // No records this week — nothing to reflect on

@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveFile, MAX_FILE_SIZE, ALLOWED_TYPES } from "@/lib/storage";
 import { getSession } from "@/lib/auth/session";
+import { uploadLimiter, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
@@ -38,6 +39,10 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Rate limit by user ID — prevents one user from flooding storage.
+  const rl = uploadLimiter(session.userId);
+  if (!rl.success) return rateLimitResponse(rl);
 
   try {
     // ---- Parse the form data ----
