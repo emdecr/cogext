@@ -34,6 +34,7 @@ import { db } from "@/db";
 import { records, recordTags, collectionRecords } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { embedRecord } from "@/lib/ai/embed-record";
+import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
 import { addTagToRecord } from "@/lib/actions/tags";
 import {
@@ -135,44 +136,107 @@ export async function createRecord(
       .returning();
 
     // Step 4: AI processing (async, non-blocking)
-    // We kick off embedding and auto-tagging in the background.
-    // These run AFTER we return success to the user — the record is
-    // already saved, so the user sees it immediately. The AI features
-    // enhance it asynchronously.
+    // We kick off AI enhancement in the background. These run AFTER we
+    // return success — the record is already saved and visible to the
+    // user immediately. AI features layer on asynchronously.
     //
-    // We don't await these — they run as "fire and forget" promises.
-    // If they fail, the record still exists, it just won't have an
-    // embedding or AI tags. The errors are logged in each function.
+    // For non-image records: embed + tag run in parallel (independent).
+    // For image records: we sequence them — analyze first, THEN embed + tag.
     //
-    // Why not await? Embedding takes 100-500ms, auto-tagging takes 1-5s.
-    // Making the user wait that long to see "Record saved" feels sluggish.
+    // WHY the different sequencing for images?
+    //   embedRecord() re-fetches the record from the database before embedding.
+    //   If we fired analysis and embedding at the same time, the embedding
+    //   would grab "Image" (the placeholder) before the description lands.
+    //   By awaiting analysis first and writing the description to the DB,
+    //   the embedding step will always see the rich description.
+    //
+    //   Timeline for image records (all background, user sees none of this):
+    //     0ms:      Record saved with content = "Image" (or user description)
+    //     0ms:      Return success to user ← user sees "Record saved" here
+    //     ~1-3s:    Claude Vision analyzes the image → description generated
+    //     ~1-3s:    DB updated with rich description
+    //     ~1-4s:    Embedding generated from description → stored in DB
+    //     ~2-8s:    AI tags generated from description → linked to record
+    //
+    //   Timeline for other record types (parallel, faster):
+    //     0ms:      Return success to user
+    //     ~100ms:   Embedding generated
+    //     ~1-5s:    AI tags generated
 
-    // Generate embedding for semantic search
-    embedRecord(created.id).catch((err) =>
-      console.error("Background embed failed:", err),
-    );
+    const isImageRecord =
+      parsed.data.type === "image" && !!parsed.data.imagePath;
 
-    // Generate AI tags
-    (async () => {
-      try {
-        const llm = await getLLMProvider();
-        const aiTags = await llm.generateTags(
-          parsed.data.content,
-          parsed.data.type,
-        );
+    if (isImageRecord) {
+      // Image path: analyze → update content → embed + tag in sequence
+      (async () => {
+        try {
+          // ---- 1. Analyze the image with Claude Vision ----
+          const description = await analyzeImage(parsed.data.imagePath!);
 
-        // Add each AI-generated tag to the record
-        // The `isAi: true` flag is set inside addTagToRecord when
-        // we add the tag creation logic there
-        await Promise.all(
-          aiTags.map((tagName) =>
-            addTagToRecord(created.id, tagName, true, true),
-          ),
-        );
-      } catch (err) {
-        console.error("Background AI tagging failed:", err);
-      }
-    })();
+          // ---- 2. Update the record's content with the description ----
+          // Only update if we actually got a description back. If analysis
+          // failed or was skipped (no API key), keep whatever the user typed.
+          if (description) {
+            await db
+              .update(records)
+              .set({ content: description, updatedAt: new Date() })
+              .where(eq(records.id, created.id));
+          }
+
+          // ---- 3. Embed the record ----
+          // embedRecord() re-fetches the record from DB, so it picks up
+          // the description we just wrote. This is intentional — the
+          // embedding should represent the AI-generated description.
+          await embedRecord(created.id);
+
+          // ---- 4. Generate AI tags ----
+          // Use the description (if we got one) or fall back to whatever
+          // content was saved. Tags based on a real description are much
+          // better than tags based on "Image".
+          const contentForTagging = description || parsed.data.content;
+          const llm = await getLLMProvider();
+          const aiTags = await llm.generateTags(
+            contentForTagging,
+            parsed.data.type,
+          );
+
+          await Promise.all(
+            aiTags.map((tagName) =>
+              addTagToRecord(created.id, tagName, true, true),
+            ),
+          );
+        } catch (err) {
+          console.error("Background image AI processing failed:", err);
+        }
+      })();
+    } else {
+      // Non-image path: embedding and tagging are independent, run in parallel.
+      // Neither depends on the other's result, so no sequencing needed.
+
+      // Generate embedding for semantic search
+      embedRecord(created.id).catch((err) =>
+        console.error("Background embed failed:", err),
+      );
+
+      // Generate AI tags
+      (async () => {
+        try {
+          const llm = await getLLMProvider();
+          const aiTags = await llm.generateTags(
+            parsed.data.content,
+            parsed.data.type,
+          );
+
+          await Promise.all(
+            aiTags.map((tagName) =>
+              addTagToRecord(created.id, tagName, true, true),
+            ),
+          );
+        } catch (err) {
+          console.error("Background AI tagging failed:", err);
+        }
+      })();
+    }
 
     // Step 5: Revalidate the dashboard
     // Next.js caches rendered pages. When we add a new record, the cached
