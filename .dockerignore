@@ -1,0 +1,41 @@
+# ============================================================================
+# DOCKER BUILD CONTEXT EXCLUSIONS
+# ============================================================================
+# When you run `docker build`, Docker sends the entire directory (the "build
+# context") to the Docker daemon. This file tells it what to skip.
+#
+# Why this matters:
+#   - node_modules is ~500MB+ — sending it to Docker is slow and pointless
+#     since we run `npm ci` inside the container anyway
+#   - .next contains previous build output — we rebuild fresh in Docker
+#   - .env files contain secrets — they should NEVER be baked into images
+#     (secrets are passed at runtime via environment variables)
+# ============================================================================
+
+node_modules
+.next
+.git
+.gitignore
+
+# Environment files — secrets must not be baked into images
+.env
+.env.*
+
+# Dev/test tooling — not needed in production image
+playwright-report
+test-results
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local uploads — production uses MinIO, not local files
+public/uploads
+
+# Documentation
+README.md
+SPEC.md
