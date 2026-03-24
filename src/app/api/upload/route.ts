@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { saveFile, MAX_FILE_SIZE, ALLOWED_TYPES } from "@/lib/storage";
 import { getSession } from "@/lib/auth/session";
 import { uploadLimiter, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     // imagePath when creating the record.
     return NextResponse.json({ path });
   } catch (error) {
-    console.error("Upload failed:", error);
+    logger.error("File upload failed", { userId: session.userId, error });
     return NextResponse.json(
       { error: "Upload failed. Please try again." },
       { status: 500 },

@@ -26,6 +26,7 @@ import { getSession } from "@/lib/auth/session";
 import { generateWeeklyReflection } from "@/lib/ai/reflection";
 import { aiGenerationLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Reflection generation error:", error);
+    logger.error("Reflection generation failed", { userId, isCronCall, error });
     return new Response(
       JSON.stringify({ error: "Failed to generate reflection" }),
       { status: 500, headers: { "Content-Type": "application/json" } }

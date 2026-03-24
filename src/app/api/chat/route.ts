@@ -41,6 +41,7 @@ import { getEmbeddingProvider, getChatProvider } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/ai/types";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // CONFIGURATION
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
           // Signal that we're done streaming
           controller.close();
         } catch (error) {
-          console.error("Streaming error:", error);
+          logger.error("Chat stream interrupted", { userId, conversationId, error });
           controller.error(error);
         }
       },
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat API error:", error);
+    logger.error("Chat API failed", { userId, conversationId, error });
     return new Response(
       JSON.stringify({ error: "Failed to generate response" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
@@ -352,7 +353,7 @@ async function retrieveRelevantRecords(
       tags: tagsByRecord.get(record.id) || [],
     }));
   } catch (error) {
-    console.error("Record retrieval failed:", error);
+    logger.error("RAG record retrieval failed", { userId, error });
     return [];
   }
 }

@@ -18,6 +18,7 @@ import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
 import { registerLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   // Rate limit by IP — prevents mass account creation from a single source.
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
     // Log the full error for debugging, but send a generic message
     // to the client. Never expose internal error details — they can
     // reveal database structure, file paths, or other sensitive info.
-    console.error("Registration error:", error);
+    logger.error("Registration request failed", { ip, error });
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 } // 500 = Internal Server Error

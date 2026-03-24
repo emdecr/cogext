@@ -19,6 +19,7 @@ import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { generateProfile, getProfile } from "@/lib/ai/profile";
 import { aiGenerationLimiter, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // GET — Retrieve the current profile
@@ -48,7 +49,7 @@ export async function GET() {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Failed to fetch profile:", error);
+    logger.error("Failed to fetch profile", { userId: session.userId, error });
     return new Response(
       JSON.stringify({ error: "Failed to fetch profile" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Profile generation failed:", error);
+    logger.error("Profile generation failed", { userId: session.userId, error });
     return new Response(
       JSON.stringify({ error: "Failed to generate profile" }),
       { status: 500, headers: { "Content-Type": "application/json" } }

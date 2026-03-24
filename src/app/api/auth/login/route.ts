@@ -18,6 +18,7 @@ import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
 import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 // Generic error message — intentionally vague for security.
 const INVALID_CREDENTIALS = "Invalid email or password";
@@ -79,7 +80,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    // Structured error log — includes the IP so you can correlate with
+    // rate limit logs or spot scanning patterns.
+    logger.error("Login request failed", { ip, error });
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }
