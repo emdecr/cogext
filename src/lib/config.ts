@@ -158,6 +158,45 @@ export const config = {
 };
 
 // =============================================================================
+// VALIDATE SECRETS STRENGTH
+// =============================================================================
+// These checks run at module load time (server startup). They prevent the app
+// from running with weak or default secrets that could compromise security.
+//
+// Why fail at startup instead of logging a warning?
+//   A warning gets buried in logs. A crash forces you to fix it before
+//   the server accepts any traffic. For secrets, this is the right trade-off.
+//
+// In development (NODE_ENV !== "production"), we skip these checks so you
+// can use simple values like "dev-secret" without friction.
+// =============================================================================
+if (process.env.NODE_ENV === "production") {
+  // JWT_SECRET must be at least 32 characters (256 bits of entropy when hex).
+  // Shorter secrets are vulnerable to brute-force attacks.
+  // The common default "dev-secret-change-me-in-production" is explicitly
+  // rejected in case someone copies .env.example verbatim.
+  if (config.auth.jwtSecret.length < 32) {
+    throw new Error(
+      `JWT_SECRET must be at least 32 characters in production.\n` +
+        `Generate one with: openssl rand -hex 32`
+    );
+  }
+
+  const knownDefaults = [
+    "dev-secret-change-me-in-production",
+    "dev-secret",
+    "secret",
+    "changeme",
+  ];
+  if (knownDefaults.includes(config.auth.jwtSecret.toLowerCase())) {
+    throw new Error(
+      `JWT_SECRET is set to a known default value. This is not safe for production.\n` +
+        `Generate a strong one with: openssl rand -hex 32`
+    );
+  }
+}
+
+// =============================================================================
 // VALIDATE MINIO CONFIG
 // =============================================================================
 // If STORAGE_PROVIDER=minio, the S3-specific vars become required.

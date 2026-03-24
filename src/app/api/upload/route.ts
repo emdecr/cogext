@@ -31,6 +31,60 @@ import { getSession } from "@/lib/auth/session";
 import { uploadLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
+// ============================================================================
+// ALLOWED FILE SIGNATURES (MAGIC BYTES)
+// ============================================================================
+//
+// Every file format has a unique byte sequence at the beginning called a
+// "magic number" or "file signature." These are baked into the format spec
+// and can't be spoofed without breaking the file.
+//
+// Why check magic bytes instead of just MIME type?
+//   The browser sets the MIME type based on the file extension, which is
+//   trivially spoofable: rename malware.exe → image.jpg and the browser
+//   sends "image/jpeg". Magic bytes verify the ACTUAL file content.
+//
+// Format signatures:
+//   JPEG: starts with FF D8 FF (always)
+//   PNG:  starts with 89 50 4E 47 (the letters "PNG" preceded by 0x89)
+//   GIF:  starts with "GIF87a" or "GIF89a" (ASCII)
+//   WebP: starts with "RIFF" at offset 0 and "WEBP" at offset 8
+//
+// We only need to check the first 12 bytes of the file.
+// ============================================================================
+const MAGIC_SIGNATURES = {
+  jpeg: [0xff, 0xd8, 0xff],
+  png: [0x89, 0x50, 0x4e, 0x47],
+  gif87: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // "GIF87a"
+  gif89: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // "GIF89a"
+  // WebP is special: RIFF at offset 0, WEBP at offset 8
+} as const;
+
+/**
+ * Verify that a file's actual bytes match a known image format.
+ * Returns true if the file is a genuine image, false if spoofed.
+ */
+function hasValidMagicBytes(buffer: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(buffer).slice(0, 12);
+
+  // Check JPEG: FF D8 FF
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return true;
+
+  // Check PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return true;
+
+  // Check GIF: "GIF87a" or "GIF89a"
+  const gifHeader = String.fromCharCode(...bytes.slice(0, 6));
+  if (gifHeader === "GIF87a" || gifHeader === "GIF89a") return true;
+
+  // Check WebP: "RIFF" at offset 0 + "WEBP" at offset 8
+  const riff = String.fromCharCode(...bytes.slice(0, 4));
+  const webp = String.fromCharCode(...bytes.slice(8, 12));
+  if (riff === "RIFF" && webp === "WEBP") return true;
+
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
   // Even though middleware protects the page, API routes should
@@ -59,15 +113,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ---- Validate file type ----
-    // Check the MIME type against our allowlist. This is a basic check —
-    // a determined attacker could spoof the MIME type, but combined with
-    // the file extension check in storage, it catches most mistakes.
+    // ---- Validate file type (two layers) ----
+    //
+    // Layer 1: MIME type check (fast, catches honest mistakes)
+    // The browser sets this based on the file extension. It's easy to spoof
+    // but catches the 99% case of a user accidentally selecting a .pdf.
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
         {
           error: `Invalid file type: ${file.type}. Allowed: ${ALLOWED_TYPES.join(", ")}`,
         },
+        { status: 400 },
+      );
+    }
+
+    // Layer 2: Magic byte check (thorough, catches spoofing)
+    // Read the first 12 bytes of the file and compare against known
+    // image format signatures. This verifies the ACTUAL file content,
+    // not just what the browser claims it is.
+    //
+    // Why both layers? MIME check is fast and gives a good error message
+    // ("you uploaded a PDF"). Magic bytes are the real security gate.
+    const fileBuffer = await file.arrayBuffer();
+    if (!hasValidMagicBytes(fileBuffer)) {
+      logger.warn("Upload rejected: MIME type passed but magic bytes failed", {
+        userId: session.userId,
+        claimedType: file.type,
+        fileName: file.name,
+      });
+      return NextResponse.json(
+        { error: "File content doesn't match a valid image format" },
         { status: 400 },
       );
     }

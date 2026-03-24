@@ -33,6 +33,7 @@
 
 import { NextRequest } from "next/server";
 import { eq, and, sql, isNotNull, desc } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db";
 import { records, conversations, messages, recordTags, tags } from "@/db/schema";
@@ -42,6 +43,24 @@ import type { ChatMessage } from "@/lib/ai/types";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+
+// ============================================================================
+// INPUT VALIDATION
+// ============================================================================
+//
+// Validate the chat request body with Zod. This ensures:
+//   - conversationId is a valid UUID (not an arbitrary string that could
+//     cause unexpected behavior in SQL queries)
+//   - message is non-empty and bounded (10,000 chars prevents someone from
+//     sending a novel-length message that blows up embedding + token costs)
+//
+// Without this, a malicious client could send:
+//   { conversationId: "not-a-uuid", message: "" }
+//   { conversationId: "'; DROP TABLE--", message: "x".repeat(1000000) }
+const chatRequestSchema = z.object({
+  conversationId: z.string().uuid("Invalid conversation ID"),
+  message: z.string().trim().min(1, "Message is required").max(10000, "Message too long"),
+});
 
 // ============================================================================
 // CONFIGURATION
@@ -87,20 +106,26 @@ export async function POST(request: NextRequest) {
   if (!rl.success) return rateLimitResponse(rl);
 
   // ---- Step 2: Parse and validate the request body ----
+  // Using Zod for structured validation instead of manual if-checks.
+  // This catches malformed UUIDs, empty messages, and oversized payloads
+  // in one clean step. See chatRequestSchema above for the rules.
   let conversationId: string;
   let message: string;
 
   try {
     const body = await request.json();
-    conversationId = body.conversationId;
-    message = body.message?.trim();
+    const parsed = chatRequestSchema.safeParse(body);
 
-    if (!conversationId || !message) {
-      return new Response(
-        JSON.stringify({ error: "conversationId and message are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || "Invalid input";
+      return new Response(JSON.stringify({ error: firstError }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
+
+    conversationId = parsed.data.conversationId;
+    message = parsed.data.message;
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
@@ -289,13 +314,28 @@ async function retrieveRelevantRecords(
     } else if (scope === "date_range" && scopeValue) {
       // Scope to records within a date range.
       // Expected format: "2026-01-01,2026-03-01"
+      //
+      // SECURITY: We validate that both parts are valid ISO date strings
+      // before interpolating into SQL. Without this, a crafted scopeValue
+      // like "2026-01-01,2026-01-01'); DROP TABLE records;--" could be
+      // dangerous if Drizzle's parameterization ever had a gap.
+      // Defense in depth: validate even when the ORM parameterizes.
       const [start, end] = scopeValue.split(",");
-      if (start && end) {
+      const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (
+        start && end &&
+        isoDatePattern.test(start) && isoDatePattern.test(end) &&
+        !isNaN(Date.parse(start)) && !isNaN(Date.parse(end))
+      ) {
         conditions.push(
           sql`${records.createdAt} >= ${start}::timestamptz`,
           sql`${records.createdAt} <= ${end}::timestamptz`
         );
       }
+      // If the format is invalid, we silently skip the date filter rather
+      // than erroring. The user still gets results — just unscoped.
+      // This is a graceful degradation: bad input ≠ crash.
     }
     // scope === "all" → no additional filtering
 

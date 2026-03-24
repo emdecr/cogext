@@ -36,7 +36,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zxcvbn-typescript": "^5.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
