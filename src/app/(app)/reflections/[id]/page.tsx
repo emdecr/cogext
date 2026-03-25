@@ -90,8 +90,13 @@ export default async function ReflectionDetailPage({ params }: Props) {
           </header>
 
           {/* Reflection content — rendered as markdown.
-              This is a client component because react-markdown runs in the browser. */}
-          <ReflectionContent content={reflection.content} />
+              This is a client component because react-markdown runs in the browser.
+              We pass recommendations separately rather than concatenating them
+              into markdown so the UI can render them as structured cards. */}
+          <ReflectionContent
+            content={reflection.content}
+            recommendations={reflection.recommendations}
+          />
         </article>
       </div>
     </div>

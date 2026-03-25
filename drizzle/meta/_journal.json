@@ -29,6 +29,13 @@
       "when": 1774127529425,
       "tag": "0003_lowly_mojo",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774466437057,
+      "tag": "0004_sharp_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

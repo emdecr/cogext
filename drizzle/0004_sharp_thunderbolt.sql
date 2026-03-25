@@ -1,0 +1,1 @@
+ALTER TABLE "reflections" ADD COLUMN "recommendations" jsonb;

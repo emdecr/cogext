@@ -30,6 +30,7 @@ import {
   vector,     // pgvector column — stores embeddings as arrays of floats
   index,      // database index for query performance
 } from "drizzle-orm/pg-core";
+import type { Recommendation } from "@/lib/ai/recommendations";
 
 // ============================================================================
 // ENUMS
@@ -370,6 +371,18 @@ export const reflections = pgTable("reflections", {
 
   // The reflection content (markdown).
   content: text("content").notNull(),
+
+  // Structured media recommendations that pair with the reflection.
+  //
+  // We use JSONB here because recommendations are naturally nested data:
+  // an array of small objects with a few fields each. A separate table would
+  // make sense if we needed to query recommendations independently, but for
+  // now they behave like part of the reflection document.
+  //
+  // Nullable on purpose: old reflections were created before this feature
+  // existed. The app normalizes null -> [] so older rows still behave like
+  // "a reflection with no recommendations".
+  recommendations: jsonb("recommendations").$type<Recommendation[]>(),
 
   // The time period this reflection covers.
   periodStart: date("period_start").notNull(),

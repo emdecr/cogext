@@ -2,59 +2,75 @@
 // AI WEEKLY REFLECTION GENERATOR
 // ============================================================================
 //
-// Generates a weekly "reflection" by analyzing the user's records from the
-// past week alongside their AI profile. The reflection is a thoughtful,
-// markdown-formatted piece that surfaces:
-//   - Themes and patterns from the week's saves
-//   - Connections between records the user might not have noticed
-//   - Gentle prompts for deeper exploration
+// Generates a weekly reflection by analyzing the user's records from the past
+// week alongside their AI profile. In Step 6, this file also became the home
+// of weekly media recommendations.
 //
-// This follows the same architecture as profile.ts:
-//   1. Fetch data (records from the past week + existing profile)
-//   2. Summarize the data into a compact prompt
-//   3. Send to the LLM via the provider-agnostic interface
-//   4. Save the result to the database
+// The high-level flow is now:
+//   1. Determine the current week boundaries
+//   2. Check for an existing reflection (idempotency)
+//   3. Fetch this week's records and tags
+//   4. Fetch the user's AI profile
+//   5. Generate the reflection markdown
+//   6. Generate 4-6 media recommendations from the reflection + compact context
+//   7. Save BOTH artifacts on one `reflections` row
 //
-// Why a separate file from profile.ts?
-//   Profile = "who is this user?" (stable, updated infrequently)
-//   Reflection = "what happened this week?" (ephemeral, one per week)
-//   Different data, different prompts, different output shapes.
+// Why keep recommendations inside this file instead of the API route?
+//   The route should stay thin — auth, rate limiting, transport concerns.
+//   This file owns the business logic for "what a weekly reflection is," and
+//   recommendations are now part of that weekly reflection artifact.
 //
-// The reflection is stored as markdown in the `reflections` table.
-// The UI renders it with react-markdown (same as chat messages).
+// Why save both on one row?
+//   The product goal is one weekly digest, not two separate features. One row
+//   keeps reads simple, keeps idempotency simple, and matches the detail page
+//   experience where the reflection and recommendations appear together.
 // ============================================================================
 
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { records, reflections, recordTags, tags } from "@/db/schema";
+import { records, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
-import { getProfile } from "@/lib/ai/profile";
+import { getProfile, type UserProfile } from "@/lib/ai/profile";
+import {
+  generateRecommendations,
+  type RecommendationSeedRecord,
+} from "@/lib/ai/generate-recommendations";
+import {
+  normalizeStoredRecommendations,
+  type Recommendation,
+} from "@/lib/ai/recommendations";
+
+// ============================================================================
+// RETURN TYPE
+// ============================================================================
+// We include recommendations in the return type so callers CAN inspect them if
+// they want to later, but current callers still only use `id` and `content`.
+
+export type GeneratedWeeklyReflection = {
+  id: string;
+  content: string;
+  recommendations: Recommendation[];
+};
 
 // ============================================================================
 // GENERATE WEEKLY REFLECTION
 // ============================================================================
-// Main entry point. Call this with a userId and it will:
-//   1. Determine the current week's boundaries (Monday → Sunday)
-//   2. Check for an existing reflection (prevent duplicates)
-//   3. Fetch that week's records
-//   4. Build a prompt with records + profile context
-//   5. Call the LLM and save the result
+// Main entry point. This is intentionally a step-by-step orchestration
+// function so the feature is easy to follow in a teaching codebase.
 //
-// Returns the reflection content, or null if:
-//   - A reflection already exists for this week
-//   - No records were saved this week (nothing to reflect on)
+// Returns:
+//   - existing row if this week's reflection already exists
+//   - new row if generation succeeds
+//   - null if the user saved nothing this week
 
 export async function generateWeeklyReflection(
   userId: string
-): Promise<{ content: string; id: string } | null> {
-  // ---- Step 1: Calculate the current week boundaries ----
-  // We use Monday–Sunday as the week. getWeekBoundaries() returns
-  // the most recent Monday and the following Sunday.
+): Promise<GeneratedWeeklyReflection | null> {
+  // ---- Step 1: Calculate this week's Monday → Sunday boundaries ----
   const { periodStart, periodEnd } = getWeekBoundaries();
 
-  // ---- Step 2: Check for existing reflection ----
-  // One reflection per week per user. If we already generated one
-  // for this period, don't duplicate it.
+  // ---- Step 2: Prevent duplicates ----
+  // Weekly reflections are idempotent: one row per user per week.
   const existing = await db.query.reflections.findFirst({
     where: and(
       eq(reflections.userId, userId),
@@ -64,13 +80,17 @@ export async function generateWeeklyReflection(
   });
 
   if (existing) {
-    return { content: existing.content, id: existing.id };
+    return {
+      id: existing.id,
+      content: existing.content,
+      // Older rows may have null recommendations because the column was added
+      // after reflections already existed. Normalize to an empty array so
+      // callers never have to care about the migration boundary.
+      recommendations: normalizeStoredRecommendations(existing.recommendations),
+    };
   }
 
-  // ---- Step 3: Fetch this week's records with tags ----
-  // We grab everything the user saved between Monday and Sunday.
-  // Unlike profile generation (which uses the last 100 records),
-  // reflections are time-bounded — we only look at this week.
+  // ---- Step 3: Fetch the records saved during this week ----
   const weekRecords = await db.query.records.findMany({
     where: and(
       eq(records.userId, userId),
@@ -87,23 +107,95 @@ export async function generateWeeklyReflection(
     },
   });
 
-  // Nothing saved this week? Skip reflection.
+  // No saves this week means nothing to reflect on.
   if (weekRecords.length === 0) {
     return null;
   }
 
-  // ---- Step 4: Fetch the user's AI profile for additional context ----
-  // The profile gives the LLM background on who this user is, so the
-  // reflection can connect this week's records to broader interests.
-  // If no profile exists, the reflection still works — it just won't
-  // reference long-term patterns.
+  // ---- Step 4: Fetch the long-term AI profile ----
+  // The reflection works without it, but the profile helps connect this week
+  // to broader interests and recurring patterns.
   const userProfile = await getProfile(userId);
 
-  // ---- Step 5: Build record summaries ----
-  // Same compact format as profile.ts — type, title, content preview,
-  // tags. We include a bit more content here (200 chars) since we're
-  // looking at fewer records (one week vs. 100 records).
-  const recordSummaries = weekRecords.map((record) => {
+  // ---- Step 5: Build the compact summary sent to the reflection model ----
+  const recordSummaries = buildReflectionRecordSummaries(weekRecords);
+
+  // ---- Step 6: Generate the reflection markdown ----
+  const reflectionPrompt = buildReflectionPrompt(
+    recordSummaries,
+    weekRecords.length,
+    periodStart,
+    periodEnd,
+    userProfile
+  );
+
+  try {
+    const chatProvider = await getChatProvider();
+    const content = await chatProvider.chat(
+      [{ role: "user", content: reflectionPrompt }],
+      "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base this week. Write in a warm, observant tone. Use markdown formatting."
+    );
+
+    // ---- Step 7: Build compact recommendation input ----
+    // Important token-saving choice: we do NOT resend raw record content here.
+    // The reflection text already distilled the week, so recommendations only
+    // get the reflection, the AI profile, and titles/tags for duplicate checks.
+    const recommendationSeeds = buildRecommendationSeedRecords(weekRecords);
+
+    // ---- Step 8: Generate recommendations ----
+    // This call is intentionally non-fatal. If it fails, we still save the
+    // reflection — recommendations are a bonus layer, not the core artifact.
+    const recommendations = await generateRecommendations({
+      reflectionContent: content,
+      userProfile,
+      recordSummaries: recommendationSeeds,
+    });
+
+    // ---- Step 9: Save one combined digest row ----
+    const [saved] = await db
+      .insert(reflections)
+      .values({
+        userId,
+        content,
+        recommendations,
+        periodStart,
+        periodEnd,
+      })
+      .returning({ id: reflections.id });
+
+    return {
+      id: saved.id,
+      content,
+      recommendations,
+    };
+  } catch (error) {
+    console.error("Reflection generation failed:", error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// BUILD REFLECTION RECORD SUMMARIES
+// ============================================================================
+// The reflection model needs a little more context than the recommendation
+// model, so we include a content preview here.
+//
+// We spell this type out instead of deriving it from Drizzle query helpers
+// because explicit shapes are easier to read in a teaching codebase.
+
+type WeeklyRecordWithTags = {
+  type: string;
+  title: string | null;
+  content: string;
+  sourceAuthor: string | null;
+  createdAt: Date;
+  recordTags: Array<{ tag: { name: string } }>;
+};
+
+function buildReflectionRecordSummaries(
+  weekRecords: WeeklyRecordWithTags[]
+): string[] {
+  return weekRecords.map((record) => {
     const tagNames = record.recordTags.map((rt) => rt.tag.name);
     const preview = record.content.slice(0, 200);
     const date = record.createdAt.toLocaleDateString("en-US", {
@@ -122,67 +214,48 @@ export async function generateWeeklyReflection(
       .filter(Boolean)
       .join(" ");
   });
+}
 
-  // ---- Step 6: Build the prompt ----
-  // The prompt asks for a warm, thoughtful reflection — not a dry summary.
-  // We want it to feel like a knowledgeable friend reviewing your week.
-  const prompt = buildReflectionPrompt(
-    recordSummaries,
-    weekRecords.length,
-    periodStart,
-    periodEnd,
-    userProfile
-  );
+// ============================================================================
+// BUILD RECOMMENDATION SEED RECORDS
+// ============================================================================
+// The recommendation model gets only titles + tags. This supports duplicate
+// avoidance without paying to resend full record text.
 
-  // ---- Step 7: Call the LLM ----
-  // We use chat() (non-streaming) because reflections are generated
-  // in the background — no one is watching the response stream in.
-  try {
-    const chatProvider = await getChatProvider();
-    const content = await chatProvider.chat(
-      [{ role: "user", content: prompt }],
-      "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base this week. Write in a warm, observant tone. Use markdown formatting."
-    );
-
-    // ---- Step 8: Save to database ----
-    const [saved] = await db
-      .insert(reflections)
-      .values({
-        userId,
-        content,
-        periodStart,
-        periodEnd,
-      })
-      .returning({ id: reflections.id });
-
-    return { content, id: saved.id };
-  } catch (error) {
-    console.error("Reflection generation failed:", error);
-    throw error;
-  }
+function buildRecommendationSeedRecords(
+  weekRecords: WeeklyRecordWithTags[]
+): RecommendationSeedRecord[] {
+  return weekRecords
+    .filter((record) => {
+      // Records without a title are harder to use for duplicate avoidance.
+      // We skip them rather than sending placeholder strings.
+      return typeof record.title === "string" && record.title.trim().length > 0;
+    })
+    .slice(0, 15)
+    .map((record) => ({
+      title: record.title!.trim(),
+      tags: record.recordTags.map((rt) => rt.tag.name),
+    }));
 }
 
 // ============================================================================
 // BUILD REFLECTION PROMPT
 // ============================================================================
-// Constructs the prompt sent to the LLM. Includes:
-//   - The week's records (summarized)
-//   - The user's profile (if available) for broader context
-//   - Instructions for tone and format
-//
-// The output should be markdown that reads well in a card-style UI.
+// Constructs the prompt sent to the reflection model. Includes:
+//   - the week's records (summarized)
+//   - the user's long-term profile, if available
+//   - instructions for tone and format
 
 function buildReflectionPrompt(
   recordSummaries: string[],
   recordCount: number,
   periodStart: string,
   periodEnd: string,
-  userProfile: { summary: string; topInterests: string[]; patterns: string[] } | null
+  userProfile: UserProfile | null
 ): string {
   let prompt = `Here are ${recordCount} records saved to a personal knowledge base during the week of ${periodStart} to ${periodEnd}:\n\n`;
   prompt += recordSummaries.join("\n");
 
-  // Include profile context if available
   if (userProfile && userProfile.topInterests.length > 0) {
     prompt += `\n\nFor context, here's what we know about this person:\n`;
     prompt += `${userProfile.summary}\n`;
@@ -210,34 +283,22 @@ Do NOT start with "This week" or "Here's your reflection" — jump straight into
 // WEEK BOUNDARIES
 // ============================================================================
 // Returns the Monday and Sunday of the current week as ISO date strings
-// (YYYY-MM-DD). We use Monday as the start because most people think of
-// weeks that way, and it aligns with ISO 8601.
-//
-// Example: if today is Wednesday 2026-03-18, returns:
-//   periodStart: "2026-03-16" (Monday)
-//   periodEnd: "2026-03-22" (Sunday)
+// (YYYY-MM-DD).
 
 export function getWeekBoundaries(referenceDate?: Date): {
   periodStart: string;
   periodEnd: string;
 } {
   const now = referenceDate || new Date();
-
-  // getDay() returns 0 for Sunday, 1 for Monday, ..., 6 for Saturday.
-  // We want Monday = 0, so we shift: (day + 6) % 7
-  // This makes Monday=0, Tuesday=1, ..., Sunday=6
   const dayOfWeek = now.getDay();
   const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-  // Calculate Monday (start of week)
   const monday = new Date(now);
   monday.setDate(now.getDate() - mondayOffset);
 
-  // Calculate Sunday (end of week)
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
 
-  // Format as YYYY-MM-DD for the date column
   const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
   return {

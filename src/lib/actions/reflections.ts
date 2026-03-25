@@ -21,6 +21,10 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { reflections } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
+import {
+  normalizeStoredRecommendations,
+  type Recommendation,
+} from "@/lib/ai/recommendations";
 
 // ============================================================================
 // AUTH HELPER
@@ -69,15 +73,20 @@ export async function getReflections(): Promise<ReflectionSummary[]> {
   }));
 }
 
-// ============================================================================
+// ============================================================================ 
 // GET SINGLE REFLECTION
 // ============================================================================
 // Returns the full reflection content for the detail view.
-// Also marks it as read (viewing it = reading it).
+//
+// Unlike the list view, the detail view needs the structured recommendation
+// payload too. We intentionally keep the summary and detail shapes different:
+//   - Summary view: optimized for lightweight lists and badges
+//   - Detail view: optimized for rendering the full digest experience
 
 export type ReflectionDetail = {
   id: string;
   content: string;
+  recommendations: Recommendation[];
   periodStart: string;
   periodEnd: string;
   isRead: boolean;
@@ -98,6 +107,10 @@ export async function getReflection(
   return {
     id: result.id,
     content: result.content,
+    // recommendations is stored as JSONB, so older rows may be null and
+    // Drizzle returns the value as unknown. Normalize immediately so the UI
+    // always receives a plain Recommendation[].
+    recommendations: normalizeStoredRecommendations(result.recommendations),
     periodStart: result.periodStart,
     periodEnd: result.periodEnd,
     isRead: result.isRead,
