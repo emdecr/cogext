@@ -40,6 +40,17 @@ export default defineConfig({
     //   - Inside the src/ directory (not in node_modules, not in drizzle/, etc.)
     include: ["src/**/*.test.{ts,tsx}"],
 
+    // IMPORTANT: exclude integration tests from this config.
+    // Integration tests (*.integration.test.ts) require a real database and
+    // are run separately via `npm run test:integration` using
+    // vitest.integration.config.ts. Without this exclude, they'd be picked
+    // up by the unit test runner and fail (no DB available).
+    //
+    // Why does this need explicit exclusion?
+    // "some.integration.test.ts" ends in ".test.ts", so the include pattern
+    // above would match it. The exclude takes precedence.
+    exclude: ["src/**/*.integration.test.ts", "node_modules/**"],
+
     // Enable global test functions (describe, it, expect) without importing
     // them in every test file. Matches the Jest convention most devs expect.
     globals: true,

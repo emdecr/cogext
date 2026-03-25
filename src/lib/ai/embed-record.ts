@@ -36,7 +36,10 @@ import { getEmbeddingProvider } from "@/lib/ai";
 // We prefix each section so the model understands the structure.
 // "Title: Quick Pasta" gives more signal than just "Quick Pasta".
 
-function prepareTextForEmbedding(record: {
+// Exported so unit tests can verify the text preparation logic directly.
+// This function is pure — no side effects, no I/O — making it ideal to
+// test in isolation without mocking the database or embedding provider.
+export function prepareTextForEmbedding(record: {
   title: string | null;
   content: string;
   sourceAuthor: string | null;
