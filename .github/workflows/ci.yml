@@ -1,0 +1,205 @@
+# =============================================================================
+# CI PIPELINE — Brain Extension
+# =============================================================================
+#
+# This workflow runs on every push and pull request. It catches bugs BEFORE
+# they reach production by running four checks:
+#
+#   1. lint-and-typecheck — ESLint + TypeScript compiler (catches syntax,
+#      type errors, and code quality issues)
+#   2. test — Vitest unit + component tests (catches logic bugs)
+#   3. build — Next.js production build (catches import errors, build failures)
+#   4. docker — Docker image build (catches Dockerfile / dependency issues)
+#
+# Each job runs independently in parallel. If ANY job fails, the overall
+# check fails and the PR gets a red X.
+#
+# DEPLOY JOB: only runs on pushes to main (not PRs). Builds a Docker image
+# and pushes it to GitHub Container Registry (ghcr.io). Your server pulls
+# the latest image on deploy.
+#
+# SETUP:
+#   Before the deploy job works, you need to configure these GitHub secrets:
+#     (Settings → Secrets and variables → Actions → New repository secret)
+#
+#   No secrets are needed for CI jobs (lint, test, build) — they work out
+#   of the box with zero configuration.
+# =============================================================================
+
+name: CI
+
+# ---- Triggers ----
+# push to main: runs full pipeline including deploy
+# pull_request: runs CI checks only (no deploy)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ---- Permissions ----
+# The deploy job needs write access to push Docker images to GHCR.
+# We grant it at the workflow level (applies to all jobs).
+permissions:
+  contents: read
+  packages: write
+
+# =============================================================================
+# JOB 1: Lint + Type Check
+# =============================================================================
+# Fast — typically finishes in <30s. Catches:
+#   - ESLint rule violations (unused variables, missing imports, etc.)
+#   - TypeScript type errors (wrong argument types, missing properties, etc.)
+#
+# Why separate from tests?
+#   These are static checks (no code execution). They're fast and catch
+#   different bugs than tests do. Running them in parallel with tests
+#   gives faster feedback.
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---- Checkout ----
+      # actions/checkout clones your repo into the runner's workspace.
+      # Without this, the runner has an empty directory.
+      - uses: actions/checkout@v4
+
+      # ---- Node.js setup ----
+      # Installs the specified Node version and configures npm's cache.
+      # The cache key is based on package-lock.json — if the lockfile
+      # hasn't changed, npm ci reuses cached modules (~10s vs ~30s).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      # ---- Install dependencies ----
+      # `npm ci` is the CI-safe version of `npm install`:
+      #   - Deletes existing node_modules (clean slate)
+      #   - Installs exact versions from package-lock.json
+      #   - Fails if lockfile is out of sync with package.json
+      - run: npm ci
+
+      # ---- Lint ----
+      # next lint runs ESLint with the Next.js preset.
+      # The `--max-warnings 0` flag treats warnings as errors in CI —
+      # this prevents warning creep (warnings pile up and everyone ignores them).
+      - name: Lint
+        run: npx next lint --max-warnings 0
+
+      # ---- Type Check ----
+      # `tsc --noEmit` runs the TypeScript compiler without producing output files.
+      # It only checks for type errors. If anything is wrong (e.g., you passed a
+      # string where a number was expected), this fails with a clear error.
+      - name: Type Check
+        run: npx tsc --noEmit
+
+  # =============================================================================
+  # JOB 2: Unit + Component Tests
+  # =============================================================================
+  # Runs Vitest unit tests and React Testing Library component tests.
+  # These don't need a database — all external dependencies are mocked.
+  test:
+    name: Unit & Component Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Run unit tests (vitest run uses vitest.config.ts which excludes
+      # integration tests automatically via the exclude pattern).
+      - name: Run Tests
+        run: npm run test:unit
+
+  # =============================================================================
+  # JOB 3: Production Build
+  # =============================================================================
+  # Verifies the Next.js production build succeeds. This catches:
+  #   - Import errors that only surface during build (tree shaking)
+  #   - Server/client component boundary violations
+  #   - Missing environment variables at build time
+  #
+  # We provide minimal dummy env vars so the build doesn't fail on
+  # missing secrets. These are NOT real values — they're just enough
+  # for Next.js to compile. The real values are injected at runtime.
+  build:
+    name: Next.js Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Provide dummy env vars so the config module doesn't throw.
+      # These are NOT used for real requests — just for compilation.
+      # The actual secrets are injected at container runtime.
+      - name: Build
+        env:
+          DATABASE_URL: "postgres://ci:ci@localhost:5432/ci"
+          JWT_SECRET: "ci-build-only-not-a-real-secret-do-not-use"
+          AI_BASE_URL: "http://localhost:11434"
+        run: npm run build
+
+  # =============================================================================
+  # JOB 4: Docker Image Build
+  # =============================================================================
+  # Builds the Docker image to verify the Dockerfile is valid and the
+  # multi-stage build completes. This catches:
+  #   - Dockerfile syntax errors
+  #   - Missing files referenced in COPY instructions
+  #   - npm ci failures in the container (OS-specific native modules)
+  #
+  # On pushes to main, it also PUSHES the image to GitHub Container
+  # Registry (ghcr.io) so your server can pull it for deployment.
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Login to GHCR (only on push to main) ----
+      # ghcr.io is GitHub's built-in container registry. Free for public repos.
+      # The GITHUB_TOKEN is automatically provided by GitHub Actions — no
+      # manual secret needed.
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---- Build (and optionally push) ----
+      # docker/build-push-action handles caching, tagging, and pushing.
+      #
+      # Tags:
+      #   - ghcr.io/OWNER/brain-extension:latest — always points to newest build
+      #   - ghcr.io/OWNER/brain-extension:sha-abc123 — pinned to specific commit
+      #
+      # The SHA tag lets you roll back to an exact commit if something breaks.
+      # "latest" is what your docker-compose.prod.yml pulls by default.
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Only push on main branch (not on PRs)
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
