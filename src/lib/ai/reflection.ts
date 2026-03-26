@@ -140,7 +140,16 @@ export async function generateWeeklyReflection(
     // Important token-saving choice: we do NOT resend raw record content here.
     // The reflection text already distilled the week, so recommendations only
     // get the reflection, the AI profile, and titles/tags for duplicate checks.
-    const recommendationSeeds = buildRecommendationSeedRecords(weekRecords);
+    //
+    // We extend the seed pool beyond just this week's records. A user might
+    // have saved a book two weeks ago that Claude could re-recommend if it
+    // only sees the current week. Fetching the last 4 weeks of titled records
+    // catches most recent saves without a heavy query.
+    const recentRecords = await getRecentTitledRecords(userId, periodStart);
+    const recommendationSeeds = buildRecommendationSeedRecords([
+      ...weekRecords,
+      ...recentRecords,
+    ]);
 
     // ---- Step 8: Fetch previous recommendation titles for dedup ----
     // Without this, Claude might recommend the same book across consecutive
@@ -229,21 +238,70 @@ function buildReflectionRecordSummaries(
 // ============================================================================
 // The recommendation model gets only titles + tags. This supports duplicate
 // avoidance without paying to resend full record text.
+//
+// The input may contain records from multiple weeks (current + recent), so we
+// deduplicate by title to avoid sending the same entry twice.
 
 function buildRecommendationSeedRecords(
-  weekRecords: WeeklyRecordWithTags[]
+  allRecords: WeeklyRecordWithTags[]
 ): RecommendationSeedRecord[] {
-  return weekRecords
+  const seen = new Set<string>();
+
+  return allRecords
     .filter((record) => {
       // Records without a title are harder to use for duplicate avoidance.
       // We skip them rather than sending placeholder strings.
-      return typeof record.title === "string" && record.title.trim().length > 0;
+      if (typeof record.title !== "string" || record.title.trim().length === 0) {
+        return false;
+      }
+      // Deduplicate by normalized title so the same save from multiple weeks
+      // doesn't waste a slot in the seed list.
+      const key = record.title.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     })
-    .slice(0, 15)
+    .slice(0, 20)
     .map((record) => ({
       title: record.title!.trim(),
       tags: record.recordTags.map((rt) => rt.tag.name),
     }));
+}
+
+// ============================================================================
+// RECENT TITLED RECORDS
+// ============================================================================
+// Fetches records from the 4 weeks before the current reflection period. These
+// supplement the current week's records for duplicate avoidance — a user who
+// saved a book 2 weeks ago shouldn't get it recommended back.
+//
+// We only fetch records with titles and only select the columns needed for seed
+// records (title + tags), keeping the query lightweight.
+
+async function getRecentTitledRecords(
+  userId: string,
+  currentPeriodStart: string
+): Promise<WeeklyRecordWithTags[]> {
+  // 4 weeks before the current period start
+  const lookbackDate = new Date(`${currentPeriodStart}T00:00:00Z`);
+  lookbackDate.setDate(lookbackDate.getDate() - 28);
+
+  return db.query.records.findMany({
+    where: and(
+      eq(records.userId, userId),
+      gte(records.createdAt, lookbackDate),
+      lt(records.createdAt, new Date(`${currentPeriodStart}T00:00:00Z`))
+    ),
+    orderBy: desc(records.createdAt),
+    limit: 50,
+    with: {
+      recordTags: {
+        with: {
+          tag: true,
+        },
+      },
+    },
+  });
 }
 
 // ============================================================================

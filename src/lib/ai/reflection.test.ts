@@ -125,16 +125,20 @@ describe("generateWeeklyReflection", () => {
 
   it("saves both the reflection content and recommendations on a new row", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
-    mockFindWeeklyRecords.mockResolvedValue([
-      {
-        type: "article",
-        title: "Slow Productivity",
-        content: "Notes on attention and deliberate pace.",
-        sourceAuthor: "Cal Newport",
-        createdAt: new Date("2026-03-24T12:00:00Z"),
-        recordTags: [{ tag: { name: "attention" } }, { tag: { name: "work" } }],
-      },
-    ]);
+    // First call: this week's records. Second call: recent titled records
+    // from previous weeks (empty here — no older saves in this scenario).
+    mockFindWeeklyRecords
+      .mockResolvedValueOnce([
+        {
+          type: "article",
+          title: "Slow Productivity",
+          content: "Notes on attention and deliberate pace.",
+          sourceAuthor: "Cal Newport",
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [{ tag: { name: "attention" } }, { tag: { name: "work" } }],
+        },
+      ])
+      .mockResolvedValueOnce([]);
 
     const result = await generateWeeklyReflection("user-123");
 
@@ -178,16 +182,18 @@ describe("generateWeeklyReflection", () => {
 
   it("still saves the reflection when recommendations come back empty", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
-    mockFindWeeklyRecords.mockResolvedValue([
-      {
-        type: "note",
-        title: "On slowness",
-        content: "A short note about patience.",
-        sourceAuthor: null,
-        createdAt: new Date("2026-03-24T12:00:00Z"),
-        recordTags: [],
-      },
-    ]);
+    mockFindWeeklyRecords
+      .mockResolvedValueOnce([
+        {
+          type: "note",
+          title: "On slowness",
+          content: "A short note about patience.",
+          sourceAuthor: null,
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
     mockGenerateRecommendations.mockResolvedValue([]);
 
     await generateWeeklyReflection("user-123");
