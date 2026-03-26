@@ -146,6 +146,12 @@ function buildRecommendationsPrompt(
         input.userProfile.topInterests.length > 0
           ? `Top interests: ${input.userProfile.topInterests.join(", ")}`
           : "",
+        // The content breakdown shows what media types the user already engages
+        // with heavily. This helps Claude diversify — e.g. if someone saves
+        // mostly articles, lean toward books or films for variety.
+        Object.keys(input.userProfile.contentBreakdown).length > 0
+          ? `Content they save most: ${formatContentBreakdown(input.userProfile.contentBreakdown)}`
+          : "",
         input.userProfile.patterns.length > 0
           ? `Patterns: ${input.userProfile.patterns.join("; ")}`
           : "",
@@ -195,7 +201,7 @@ Return a JSON array of exactly 3 recommendations. Each item must have this shape
 
 Requirements:
 - Ground each recommendation in the reflection's specific themes, tensions, curiosities, or patterns.
-- Mix media types when possible instead of recommending three items from the same category.
+- Mix media types when possible instead of recommending three items from the same category. If the user's profile shows they save mostly one type (e.g. articles), lean toward other formats for variety.
 - Prefer depth, resonance, and timelessness over generic popularity.
 - Use web search when helpful for recency or accuracy, but do not turn this into a list of trending items.
 - Avoid duplicates of things the user has already saved (see titles/tags above) or been recommended before (see previously recommended above).
@@ -335,4 +341,14 @@ function normalizeHttpsUrl(value: unknown): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.startsWith("https://") ? trimmed : undefined;
+}
+
+// Turns { article: 30, note: 20, quote: 5 } into "article (30), note (20),
+// quote (5)" — a compact string for the prompt that tells Claude what media
+// types the user already engages with, sorted by frequency.
+function formatContentBreakdown(breakdown: Record<string, number>): string {
+  return Object.entries(breakdown)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => `${type} (${count})`)
+    .join(", ");
 }
