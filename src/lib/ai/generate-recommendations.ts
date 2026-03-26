@@ -92,7 +92,12 @@ export async function generateRecommendations(
 
     const response = await client.messages.create({
       model,
-      max_tokens: 1200,
+      // 2000 gives comfortable headroom for web search tool turns + the final
+      // JSON array. With 1200, multiple search calls before the answer could
+      // squeeze the output and cause a truncated/unparseable response. We now
+      // only ask for 3 recommendations (down from 4-6), so 2000 is still
+      // conservative — a 3-item JSON array is roughly 300-400 tokens.
+      max_tokens: 2000,
       system:
         "You are a thoughtful cultural guide. Recommend books, films, shows, essays, podcasts, and articles that connect specifically to the user's weekly reflection. Return only valid JSON.",
       messages: [
