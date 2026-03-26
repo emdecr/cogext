@@ -13,6 +13,7 @@
 import { beforeEach, vi } from "vitest";
 
 const mockFindExistingReflection = vi.hoisted(() => vi.fn());
+const mockFindPreviousReflections = vi.hoisted(() => vi.fn());
 const mockFindWeeklyRecords = vi.hoisted(() => vi.fn());
 const mockInsertValues = vi.hoisted(() => vi.fn());
 const mockReturning = vi.hoisted(() => vi.fn());
@@ -26,6 +27,7 @@ vi.mock("@/db", () => ({
     query: {
       reflections: {
         findFirst: mockFindExistingReflection,
+        findMany: mockFindPreviousReflections,
       },
       records: {
         findMany: mockFindWeeklyRecords,
@@ -71,6 +73,10 @@ describe("generateWeeklyReflection", () => {
       generatedAt: "2026-03-25T00:00:00.000Z",
       recordCount: 5,
     });
+
+    // No previous reflections by default — the cross-week dedup query returns
+    // empty so recommendations start fresh.
+    mockFindPreviousReflections.mockResolvedValue([]);
 
     mockGenerateRecommendations.mockResolvedValue([
       {
@@ -136,6 +142,7 @@ describe("generateWeeklyReflection", () => {
       expect.objectContaining({
         reflectionContent: expect.stringContaining("attention"),
         recordSummaries: [{ title: "Slow Productivity", tags: ["attention", "work"] }],
+        previousRecommendationTitles: [],
       })
     );
 

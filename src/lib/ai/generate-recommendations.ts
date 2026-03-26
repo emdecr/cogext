@@ -2,7 +2,7 @@
 // WEEKLY REFLECTION RECOMMENDATIONS
 // ============================================================================
 //
-// This module asks Claude for 4-6 media recommendations that connect to a
+// This module asks Claude for 3 media recommendations that connect to a
 // weekly reflection's themes. The recommendations are meant to feel like
 // thoughtful "next steps" rather than algorithmic feed content.
 //
@@ -50,6 +50,10 @@ export type GenerateRecommendationsInput = {
   reflectionContent: string;
   userProfile: UserProfile | null;
   recordSummaries: RecommendationSeedRecord[];
+  // Titles from the last few weeks of recommendations. Passed in so Claude can
+  // avoid repeating itself across weeks. The orchestrator in reflection.ts
+  // fetches these from recent reflection rows.
+  previousRecommendationTitles: string[];
 };
 
 // ============================================================================
@@ -156,6 +160,13 @@ function buildRecommendationsPrompt(
           .join("\n")
       : "No recent titles/tags available.";
 
+  // Previous recommendation titles help Claude avoid repeating itself across
+  // weeks. We only include this section when there are titles to show.
+  const previousRecs =
+    input.previousRecommendationTitles.length > 0
+      ? `\nPREVIOUSLY RECOMMENDED (do NOT repeat these):\n${input.previousRecommendationTitles.map((t) => `- ${t}`).join("\n")}\n`
+      : "";
+
   return `You are generating recommendations for a personal knowledge base weekly reflection.
 
 WEEKLY REFLECTION:
@@ -166,8 +177,8 @@ ${profileSummary}
 
 RECENT TITLES AND TAGS:
 ${recentTitles}
-
-Return a JSON array of 4-6 recommendations. Each item must have this shape:
+${previousRecs}
+Return a JSON array of exactly 3 recommendations. Each item must have this shape:
 {
   "type": "book" | "film" | "show" | "essay" | "podcast" | "article",
   "title": "string",
@@ -178,10 +189,10 @@ Return a JSON array of 4-6 recommendations. Each item must have this shape:
 
 Requirements:
 - Ground each recommendation in the reflection's specific themes, tensions, curiosities, or patterns.
-- Mix media types when possible instead of recommending six items from the same category.
+- Mix media types when possible instead of recommending three items from the same category.
 - Prefer depth, resonance, and timelessness over generic popularity.
 - Use web search when helpful for recency or accuracy, but do not turn this into a list of trending items.
-- Avoid obvious duplicates of things the user appears to have already saved based on the titles and tags above.
+- Avoid duplicates of things the user has already saved (see titles/tags above) or been recommended before (see previously recommended above).
 - Keep reasons concrete and personal to the reflection, not generic blurbs.
 
 Return ONLY the JSON array. No prose before or after it.`;
@@ -219,8 +230,8 @@ function extractTextFromAnthropicResponse(response: {
 //   4. Keep the valid ones and drop the rest
 //
 // This "partial success" approach is important because recommendations are
-// additive. If Claude gives us 4 valid items and 1 malformed one, the user is
-// still better off seeing the 4 good recommendations.
+// additive. If Claude gives us 2 valid items and 1 malformed one, the user is
+// still better off seeing the 2 good recommendations.
 
 export function parseRecommendationsResponse(
   response: string
@@ -234,7 +245,7 @@ export function parseRecommendationsResponse(
     return parsed
       .map((item) => normalizeRecommendation(item))
       .filter((item): item is Recommendation => item !== null)
-      .slice(0, 6);
+      .slice(0, 3);
   } catch {
     console.warn(
       "[generate-recommendations] Failed to parse recommendation JSON:",

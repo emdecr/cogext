@@ -167,6 +167,7 @@ describe("generate-recommendations", () => {
         reflectionContent: "A week centered on slowness, memory, and deliberate attention.",
         userProfile: null,
         recordSummaries: [{ title: "Slow Looking", tags: ["art", "attention"] }],
+        previousRecommendationTitles: [],
       });
 
       expect(result).toHaveLength(1);
@@ -180,6 +181,7 @@ describe("generate-recommendations", () => {
         reflectionContent: "A reflection",
         userProfile: null,
         recordSummaries: [],
+        previousRecommendationTitles: [],
       });
 
       expect(mockCreate).not.toHaveBeenCalled();
@@ -193,6 +195,7 @@ describe("generate-recommendations", () => {
         reflectionContent: "A reflection",
         userProfile: null,
         recordSummaries: [],
+        previousRecommendationTitles: [],
       });
 
       expect(result).toEqual([]);
@@ -207,6 +210,7 @@ describe("generate-recommendations", () => {
         reflectionContent: "A reflection",
         userProfile: null,
         recordSummaries: [],
+        previousRecommendationTitles: [],
       });
 
       expect(result).toEqual([]);

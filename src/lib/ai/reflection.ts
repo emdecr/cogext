@@ -12,7 +12,7 @@
 //   3. Fetch this week's records and tags
 //   4. Fetch the user's AI profile
 //   5. Generate the reflection markdown
-//   6. Generate 4-6 media recommendations from the reflection + compact context
+//   6. Generate 3 media recommendations from the reflection + compact context
 //   7. Save BOTH artifacts on one `reflections` row
 //
 // Why keep recommendations inside this file instead of the API route?
@@ -26,7 +26,7 @@
 //   experience where the reflection and recommendations appear together.
 // ============================================================================
 
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { records, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
@@ -142,16 +142,24 @@ export async function generateWeeklyReflection(
     // get the reflection, the AI profile, and titles/tags for duplicate checks.
     const recommendationSeeds = buildRecommendationSeedRecords(weekRecords);
 
-    // ---- Step 8: Generate recommendations ----
+    // ---- Step 8: Fetch previous recommendation titles for dedup ----
+    // Without this, Claude might recommend the same book across consecutive
+    // weeks. We look back ~4 weeks of reflections and extract the titles from
+    // their stored JSONB recommendations. Cheap query, big quality-of-life win.
+    const previousRecommendationTitles =
+      await getPreviousRecommendationTitles(userId, periodStart);
+
+    // ---- Step 9: Generate recommendations ----
     // This call is intentionally non-fatal. If it fails, we still save the
     // reflection — recommendations are a bonus layer, not the core artifact.
     const recommendations = await generateRecommendations({
       reflectionContent: content,
       userProfile,
       recordSummaries: recommendationSeeds,
+      previousRecommendationTitles,
     });
 
-    // ---- Step 9: Save one combined digest row ----
+    // ---- Step 10: Save one combined digest row ----
     const [saved] = await db
       .insert(reflections)
       .values({
@@ -236,6 +244,38 @@ function buildRecommendationSeedRecords(
       title: record.title!.trim(),
       tags: record.recordTags.map((rt) => rt.tag.name),
     }));
+}
+
+// ============================================================================
+// PREVIOUS RECOMMENDATION TITLES
+// ============================================================================
+// Fetches titles from the last 4 weeks of recommendations so the generator can
+// avoid repeating itself. We query reflections older than the current week,
+// grab the JSONB recommendations column, and extract just the title strings.
+//
+// This is a lightweight query: we only need a handful of rows and only read
+// one JSONB column from each.
+
+async function getPreviousRecommendationTitles(
+  userId: string,
+  currentPeriodStart: string
+): Promise<string[]> {
+  const recentReflections = await db.query.reflections.findMany({
+    where: and(
+      eq(reflections.userId, userId),
+      lt(reflections.periodStart, currentPeriodStart)
+    ),
+    orderBy: desc(reflections.periodStart),
+    limit: 4,
+    columns: {
+      recommendations: true,
+    },
+  });
+
+  return recentReflections.flatMap((row) => {
+    const recs = normalizeStoredRecommendations(row.recommendations);
+    return recs.map((rec) => rec.title);
+  });
 }
 
 // ============================================================================
