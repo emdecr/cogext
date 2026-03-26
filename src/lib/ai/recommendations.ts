@@ -19,6 +19,10 @@
 // The allowed recommendation categories. Keeping them as a string union gives
 // us both autocomplete in the editor and runtime validation targets when we
 // parse Claude's JSON response.
+//
+// This array is exported so generate-recommendations.ts can use it for runtime
+// validation without duplicating the list. The type and the array stay in sync
+// in one place.
 export type RecommendationType =
   | "book"
   | "film"
@@ -52,7 +56,7 @@ export type Recommendation = {
 // The AI parser in generate-recommendations.ts is stricter. This helper's job
 // is different: safely reading already-stored data, including older rows.
 
-const ALLOWED_TYPES: RecommendationType[] = [
+export const ALLOWED_TYPES: RecommendationType[] = [
   "book",
   "film",
   "show",

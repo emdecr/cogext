@@ -29,9 +29,10 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { UserProfile } from "@/lib/ai/profile";
-import type {
-  Recommendation,
-  RecommendationType,
+import {
+  ALLOWED_TYPES,
+  type Recommendation,
+  type RecommendationType,
 } from "@/lib/ai/recommendations";
 
 // ============================================================================
@@ -50,21 +51,6 @@ export type GenerateRecommendationsInput = {
   userProfile: UserProfile | null;
   recordSummaries: RecommendationSeedRecord[];
 };
-
-// ============================================================================
-// ALLOWED TYPES
-// ============================================================================
-// Claude returns strings in JSON. We validate them against this allow-list so
-// malformed or invented categories don't leak into the UI.
-
-const ALLOWED_TYPES: RecommendationType[] = [
-  "book",
-  "film",
-  "show",
-  "essay",
-  "podcast",
-  "article",
-];
 
 // ============================================================================
 // MAIN ENTRY POINT
