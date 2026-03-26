@@ -37,6 +37,7 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
+import { logAiUsage } from "@/lib/ai/usage";
 
 // ============================================================================
 // SUPPORTED IMAGE TYPES
@@ -131,12 +132,19 @@ function getMimeType(imagePath: string): ImageMediaType | null {
 //   - Keep the existing content (user description or "Image") if null
 //
 // Usage:
-//   const description = await analyzeImage("/uploads/abc.jpg");
+//   const description = await analyzeImage("/uploads/abc.jpg", userId);
 //   if (description) {
 //     await db.update(records).set({ content: description }).where(...)
 //   }
+//
+// The optional userId parameter enables token usage logging. When provided,
+// the function logs input/output tokens to the ai_usage table. Without it
+// (e.g., in tests), logging is silently skipped.
 
-export async function analyzeImage(imagePath: string): Promise<string | null> {
+export async function analyzeImage(
+  imagePath: string,
+  userId?: string
+): Promise<string | null> {
   // ---- Guard: skip if no API key ----
   // If ANTHROPIC_API_KEY isn't set (e.g., development without an account),
   // analysis silently skips. Images still save and work — they just won't
@@ -215,6 +223,20 @@ export async function analyzeImage(imagePath: string): Promise<string | null> {
         },
       ],
     });
+
+    // Log token usage if we have a userId for attribution.
+    if (userId) {
+      logAiUsage({
+        userId,
+        feature: "image_analysis",
+        provider: "claude",
+        model: "claude-3-5-haiku-20241022",
+        usage: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+      });
+    }
 
     // ---- Extract the text description ----
     // Claude's response content is an array of blocks. For a description

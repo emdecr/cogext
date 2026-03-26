@@ -36,6 +36,13 @@
       "when": 1774466437057,
       "tag": "0004_sharp_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774556287199,
+      "tag": "0005_round_karnak",
+      "breakpoints": true
     }
   ]
 }

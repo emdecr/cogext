@@ -39,6 +39,7 @@ import {
   normalizeStoredRecommendations,
   type Recommendation,
 } from "@/lib/ai/recommendations";
+import { logAiUsage, type TokenUsage } from "@/lib/ai/usage";
 
 // ============================================================================
 // RETURN TYPE
@@ -131,9 +132,16 @@ export async function generateWeeklyReflection(
 
   try {
     const chatProvider = await getChatProvider();
+    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+
+    // Capture token usage via the callback so we can log it after the
+    // reflection row is saved (we need the reflectionId for context).
+    let reflectionUsage: TokenUsage | null = null;
+
     const content = await chatProvider.chat(
       [{ role: "user", content: reflectionPrompt }],
-      "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base this week. Write in a warm, observant tone. Use markdown formatting."
+      "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base this week. Write in a warm, observant tone. Use markdown formatting.",
+      (usage) => { reflectionUsage = usage; }
     );
 
     // ---- Step 7: Build compact recommendation input ----
@@ -166,6 +174,7 @@ export async function generateWeeklyReflection(
       userProfile,
       recordSummaries: recommendationSeeds,
       previousRecommendationTitles,
+      userId,
     });
 
     // ---- Step 10: Save one combined digest row ----
@@ -179,6 +188,19 @@ export async function generateWeeklyReflection(
         periodEnd,
       })
       .returning({ id: reflections.id });
+
+    // Log token usage now that we have the reflectionId.
+    // Fire-and-forget — don't block the return on logging.
+    if (reflectionUsage) {
+      logAiUsage({
+        userId,
+        feature: "reflection",
+        provider: "claude",
+        model: chatModel,
+        usage: reflectionUsage,
+        reflectionId: saved.id,
+      });
+    }
 
     return {
       id: saved.id,

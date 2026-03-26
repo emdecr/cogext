@@ -60,6 +60,21 @@ export interface ChatMessage {
 }
 
 // ============================================================================
+// USAGE CALLBACK
+// ============================================================================
+// Optional callback that providers call after an API response completes.
+// Callers pass this in to capture token counts without changing the return
+// type of chat/chatStream. If not provided, usage data is simply ignored.
+//
+// For streaming: the callback fires after the stream finishes (when the
+// final message event arrives with the full usage tally).
+
+export type UsageCallback = (usage: {
+  inputTokens: number;
+  outputTokens: number;
+}) => void;
+
+// ============================================================================
 // LLM PROVIDER
 // ============================================================================
 // A language model that can analyze content and generate structured output.
@@ -95,7 +110,13 @@ export interface LLMProvider {
   // Get a complete response (waits for the full answer).
   // Good for background tasks like profile generation where streaming
   // doesn't help.
-  chat(messages: ChatMessage[], context?: string): Promise<string>;
+  // The optional onUsage callback fires once with the token counts after
+  // the response is received. Pass it to capture usage for logging.
+  chat(
+    messages: ChatMessage[],
+    context?: string,
+    onUsage?: UsageCallback
+  ): Promise<string>;
 
   // Get a streaming response, yielding text chunks as they arrive.
   // AsyncGenerator is the simplest streaming primitive in JS:
@@ -103,8 +124,10 @@ export interface LLMProvider {
   //     process.stdout.write(chunk);  // each chunk is a few tokens
   //   }
   // No ReadableStream, no event emitters, no callbacks — just a for loop.
+  // The optional onUsage callback fires once after the stream completes.
   chatStream(
     messages: ChatMessage[],
-    context?: string
+    context?: string,
+    onUsage?: UsageCallback
   ): AsyncGenerator<string, void, unknown>;
 }

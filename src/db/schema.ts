@@ -59,6 +59,21 @@ export const scopeTypeEnum = pgEnum("scope_type", [
 // Who sent a message in a conversation.
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant"]);
 
+// Which app feature triggered the AI call.
+// This is what gives usage rows context that the API dashboard can't —
+// e.g. "how much did reflections cost this month?"
+export const aiFeatureEnum = pgEnum("ai_feature", [
+  "chat",
+  "reflection",
+  "profile",
+  "recommendation",
+  "image_analysis",
+  "tagging",
+]);
+
+// Which AI provider handled the request.
+export const aiProviderEnum = pgEnum("ai_provider", ["claude", "ollama"]);
+
 // ============================================================================
 // USERS
 // ============================================================================
@@ -397,6 +412,50 @@ export const reflections = pgTable("reflections", {
 });
 
 // ============================================================================
+// AI USAGE
+// ============================================================================
+// Tracks token consumption per AI call. Every time the app talks to Claude
+// or Ollama, a row lands here with:
+//   - which feature triggered the call (chat, reflection, etc.)
+//   - which provider + model handled it
+//   - how many input/output tokens were used
+//   - an optional FK to the conversation or reflection that owns the call
+//
+// This gives you cost visibility that the Anthropic dashboard can't:
+// "my reflections used 45k tokens this month" or "conversation X is my
+// most expensive conversation."
+
+export const aiUsage = pgTable("ai_usage", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+
+  feature: aiFeatureEnum("feature").notNull(),
+  provider: aiProviderEnum("provider").notNull(),
+
+  // The specific model used, e.g. "claude-sonnet-4-6", "llama3.2:1b".
+  // Stored as text (not an enum) because models change frequently — you
+  // don't want a migration every time Anthropic ships a new model.
+  model: text("model").notNull(),
+
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+
+  // Optional links to the domain object that triggered this call.
+  // Only chat and reflections have a natural parent; for other features
+  // (profile, image_analysis, tagging) these stay null and the feature
+  // label alone provides enough context.
+  conversationId: uuid("conversation_id").references(() => conversations.id),
+  reflectionId: uuid("reflection_id").references(() => reflections.id),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 // Drizzle relations don't change the database — they're a TypeScript-only
@@ -490,5 +549,20 @@ export const reflectionsRelations = relations(reflections, ({ one }) => ({
   user: one(users, {
     fields: [reflections.userId],
     references: [users.id],
+  }),
+}));
+
+export const aiUsageRelations = relations(aiUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [aiUsage.userId],
+    references: [users.id],
+  }),
+  conversation: one(conversations, {
+    fields: [aiUsage.conversationId],
+    references: [conversations.id],
+  }),
+  reflection: one(reflections, {
+    fields: [aiUsage.reflectionId],
+    references: [reflections.id],
   }),
 }));

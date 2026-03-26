@@ -36,6 +36,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { records, aiProfile, recordTags, tags } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
+import { logAiUsage } from "@/lib/ai/usage";
 
 // ============================================================================
 // PROFILE SHAPE
@@ -155,10 +156,20 @@ Return ONLY the JSON object, no other text.`;
 
   try {
     const chatProvider = await getChatProvider();
+    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-4-6";
 
     const response = await chatProvider.chat(
       [{ role: "user", content: prompt }],
-      "You are a data analyst. Analyze the provided records and extract a structured user profile. Return only valid JSON."
+      "You are a data analyst. Analyze the provided records and extract a structured user profile. Return only valid JSON.",
+      (usage) => {
+        logAiUsage({
+          userId,
+          feature: "profile",
+          provider: "claude",
+          model: chatModel,
+          usage,
+        });
+      }
     );
 
     // ---- Step 4: Parse the LLM response ----

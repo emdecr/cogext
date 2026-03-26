@@ -171,7 +171,7 @@ export async function createRecord(
       (async () => {
         try {
           // ---- 1. Analyze the image with Claude Vision ----
-          const description = await analyzeImage(parsed.data.imagePath!);
+          const description = await analyzeImage(parsed.data.imagePath!, userId);
 
           // ---- 2. Update the record's content with the description ----
           // Only update if we actually got a description back. If analysis

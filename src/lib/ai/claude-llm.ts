@@ -23,7 +23,7 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMProvider, ChatMessage } from "./types";
+import type { LLMProvider, ChatMessage, UsageCallback } from "./types";
 
 export class ClaudeLLMProvider implements LLMProvider {
   private client: Anthropic;
@@ -107,7 +107,11 @@ export class ClaudeLLMProvider implements LLMProvider {
   //   1. The conversation history stays clean (just user/assistant turns)
   //   2. The caller decides what context to inject — the provider doesn't
   //      need to know about records, profiles, or search results.
-  async chat(messages: ChatMessage[], context?: string): Promise<string> {
+  async chat(
+    messages: ChatMessage[],
+    context?: string,
+    onUsage?: UsageCallback
+  ): Promise<string> {
     try {
       const response = await this.client.messages.create({
         model: this.model,
@@ -125,6 +129,15 @@ export class ClaudeLLMProvider implements LLMProvider {
           content: msg.content,
         })),
       });
+
+      // Report token usage if the caller wants it.
+      // response.usage is always present on a successful Anthropic response.
+      if (onUsage) {
+        onUsage({
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        });
+      }
 
       const textBlock = response.content.find((block) => block.type === "text");
       return textBlock && textBlock.type === "text" ? textBlock.text : "";
@@ -162,7 +175,8 @@ export class ClaudeLLMProvider implements LLMProvider {
   //     at the API route level — but the provider stays simple.
   async *chatStream(
     messages: ChatMessage[],
-    context?: string
+    context?: string,
+    onUsage?: UsageCallback
   ): AsyncGenerator<string, void, unknown> {
     // client.messages.stream() returns a Stream object that emits events.
     // We use the .stream() method (not .create()) — it returns a helper
@@ -197,6 +211,23 @@ export class ClaudeLLMProvider implements LLMProvider {
         event.delta.type === "text_delta"
       ) {
         yield event.delta.text;
+      }
+    }
+
+    // After the stream completes, the SDK can reconstruct the full message
+    // including token counts. finalMessage() is a lightweight call — no
+    // extra API request, it just assembles the data from events we already
+    // received during streaming.
+    if (onUsage) {
+      try {
+        const finalMessage = await stream.finalMessage();
+        onUsage({
+          inputTokens: finalMessage.usage.input_tokens,
+          outputTokens: finalMessage.usage.output_tokens,
+        });
+      } catch {
+        // If we can't get usage from the stream, don't break the response.
+        // The chat already completed successfully — usage is a bonus.
       }
     }
   }

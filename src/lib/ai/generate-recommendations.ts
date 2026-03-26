@@ -28,6 +28,7 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
+import { logAiUsage } from "@/lib/ai/usage";
 import type { UserProfile } from "@/lib/ai/profile";
 import {
   ALLOWED_TYPES,
@@ -54,6 +55,9 @@ export type GenerateRecommendationsInput = {
   // avoid repeating itself across weeks. The orchestrator in reflection.ts
   // fetches these from recent reflection rows.
   previousRecommendationTitles: string[];
+  // Optional userId for token usage logging. When provided, the function
+  // logs input/output tokens to the ai_usage table.
+  userId?: string;
 };
 
 // ============================================================================
@@ -117,6 +121,23 @@ export async function generateRecommendations(
         },
       ],
     });
+
+    // Log token usage. Recommendation calls with web search tend to have
+    // higher input token counts because search results get injected as
+    // context — this is visible in the usage data without needing a
+    // separate web search counter.
+    if (input.userId) {
+      logAiUsage({
+        userId: input.userId,
+        feature: "recommendation",
+        provider: "claude",
+        model,
+        usage: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+      });
+    }
 
     const text = extractTextFromAnthropicResponse(response);
     if (!text) return [];
