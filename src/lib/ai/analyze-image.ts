@@ -188,12 +188,13 @@ export async function analyzeImage(
     //
     // Claude reads them together: "here's an image, now answer this question."
     //
-    // Why claude-3-5-haiku-20241022 and not claude-sonnet-4-6?
+    // Why claude-haiku-4-5-20251001 and not claude-sonnet-4-6?
     //   Image description is a structured, well-defined task. Haiku is fast
     //   and cheap — no need for Sonnet's reasoning power here. This also
     //   keeps image analysis costs low (Haiku is ~10x cheaper than Sonnet).
+    const model = process.env.IMAGE_ANALYSIS_MODEL || "claude-haiku-4-5-20251001";
     const response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model,
       max_tokens: 500, // Description shouldn't need more than ~300 tokens
 
       messages: [
@@ -230,7 +231,7 @@ export async function analyzeImage(
         userId,
         feature: "image_analysis",
         provider: "claude",
-        model: "claude-3-5-haiku-20241022",
+        model,
         usage: {
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,

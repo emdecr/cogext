@@ -116,7 +116,7 @@ export async function generateRecommendations(
       // are needed here — the compiler validates the full request shape.
       tools: [
         {
-          type: "web_search_20250305",
+          type: (process.env.WEB_SEARCH_TOOL_VERSION || "web_search_20250305") as "web_search_20250305",
           name: "web_search",
         },
       ],

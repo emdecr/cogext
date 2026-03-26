@@ -181,7 +181,7 @@ describe("analyzeImage", () => {
     await analyzeImage("/uploads/photo.jpg");
 
     const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.model).toBe("claude-3-5-haiku-20241022");
+    expect(callArgs.model).toBe("claude-haiku-4-5-20251001");
     expect(callArgs.max_tokens).toBe(500);
   });
 

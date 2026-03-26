@@ -183,6 +183,10 @@ export async function createRecord(
               .where(eq(records.id, created.id));
           }
 
+          // If image analysis failed, skip embedding and tagging — without a
+          // real description the LLM will hallucinate irrelevant tags.
+          if (!description) return;
+
           // ---- 3. Embed the record ----
           // embedRecord() re-fetches the record from DB, so it picks up
           // the description we just wrote. This is intentional — the
@@ -190,13 +194,9 @@ export async function createRecord(
           await embedRecord(created.id);
 
           // ---- 4. Generate AI tags ----
-          // Use the description (if we got one) or fall back to whatever
-          // content was saved. Tags based on a real description are much
-          // better than tags based on "Image".
-          const contentForTagging = description || parsed.data.content;
           const llm = await getLLMProvider();
           const aiTags = await llm.generateTags(
-            contentForTagging,
+            description,
             parsed.data.type,
           );
 
