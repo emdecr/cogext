@@ -108,15 +108,15 @@ export async function generateRecommendations(
       ],
       // Anthropic's web search tool lets Claude look up timely context when
       // needed, but the prompt still pushes it toward deep, non-generic picks.
-      // We keep the request typed loosely here because this feature is more
-      // specific than our shared provider abstraction.
+      // The SDK (0.80.0+) natively types WebSearchTool20250305, so no casts
+      // are needed here — the compiler validates the full request shape.
       tools: [
         {
           type: "web_search_20250305",
           name: "web_search",
         },
-      ] as never,
-    } as never);
+      ],
+    });
 
     const text = extractTextFromAnthropicResponse(response);
     if (!text) return [];
