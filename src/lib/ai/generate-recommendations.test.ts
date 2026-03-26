@@ -159,6 +159,30 @@ describe("generate-recommendations", () => {
         reason: "It matches the reflection's quiet philosophical mood.",
       });
     });
+
+    it("keeps a valid https:// url when present", () => {
+      const result = normalizeRecommendation({
+        type: "essay",
+        title: "The Sorrow and the Pity",
+        creator: "Susan Sontag",
+        url: "https://example.com/essay",
+        reason: "It extends the reflection's interest in documentary form.",
+      });
+
+      expect(result?.url).toBe("https://example.com/essay");
+    });
+
+    it("drops a url that does not start with https://", () => {
+      const result = normalizeRecommendation({
+        type: "essay",
+        title: "The Sorrow and the Pity",
+        creator: "Susan Sontag",
+        url: "javascript:alert(1)",
+        reason: "It extends the reflection's interest in documentary form.",
+      });
+
+      expect(result?.url).toBeUndefined();
+    });
   });
 
   describe("generateRecommendations", () => {

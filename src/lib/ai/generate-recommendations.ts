@@ -189,6 +189,7 @@ Return a JSON array of exactly 3 recommendations. Each item must have this shape
   "title": "string",
   "creator": "string",
   "year": "optional string",
+  "url": "optional string — a direct https:// link to the work (publisher page, streaming platform, podcast feed, etc.) when one exists",
   "reason": "1-2 sentences explaining exactly how this connects to the reflection's themes"
 }
 
@@ -199,6 +200,7 @@ Requirements:
 - Use web search when helpful for recency or accuracy, but do not turn this into a list of trending items.
 - Avoid duplicates of things the user has already saved (see titles/tags above) or been recommended before (see previously recommended above).
 - Keep reasons concrete and personal to the reflection, not generic blurbs.
+- Include a url when you can find a reliable one — articles and essays almost always have one; books can link to a publisher or bookshop.org page.
 
 Return ONLY the JSON array. No prose before or after it.`;
 }
@@ -291,12 +293,16 @@ export function normalizeRecommendation(
   }
 
   const year = normalizeOptionalString(candidate.year);
+  // Only accept https:// URLs. This guards against javascript: URIs and other
+  // unexpected schemes that could reach the UI as a clickable href.
+  const url = normalizeHttpsUrl(candidate.url);
 
   return {
     type,
     title,
     creator,
     ...(year ? { year } : {}),
+    ...(url ? { url } : {}),
     reason,
   };
 }
@@ -320,4 +326,13 @@ function normalizeOptionalString(value: unknown): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+// Only allow https:// URLs so we never render a javascript: or data: href in
+// the UI. Returns undefined for anything that doesn't start with https://.
+function normalizeHttpsUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = value.trim();
+  return trimmed.startsWith("https://") ? trimmed : undefined;
 }

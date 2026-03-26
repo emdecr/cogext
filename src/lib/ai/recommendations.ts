@@ -34,11 +34,15 @@ export type RecommendationType =
 // The structured shape stored in the reflections.recommendations JSONB column.
 // `year` stays optional because the model may recommend timeless essays,
 // podcast episodes, or hard-to-date works where a year is unavailable.
+// `url` stays optional because Claude won't always have a canonical link
+// (e.g. physical books, old films), but when web search surfaces one it makes
+// the recommendation directly actionable.
 export type Recommendation = {
   type: RecommendationType;
   title: string;
   creator: string;
   year?: string;
+  url?: string;
   reason: string;
 };
 
@@ -89,6 +93,9 @@ export function normalizeStoredRecommendations(
       creator: item.creator,
       ...(typeof item.year === "string" && item.year.trim().length > 0
         ? { year: item.year }
+        : {}),
+      ...(typeof item.url === "string" && item.url.trim().length > 0
+        ? { url: item.url }
         : {}),
       reason: item.reason,
     }));

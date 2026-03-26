@@ -14,6 +14,7 @@
 //     - title
 //     - creator
 //     - optional year
+//     - optional url
 //     - reason
 //
 // Rendering them as structured UI means:
@@ -111,7 +112,18 @@ export default function ReflectionContent({
 
                     <div className="min-w-0 flex-1">
                       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {recommendation.title}
+                        {recommendation.url ? (
+                          <a
+                            href={recommendation.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors underline-offset-2 hover:underline"
+                          >
+                            {recommendation.title}
+                          </a>
+                        ) : (
+                          recommendation.title
+                        )}
                       </h3>
 
                       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
