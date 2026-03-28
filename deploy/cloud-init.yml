@@ -1,0 +1,88 @@
+#cloud-config
+# =============================================================================
+# GENERIC LINODE CLOUD-INIT
+# =============================================================================
+# Reusable bootstrap for any Linode Ubuntu instance.
+# Paste this into Linode's "User Data" field when creating an instance.
+#
+# What it does:
+#   1. Updates system packages
+#   2. Installs Docker, Nginx, UFW, Fail2ban
+#   3. Creates a "deploy" user with sudo + docker access
+#   4. Hardens SSH (disable password auth, disable root login)
+#   5. Configures firewall (SSH, HTTP, HTTPS only)
+#   6. Creates a swap file (essential for small instances)
+#
+# After boot, SSH in as: ssh deploy@<linode-ip>
+# You'll need to add your SSH public key to the deploy user (see below).
+# =============================================================================
+
+# --- System updates ---
+package_update: true
+package_upgrade: true
+
+# --- Install packages ---
+packages:
+  - docker.io
+  - docker-compose-plugin
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - ufw
+  - fail2ban
+  - curl
+  - git
+  - unattended-upgrades
+
+# --- Create deploy user ---
+users:
+  - name: deploy
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      # Replace with your actual public key:
+      - ssh-ed25519 AAAA... your-key-here
+
+# --- Run commands after package install ---
+runcmd:
+  # -- Enable Docker --
+  - systemctl enable docker
+  - systemctl start docker
+
+  # -- SSH hardening --
+  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - systemctl restart sshd
+
+  # -- Firewall --
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+
+  # -- Fail2ban --
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+
+  # -- Swap file (2GB — critical for small instances) --
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  # Low swappiness — only swap under memory pressure
+  - sysctl vm.swappiness=10
+  - echo 'vm.swappiness=10' >> /etc/sysctl.conf
+
+  # -- Automatic security updates --
+  - systemctl enable unattended-upgrades
+  - systemctl start unattended-upgrades
+
+  # -- Create app directory --
+  - mkdir -p /opt/brain-extension
+  - chown deploy:deploy /opt/brain-extension
+  - mkdir -p /opt/backups/brain-extension
+  - chown deploy:deploy /opt/backups/brain-extension

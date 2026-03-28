@@ -13,9 +13,8 @@
 //   - Fast enough for real-time chat
 //   - Cost-effective for a personal tool (~$3/1M input tokens)
 //
-// This provider handles both chat() and chatStream(). It also implements
-// generateTags() for completeness (any LLMProvider must), but in practice
-// the factory routes tagging to Ollama (free, local) and chat to Claude.
+// This provider handles chat(), chatStream(), and generateTags().
+// The factory uses Claude for all LLM tasks (tagging + chat).
 //
 // SDK: @anthropic-ai/sdk — Anthropic's official Node.js SDK
 //   - Handles auth, retries, rate limiting, streaming
@@ -41,17 +40,15 @@ export class ClaudeLLMProvider implements LLMProvider {
 
     this.client = new Anthropic({ apiKey });
 
-    // CHAT_MODEL is separate from LLM_MODEL (which is for Ollama tagging).
-    // This lets you run e.g. llama3.2:1b for tags and claude-sonnet-4-6 for chat.
+    // CHAT_MODEL controls which Claude model to use.
     this.model = process.env.CHAT_MODEL || "claude-sonnet-4-6";
   }
 
   // ==========================================================================
   // GENERATE TAGS
   // ==========================================================================
-  // Implemented for interface completeness. In our split setup, the factory
-  // routes tagging to the Ollama provider instead. But if someone wanted to
-  // use Claude for everything, this works.
+  // Uses Claude to analyze content and suggest tags.
+  // Haiku-class models are fast and cheap enough for this high-volume task.
   async generateTags(content: string, type: string): Promise<string[]> {
     const truncated =
       content.length > 1000 ? content.slice(0, 1000) + "..." : content;

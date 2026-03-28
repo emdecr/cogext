@@ -156,7 +156,8 @@ jobs:
         env:
           DATABASE_URL: "postgres://ci:ci@localhost:5432/ci"
           JWT_SECRET: "ci-build-only-not-a-real-secret-do-not-use"
-          AI_BASE_URL: "http://localhost:11434"
+          VOYAGE_API_KEY: "ci-build-only-not-a-real-key"
+          ANTHROPIC_API_KEY: "ci-build-only-not-a-real-key"
         run: npm run build
 
   # =============================================================================
@@ -207,3 +208,31 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+
+  # =============================================================================
+  # JOB 5: Deploy to Linode
+  # =============================================================================
+  # After the Docker image is pushed to GHCR, SSH into the server and pull
+  # the new image. Only runs on pushes to main (not PRs).
+  #
+  # Required GitHub Secrets:
+  #   DEPLOY_HOST    — server IP or hostname (records.beforeiforgetthis.space)
+  #   DEPLOY_SSH_KEY — private SSH key for the "deploy" user on the server
+  deploy:
+    name: Deploy
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Linode
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/brain-extension
+            docker compose -f docker-compose.prod.yml pull app
+            docker compose -f docker-compose.prod.yml up -d app
+            docker image prune -f

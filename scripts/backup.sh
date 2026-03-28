@@ -10,7 +10,8 @@
 # Then rotates backups older than RETENTION_DAYS.
 #
 # Usage:
-#   ./scripts/backup.sh                     # manual run
+#   ./scripts/backup.sh                     # manual run (Postgres + MinIO)
+#   ./scripts/backup.sh --db-only           # Postgres only, skip MinIO
 #   ./scripts/backup.sh --dry-run           # print what would happen, no writes
 #
 # Cron (daily at 2am):
@@ -68,10 +69,13 @@ OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
 # =============================================================================
 
 DRY_RUN=false
-if [[ "${1:-}" == "--dry-run" ]]; then
-  DRY_RUN=true
-  echo "🔍 DRY RUN — no files will be written"
-fi
+DB_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true; echo "🔍 DRY RUN — no files will be written" ;;
+    --db-only) DB_ONLY=true; echo "📦 DB-ONLY mode — skipping MinIO backup" ;;
+  esac
+done
 
 # Load environment variables from .env.prod so we have $POSTGRES_USER etc.
 if [[ -f "$ENV_FILE" ]]; then
@@ -151,6 +155,8 @@ fi
 # Verify with: docker volume ls | grep minio
 # =============================================================================
 
+if [[ "$DB_ONLY" == "false" ]]; then
+
 MINIO_BACKUP="$BACKUP_DIR/minio_${TIMESTAMP}.tar.gz"
 MINIO_VOLUME="${COMPOSE_PROJECT}_minio_data"
 
@@ -170,6 +176,8 @@ if [[ "$DRY_RUN" == "false" ]]; then
 else
   echo "   [dry-run] Would create: $MINIO_BACKUP (from volume: $MINIO_VOLUME)"
 fi
+
+fi  # end DB_ONLY check
 
 
 # =============================================================================

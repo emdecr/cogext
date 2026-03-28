@@ -45,7 +45,7 @@ export const createRecordSchema = z.object({
   // Anything else (like "banana") will fail validation.
   type: z.enum(RECORD_TYPES, {
     // Custom error message when an invalid type is provided.
-    errorMap: () => ({ message: "Please select a valid record type" }),
+    error: "Please select a valid record type",
   }),
 
   // .trim() removes leading/trailing whitespace before validation.

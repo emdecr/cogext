@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   // `node server.js` — no `next start` needed.
   output: "standalone",
 
+  // Packages that should be bundled as external (not processed by Turbopack).
+  // voyageai's ESM exports have broken relative paths that Turbopack can't resolve.
+  serverExternalPackages: ["voyageai"],
+
   // ===========================================================================
   // SECURITY HEADERS
   // ===========================================================================

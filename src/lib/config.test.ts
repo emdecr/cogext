@@ -40,7 +40,8 @@ describe("config", () => {
     // Individual tests will delete or change specific vars to test failure cases.
     process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test_db";
     process.env.JWT_SECRET = "a-very-long-secret-that-is-at-least-32-characters";
-    process.env.AI_BASE_URL = "http://localhost:11434";
+    process.env.VOYAGE_API_KEY = "test-voyage-key";
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
     process.env.STORAGE_PROVIDER = "local";
 
     // Ensure production checks are off unless a test turns them on
@@ -70,11 +71,19 @@ describe("config", () => {
     );
   });
 
-  it("throws a clear error when AI_BASE_URL is missing", async () => {
-    delete process.env.AI_BASE_URL;
+  it("throws a clear error when VOYAGE_API_KEY is missing", async () => {
+    delete process.env.VOYAGE_API_KEY;
 
     await expect(import("@/lib/config")).rejects.toThrow(
-      "Missing required environment variable: AI_BASE_URL"
+      "Missing required environment variable: VOYAGE_API_KEY"
+    );
+  });
+
+  it("throws a clear error when ANTHROPIC_API_KEY is missing", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      "Missing required environment variable: ANTHROPIC_API_KEY"
     );
   });
 
@@ -86,7 +95,8 @@ describe("config", () => {
     expect(config.auth.jwtSecret).toBe(
       "a-very-long-secret-that-is-at-least-32-characters"
     );
-    expect(config.ai.baseUrl).toBe("http://localhost:11434");
+    expect(config.voyage.apiKey).toBe("test-voyage-key");
+    expect(config.chat.anthropicApiKey).toBe("test-anthropic-key");
   });
 
   // ---- Optional variables with defaults ----
@@ -94,13 +104,13 @@ describe("config", () => {
   it("uses default embed model when EMBED_MODEL is not set", async () => {
     delete process.env.EMBED_MODEL;
     const { config } = await import("@/lib/config");
-    expect(config.ai.embedModel).toBe("nomic-embed-text");
+    expect(config.voyage.embedModel).toBe("voyage-3-lite");
   });
 
   it("uses EMBED_MODEL when set", async () => {
     process.env.EMBED_MODEL = "custom-model";
     const { config } = await import("@/lib/config");
-    expect(config.ai.embedModel).toBe("custom-model");
+    expect(config.voyage.embedModel).toBe("custom-model");
   });
 
   it("defaults storage provider to 'local'", async () => {

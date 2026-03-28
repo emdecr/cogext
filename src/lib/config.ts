@@ -77,28 +77,24 @@ export const config = {
   },
 
   // ---------------------------------------------------------------------------
-  // AI — Embeddings + Tagging (Ollama or compatible)
+  // AI — Embeddings (Voyage AI)
   // ---------------------------------------------------------------------------
-  ai: {
-    // Base URL for the AI inference server.
-    // Dev:  http://localhost:11434 (Ollama running locally)
-    // Prod: http://ollama:11434   (Ollama container on Docker network)
-    baseUrl: requireEnv("AI_BASE_URL"),
+  voyage: {
+    // Voyage AI API key. Required for generating embeddings.
+    // Get your key at https://dash.voyageai.com/
+    apiKey: requireEnv("VOYAGE_API_KEY"),
 
-    // The embedding model name. Must be pulled in Ollama first.
-    embedModel: optionalEnv("EMBED_MODEL", "nomic-embed-text"),
-
-    // The LLM used for auto-tagging.
-    llmModel: optionalEnv("LLM_MODEL", "llama3.2:1b"),
+    // The embedding model name.
+    embedModel: optionalEnv("EMBED_MODEL", "voyage-3-lite"),
   },
 
   // ---------------------------------------------------------------------------
-  // AI — Chat (Anthropic Claude)
+  // AI — Chat + Tagging (Anthropic Claude)
   // ---------------------------------------------------------------------------
   chat: {
-    // Anthropic API key. If not set, chat falls back to Ollama (lower quality).
-    // Optional — the AI factory handles the fallback.
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    // Anthropic API key. Required for chat, tagging, image analysis, etc.
+    // Get your key at https://console.anthropic.com/settings/keys
+    anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
 
     // Claude model to use for chat and reflections.
     model: optionalEnv("CHAT_MODEL", "claude-sonnet-4-6"),

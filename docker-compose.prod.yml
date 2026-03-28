@@ -3,18 +3,22 @@
 # =============================================================================
 #
 # Services:
-#   app      — Next.js app (built from Dockerfile, standalone mode)
+#   app      — Next.js app (pulled from GHCR, standalone mode)
 #   db       — PostgreSQL 17 + pgvector for relational data + vector search
 #   minio    — S3-compatible object storage for uploaded images/files
-#   ollama   — Local AI inference (embeddings + LLM tagging)
+#
+# AI services (embeddings, tagging, chat) use cloud APIs:
+#   - Voyage AI for embeddings
+#   - Anthropic Claude for tagging + chat
+# No local AI container needed.
 #
 # Networking:
 #   All services share the internal "brain_net" bridge network.
 #   Services talk to each other using their service name as hostname:
-#     app → db:5432, app → minio:9000, app → ollama:11434
-#   NO ports are published to the host for db, minio internal API, or ollama.
-#   Only the app (3000) and MinIO console (9001) are optionally accessible.
-#   Nginx (running on the host or as a separate service) proxies :443 → app:3000.
+#     app → db:5432, app → minio:9000
+#   NO ports are published to the host for db or minio internal API.
+#   Only the app (3000) and MinIO console (localhost:9001) are accessible.
+#   Nginx (running on the host) proxies :443 → app:3000.
 #
 # Persistence:
 #   Named volumes survive `docker compose down` but are wiped by `docker compose
@@ -33,58 +37,44 @@ services:
   # APP — Next.js (standalone)
   # ===========================================================================
   app:
-    # Build from the Dockerfile in this directory.
-    # In production you'd typically pre-build and push to a registry, then use
-    # `image: your-registry/brain-extension:latest` here instead.
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Pre-built image from GitHub Container Registry.
+    # Pushed by CI on every merge to main.
+    image: ghcr.io/emdecr/brain-ext:latest
 
-    # Always restart if the process crashes or the host reboots.
-    # "unless-stopped" means: restart always, EXCEPT if you manually `docker stop` it.
     restart: unless-stopped
 
     # Publish port 3000 on the host so Nginx can proxy to it.
-    # If Nginx runs as a Docker service on the same network, you can remove this
-    # and have Nginx use "app:3000" as its upstream — even more secure.
     ports:
       - "3000:3000"
 
-    # Runtime environment variables.
-    # These are NOT baked into the image — they're injected at container start.
-    # Values come from a .env.prod file (gitignored) on the host.
-    # See .env.example for the full list of required variables.
+    # Runtime environment variables from .env.prod (gitignored).
     env_file:
       - .env.prod
 
-    # Additional env vars that are always the same in prod (not secret).
     environment:
       NODE_ENV: production
 
-    # Wait for db and minio to be healthy before starting the app.
-    # Without this, the app might try to connect to Postgres before it's ready
-    # and crash on startup.
     depends_on:
       db:
         condition: service_healthy
       minio:
         condition: service_healthy
 
-    # Join the internal network.
     networks:
       - brain_net
 
-    # Health check for the app itself.
-    # Calls our /api/health endpoint (we'll build this in Phase 5 step 7).
-    # Docker uses this to know if the container is actually serving traffic.
-    # If it fails enough times, Docker marks the container "unhealthy" —
-    # useful for zero-downtime deploys and monitoring dashboards.
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s  # Give Next.js time to boot before checking
+      start_period: 40s
+
+    # Memory limit — keeps the app from eating all RAM on a 2GB instance.
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 
   # ===========================================================================
@@ -94,23 +84,21 @@ services:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
 
-    # In production: NO port mapping to the host.
-    # The app connects via Docker's internal network: db:5432
-    # Postgres should never be directly reachable from the internet.
-    # If you need to connect from your laptop (e.g. for a migration), use:
-    #   docker compose -f docker-compose.prod.yml exec db psql -U brain brain_extension
-    # Or temporarily add the port mapping, run your query, then remove it.
+    # Tuned for a 2GB instance. Override default Postgres settings that
+    # assume more RAM than we have.
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c work_mem=4MB
+      -c effective_cache_size=256MB
+      -c maintenance_work_mem=32MB
 
     environment:
-      # These are set once on first boot (when the data volume is empty).
-      # Changing them later has no effect unless you wipe the volume.
-      # Use strong, unique values in .env.prod — not "brain"/"brain".
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
 
     volumes:
-      # Persist database files. Never run `docker compose down -v` in prod.
       - pgdata:/var/lib/postgresql/data
 
     healthcheck:
@@ -123,49 +111,41 @@ services:
     networks:
       - brain_net
 
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
 
   # ===========================================================================
   # MINIO — S3-compatible object storage
   # ===========================================================================
   # MinIO replaces the local public/uploads/ directory.
-  # Your app uses the AWS SDK (or @aws-sdk/client-s3) pointed at MinIO's URL
-  # instead of S3 — same API, runs on your server.
   #
-  # Two ports:
-  #   9000 — S3 API (what your app talks to, internal only in prod)
-  #   9001 — Web console (optional, for browsing buckets visually)
-  #
-  # First-time setup: after starting, create the bucket manually:
-  #   docker compose -f docker-compose.prod.yml exec minio \
-  #     mc alias set local http://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && \
-  #     mc mb local/brain-uploads
-  # Or use the web console at http://your-server:9001
+  # First-time setup: create the bucket via the web console.
+  #   SSH tunnel: ssh -L 9001:localhost:9001 deploy@records.beforeiforgetthis.space
+  #   Then open http://localhost:9001 in your browser.
   minio:
     image: minio/minio:latest
     restart: unless-stopped
 
-    # The "server" command starts MinIO in object storage mode.
-    # --console-address fixes the console to port 9001 (otherwise it's random).
     command: server /data --console-address ":9001"
 
     ports:
-      # 9001 is the web console — useful for inspecting buckets.
-      # Gate this behind Nginx + auth if your server is public.
-      # The S3 API on 9000 stays internal (no host mapping).
-      - "9001:9001"
+      # Console on localhost only — not publicly accessible.
+      # Access via SSH tunnel when needed.
+      - "127.0.0.1:9001:9001"
+      # S3 API on localhost for Nginx to proxy image requests.
+      - "127.0.0.1:9000:9000"
 
     environment:
-      # MinIO uses these as the root credentials (equivalent to AWS access key).
-      # Your app's STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY should match these.
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
     volumes:
-      # Persist all uploaded files.
       - minio_data:/data
 
     healthcheck:
-      # MinIO provides a /minio/health/live endpoint for this exact purpose.
       test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 30s
       timeout: 10s
@@ -175,66 +155,23 @@ services:
     networks:
       - brain_net
 
-
-  # ===========================================================================
-  # OLLAMA — Local AI inference
-  # ===========================================================================
-  # Runs LLMs and embedding models locally:
-  #   - nomic-embed-text: generates vector embeddings for semantic search
-  #   - llama3.2:1b: small LLM for auto-tagging records
-  #
-  # The app calls http://ollama:11434 (internal Docker network).
-  # No port is published to the host — Ollama is not a public service.
-  #
-  # First-time model pull (run once after container starts):
-  #   docker compose -f docker-compose.prod.yml exec ollama ollama pull nomic-embed-text
-  #   docker compose -f docker-compose.prod.yml exec ollama ollama pull llama3.2:1b
-  #
-  # GPU note: if your VPS has an Nvidia GPU, add:
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-
-    volumes:
-      # Persist downloaded models (~1.5GB). Without this you'd re-download
-      # models on every `docker compose up`.
-      - ollama_data:/root/.ollama
-
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s  # Ollama takes a moment to initialize on cold start
-
-    networks:
-      - brain_net
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 
 # =============================================================================
-# VOLUMES — Named volumes persist data across container restarts.
+# VOLUMES
 # =============================================================================
-# `docker compose down` keeps these volumes.
-# `docker compose down -v` DELETES them (never do this in prod).
-# To inspect: docker volume ls | grep brain
 volumes:
   pgdata:       # PostgreSQL data files
   minio_data:   # Uploaded images and files
-  ollama_data:  # Downloaded AI models
 
 
 # =============================================================================
 # NETWORKS
 # =============================================================================
-# A custom bridge network so services can find each other by name.
-# Services NOT in this network can't reach them — isolation by default.
 networks:
   brain_net:
     driver: bridge

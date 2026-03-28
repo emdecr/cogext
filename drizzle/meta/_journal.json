@@ -43,6 +43,13 @@
       "when": 1774556287199,
       "tag": "0005_round_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774717179725,
+      "tag": "0006_rainy_beast",
+      "breakpoints": true
     }
   ]
 }

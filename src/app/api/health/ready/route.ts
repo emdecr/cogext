@@ -8,8 +8,6 @@
 //   database — SELECT 1 against Postgres. Critical: 503 if down.
 //   storage  — MinIO health endpoint (only when STORAGE_PROVIDER=minio).
 //              Degraded (200) if down — reading still works, uploads fail.
-//   ollama   — Ollama /api/tags endpoint. Degraded (200) if down —
-//              existing records still load, just no new embeddings/AI tags.
 //
 // HTTP Status:
 //   200 — all checks passed, or only non-critical checks failed (degraded)
@@ -27,8 +25,7 @@
 //     "timestamp": "...",
 //     "checks": {
 //       "database": { "status": "ok", "latencyMs": 5 },
-//       "storage":  { "status": "ok" },
-//       "ollama":   { "status": "degraded", "note": "..." }
+//       "storage":  { "status": "ok" }
 //     }
 //   }
 //
@@ -142,45 +139,6 @@ async function checkStorage(): Promise<CheckResult> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Ollama check
-// ---------------------------------------------------------------------------
-// Calls Ollama's /api/tags endpoint which lists available models.
-// Returns 200 with a JSON body if Ollama is up.
-//
-// Why /api/tags instead of just a ping?
-//   It confirms Ollama is not just running but actually serving the API.
-//   We could check for specific models too (nomic-embed-text, llama3.2:1b)
-//   but that's overkill — if Ollama is up, models are either available or
-//   will be pulled on next use.
-
-async function checkOllama(): Promise<CheckResult> {
-  const start = Date.now();
-  try {
-    const response = await fetch(`${config.ai.baseUrl}/api/tags`, {
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (response.ok) {
-      return { status: "ok", latencyMs: Date.now() - start };
-    }
-
-    return {
-      status: "degraded",
-      latencyMs: Date.now() - start,
-      note: `Ollama responded with HTTP ${response.status}`,
-    };
-  } catch (error) {
-    logger.warn("Health check: Ollama unreachable", { error });
-    return {
-      status: "degraded",
-      latencyMs: Date.now() - start,
-      // Degraded: existing records load fine. Semantic search falls back
-      // to keyword-only. No new embeddings or auto-tags until Ollama recovers.
-      note: "Ollama unreachable — AI features degraded",
-    };
-  }
-}
 
 // =============================================================================
 // READINESS HANDLER
@@ -188,15 +146,12 @@ async function checkOllama(): Promise<CheckResult> {
 
 export async function GET() {
   // Run all checks in parallel — faster than sequential.
-  // If DB takes 50ms and Ollama takes 200ms, parallel = 200ms total,
-  // sequential = 250ms. For a health endpoint called every N seconds, this adds up.
-  const [database, storage, ollama] = await Promise.all([
+  const [database, storage] = await Promise.all([
     checkDatabase(),
     checkStorage(),
-    checkOllama(),
   ]);
 
-  const checks = { database, storage, ollama };
+  const checks = { database, storage };
 
   // Determine overall status.
   // Rules:
@@ -206,20 +161,17 @@ export async function GET() {
   let overallStatus: CheckStatus = "ok";
 
   if (database.status === "error") {
-    // DB failure is always critical — nothing works without data.
     overallStatus = "error";
   } else if (
     storage.status === "degraded" ||
-    storage.status === "error" ||
-    ollama.status === "degraded" ||
-    ollama.status === "error"
+    storage.status === "error"
   ) {
     overallStatus = "degraded";
   }
 
   // HTTP 503 only for critical failures (DB down).
-  // Degraded → 200 so monitoring tools don't page you for Ollama hiccups
-  // at 3am. You can set up a separate alert for "degraded" if you want.
+  // Degraded → 200 so monitoring tools don't page you for non-critical
+  // issues at 3am. Set up a separate alert for "degraded" if you want.
   const httpStatus = overallStatus === "error" ? 503 : 200;
 
   return NextResponse.json(
