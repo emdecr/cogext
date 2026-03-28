@@ -60,9 +60,10 @@ export class ClaudeLLMProvider implements LLMProvider {
         // System prompt goes in the top-level `system` field in the
         // Anthropic API — NOT as a message with role "system".
         system:
-          "You are a tagging assistant. Return ONLY a JSON object with a " +
+          "You are a tagging assistant. Return ONLY a raw JSON object with a " +
           '"tags" key containing an array of 3-5 tag strings. Tags should be ' +
-          "lowercase, 1-3 words, useful for categorization.",
+          "lowercase, 1-3 words, useful for categorization. " +
+          "Do NOT wrap the JSON in markdown code fences or any other formatting.",
         messages: [
           {
             role: "user",
@@ -76,7 +77,11 @@ export class ClaudeLLMProvider implements LLMProvider {
       const textBlock = response.content.find((block) => block.type === "text");
       if (!textBlock || textBlock.type !== "text") return [];
 
-      const parsed = JSON.parse(textBlock.text);
+      // Strip markdown code fences if Claude wraps the JSON (e.g. ```json\n{...}\n```)
+      let rawText = textBlock.text.trim();
+      rawText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?\s*```$/, "");
+
+      const parsed = JSON.parse(rawText);
       if (!parsed.tags || !Array.isArray(parsed.tags)) return [];
 
       return parsed.tags

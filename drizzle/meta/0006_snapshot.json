@@ -556,7 +556,7 @@
         },
         "embedding": {
           "name": "embedding",
-          "type": "vector(1024)",
+          "type": "vector(512)",
           "primaryKey": false,
           "notNull": false
         },

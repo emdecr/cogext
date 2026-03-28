@@ -9,9 +9,10 @@ const nextConfig: NextConfig = {
   // `node server.js` — no `next start` needed.
   output: "standalone",
 
-  // Packages that should be bundled as external (not processed by Turbopack).
-  // voyageai's ESM exports have broken relative paths that Turbopack can't resolve.
-  serverExternalPackages: ["voyageai"],
+  // sharp uses native binaries (libvips) that can't be bundled by webpack.
+  // Marking it as external tells Next.js to load it from node_modules at runtime.
+  // In standalone mode, Next.js automatically copies the correct platform binary.
+  serverExternalPackages: ["sharp"],
 
   // ===========================================================================
   // SECURITY HEADERS

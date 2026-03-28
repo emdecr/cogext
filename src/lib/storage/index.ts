@@ -55,6 +55,16 @@ async function getLocalModules() {
 }
 
 async function saveFileLocal(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split(".").pop() || "jpg";
+  return saveBufferLocal(buffer, ext, file.type);
+}
+
+async function saveBufferLocal(
+  buffer: Buffer,
+  ext: string,
+  contentType: string
+): Promise<string> {
   const { writeFile, mkdir, path, randomUUID } = await getLocalModules();
 
   const uploadDir = path.join(process.cwd(), "public", "uploads");
@@ -64,13 +74,10 @@ async function saveFileLocal(file: File): Promise<string> {
   await mkdir(uploadDir, { recursive: true });
 
   // UUID filename prevents collisions: two "photo.jpg" uploads get
-  // different names. extname extracts ".jpg" from "photo.jpg".
-  const ext = path.extname(file.name) || ".jpg";
-  const filename = `${randomUUID()}${ext}`;
+  // different names.
+  const filename = `${randomUUID()}.${ext}`;
   const filepath = path.join(uploadDir, filename);
 
-  // Convert the Web API File/Blob → Node.js Buffer → write to disk.
-  const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(filepath, buffer);
 
   // Return a URL path. "/uploads/abc.jpg" is served by Next.js static files.
@@ -151,24 +158,29 @@ async function getS3Client() {
 }
 
 async function saveFileMinio(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split(".").pop() || "jpg";
+  return saveBufferMinio(buffer, ext, file.type);
+}
+
+async function saveBufferMinio(
+  buffer: Buffer,
+  ext: string,
+  contentType: string
+): Promise<string> {
   const { PutObjectCommand } = await import("@aws-sdk/client-s3");
   const { randomUUID } = await import("crypto");
-  const path = await import("path");
 
   const s3 = await getS3Client();
 
-  const ext = path.extname(file.name) || ".jpg";
-  const filename = `${randomUUID()}${ext}`;
-
-  // Convert File → Buffer. S3 SDK accepts Buffer as the Body.
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const filename = `${randomUUID()}.${ext}`;
 
   await s3.send(
     new PutObjectCommand({
       Bucket: config.storage.bucket,
       Key: filename,
       Body: buffer,
-      ContentType: file.type,
+      ContentType: contentType,
       // ContentLength helps S3 validate the upload; avoids chunked encoding issues.
       ContentLength: buffer.byteLength,
     })
@@ -228,6 +240,25 @@ export async function saveFile(file: File): Promise<string> {
     return saveFileMinio(file);
   }
   return saveFileLocal(file);
+}
+
+/**
+ * Save a raw buffer to storage. Used after image compression where we
+ * already have the processed bytes and know the file extension/MIME type.
+ *
+ * @param buffer - The file data
+ * @param ext - File extension without dot (e.g. "webp", "gif")
+ * @param contentType - MIME type (e.g. "image/webp")
+ */
+export async function saveBuffer(
+  buffer: Buffer,
+  ext: string,
+  contentType: string
+): Promise<string> {
+  if (config.storage.provider === "minio") {
+    return saveBufferMinio(buffer, ext, contentType);
+  }
+  return saveBufferLocal(buffer, ext, contentType);
 }
 
 /**

@@ -26,7 +26,8 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { saveFile, MAX_FILE_SIZE, ALLOWED_TYPES } from "@/lib/storage";
+import { saveBuffer, MAX_FILE_SIZE, ALLOWED_TYPES } from "@/lib/storage";
+import { compressImage } from "@/lib/storage/compress";
 import { getSession } from "@/lib/auth/session";
 import { uploadLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -156,8 +157,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ---- Save the file ----
-    const path = await saveFile(file);
+    // ---- Compress the image ----
+    // Resize to max 1600px, convert to WebP at quality 80.
+    // GIFs pass through unmodified to preserve animation.
+    // A typical 4MB phone photo → ~200-400KB WebP.
+    const rawBuffer = Buffer.from(fileBuffer);
+    const { data, ext, mime } = await compressImage(rawBuffer, file.type);
+
+    logger.info("Image compressed", {
+      userId: session.userId,
+      originalSize: rawBuffer.byteLength,
+      compressedSize: data.byteLength,
+      reduction: `${Math.round((1 - data.byteLength / rawBuffer.byteLength) * 100)}%`,
+      format: ext,
+    });
+
+    // ---- Save the compressed file ----
+    const path = await saveBuffer(data, ext, mime);
 
     // Return the public URL path. The client will use this as the
     // imagePath when creating the record.
