@@ -77,6 +77,17 @@ export default function RegisterPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 animate-[fadeIn_300ms_ease-out]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-400" />
+        <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+          Creating your account...
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -132,7 +143,7 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Creating account..." : "Register"}
+          Register
         </button>
       </form>
 
