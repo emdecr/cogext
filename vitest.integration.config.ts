@@ -31,7 +31,7 @@
 // Prerequisites:
 //   - PostgreSQL must be running with the test database available
 //   - Set DATABASE_URL in your environment or .env.test file
-//   - Recommended: use a separate DB name, e.g. "brain_extension_test"
+//   - Recommended: use a separate DB name, e.g. "cogext_test"
 //     so integration tests never touch your dev data
 // ============================================================================
 

@@ -61,8 +61,8 @@ export const config = {
   // ---------------------------------------------------------------------------
   db: {
     // Full Postgres connection string.
-    // Dev:  postgres://brain:brain@localhost:5435/brain_extension
-    // Prod: postgres://brain:STRONG_PASS@db:5432/brain_extension
+    // Dev:  postgres://cogext:cogext@localhost:5435/cogext
+    // Prod: postgres://cogext:STRONG_PASS@db:5432/cogext
     //       Note "db" — the Docker service name, not "localhost"
     url: requireEnv("DATABASE_URL"),
   },
@@ -85,7 +85,7 @@ export const config = {
     apiKey: requireEnv("VOYAGE_API_KEY"),
 
     // The embedding model name.
-    embedModel: optionalEnv("EMBED_MODEL", "voyage-3-lite"),
+    embedModel: optionalEnv("EMBED_MODEL", "voyage-4-lite"),
   },
 
   // ---------------------------------------------------------------------------
@@ -125,13 +125,13 @@ export const config = {
     secretKey: process.env.STORAGE_SECRET_KEY,
 
     // The bucket name where files are stored. Create this once in MinIO console.
-    bucket: optionalEnv("STORAGE_BUCKET", "brain-uploads"),
+    bucket: optionalEnv("STORAGE_BUCKET", "cogext-uploads"),
 
     // The public-facing base URL for serving files.
     // This is what gets prepended to filenames when building <img src> URLs.
     // Could be:
     //   https://files.yourdomain.com   (Nginx proxies to MinIO)
-    //   http://your-vps-ip:9000/brain-uploads  (direct, less ideal)
+    //   http://your-vps-ip:9000/cogext-uploads  (direct, less ideal)
     // The stored DB value (imagePath) becomes: publicUrl + "/" + filename
     publicUrl: process.env.STORAGE_PUBLIC_URL,
   },

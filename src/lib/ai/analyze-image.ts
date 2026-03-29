@@ -16,7 +16,7 @@
 //
 // The flow:
 //   1. Receive the imagePath stored in the database (e.g. "/uploads/abc.jpg"
-//      or "https://files.yourdomain.com/brain-uploads/abc.jpg")
+//      or "https://files.yourdomain.com/cogext-uploads/abc.jpg")
 //   2. Read the image bytes (from local filesystem or remote URL)
 //   3. Encode as base64 — the format Claude's vision API expects
 //   4. Detect the MIME type from the path extension

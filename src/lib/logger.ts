@@ -21,7 +21,7 @@
 //
 // One line per log entry. Docker captures all stdout/stderr from containers.
 // Pipe docker logs to your preferred collector:
-//   docker logs brain-extension-app-1 | your-log-shipper
+//   docker logs cogext-app-1 | your-log-shipper
 //
 // Usage:
 //   import { logger } from "@/lib/logger"

@@ -22,9 +22,9 @@ services:
     # Prod: use strong, unique values. Never commit prod secrets to the repo —
     # use a .env file (gitignored) or Docker secrets instead.
     environment:
-      POSTGRES_USER: brain
-      POSTGRES_PASSWORD: brain
-      POSTGRES_DB: brain_extension
+      POSTGRES_USER: cogext
+      POSTGRES_PASSWORD: cogext
+      POSTGRES_DB: cogext
 
     # Persist database files outside the container. Without this, every
     # `docker compose down` would wipe your data.
@@ -43,7 +43,7 @@ services:
     # hardware or add restart: unless-stopped so Docker auto-restarts it
     # if it crashes.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U brain -d brain_extension"]
+      test: ["CMD-SHELL", "pg_isready -U cogext -d cogext"]
       interval: 5s
       timeout: 5s
       retries: 5

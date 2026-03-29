@@ -187,7 +187,7 @@ async function saveBufferMinio(
   );
 
   // Return the public-facing URL for this file.
-  // STORAGE_PUBLIC_URL is the base (e.g. https://files.yourdomain.com/brain-uploads).
+  // STORAGE_PUBLIC_URL is the base (e.g. https://files.yourdomain.com/cogext-uploads).
   // The stored value in records.image_path will be the full URL.
   return `${config.storage.publicUrl}/${filename}`;
 }
@@ -198,7 +198,7 @@ async function deleteFileMinio(urlOrKey: string): Promise<void> {
   const s3 = await getS3Client();
 
   // Extract just the filename from either a full URL or a bare key.
-  // "https://files.example.com/brain-uploads/abc.jpg" → "abc.jpg"
+  // "https://files.example.com/cogext-uploads/abc.jpg" → "abc.jpg"
   const filename = urlOrKey.split("/").pop()!;
 
   try {
@@ -233,7 +233,7 @@ function getPublicUrlMinio(urlOrKey: string): string {
  * Returns the stored path/URL — save this in records.image_path.
  *
  * Local:  returns "/uploads/abc.jpg"
- * MinIO:  returns "https://files.yourdomain.com/brain-uploads/abc.jpg"
+ * MinIO:  returns "https://files.yourdomain.com/cogext-uploads/abc.jpg"
  */
 export async function saveFile(file: File): Promise<string> {
   if (config.storage.provider === "minio") {

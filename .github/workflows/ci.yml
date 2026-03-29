@@ -1,5 +1,5 @@
 # =============================================================================
-# CI PIPELINE — Brain Extension
+# CI PIPELINE — CogExt
 # =============================================================================
 #
 # This workflow runs on every push and pull request. It catches bugs BEFORE
@@ -194,8 +194,8 @@ jobs:
       # docker/build-push-action handles caching, tagging, and pushing.
       #
       # Tags:
-      #   - ghcr.io/OWNER/brain-extension:latest — always points to newest build
-      #   - ghcr.io/OWNER/brain-extension:sha-abc123 — pinned to specific commit
+      #   - ghcr.io/OWNER/cogext:latest — always points to newest build
+      #   - ghcr.io/OWNER/cogext:sha-abc123 — pinned to specific commit
       #
       # The SHA tag lets you roll back to an exact commit if something breaks.
       # "latest" is what your docker-compose.prod.yml pulls by default.
@@ -232,7 +232,7 @@ jobs:
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd /opt/brain-extension
+            cd /opt/cogext
             docker compose -f docker-compose.prod.yml pull app
             docker compose -f docker-compose.prod.yml up -d app
             docker image prune -f

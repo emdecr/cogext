@@ -12,7 +12,7 @@
 #   ./scripts/restore.sh 20260324_020000
 #
 # To list available backups:
-#   ls /opt/backups/brain-extension/
+#   ls /opt/backups/cogext/
 #
 # What this does:
 #   1. Stops the app container (keeps DB and MinIO running)
@@ -30,10 +30,10 @@ set -euo pipefail
 # CONFIGURATION — must match backup.sh
 # =============================================================================
 
-COMPOSE_PROJECT="brain-extension"
-COMPOSE_FILE="/opt/brain-extension/docker-compose.prod.yml"
-BACKUP_ROOT="/opt/backups/brain-extension"
-ENV_FILE="/opt/brain-extension/.env.prod"
+COMPOSE_PROJECT="cogext"
+COMPOSE_FILE="/opt/cogext/docker-compose.prod.yml"
+BACKUP_ROOT="/opt/backups/cogext"
+ENV_FILE="/opt/cogext/.env.prod"
 
 # =============================================================================
 # VALIDATION
@@ -74,7 +74,7 @@ fi
 # =============================================================================
 # This is a destructive operation. Require explicit confirmation.
 echo "============================================================"
-echo "⚠️  RESTORE — Brain Extension"
+echo "⚠️  RESTORE — CogExt"
 echo "============================================================"
 echo ""
 echo "Backup:    $BACKUP_DIR"

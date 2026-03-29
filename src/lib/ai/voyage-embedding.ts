@@ -5,7 +5,7 @@
 // Implements the EmbeddingProvider interface using Voyage AI's REST API.
 // Voyage AI is Anthropic's recommended embedding partner.
 //
-// Model: voyage-3-lite
+// Model: voyage-4-lite
 //   - 1024-dimensional vectors
 //   - ~$0.02 per 1M tokens
 //   - Good quality, low cost
@@ -15,7 +15,7 @@
 // in Next.js. The API is a single endpoint — no SDK needed.
 //
 // API: POST https://api.voyageai.com/v1/embeddings
-//   Request:  { input: ["text1", "text2"], model: "voyage-3-lite" }
+//   Request:  { input: ["text1", "text2"], model: "voyage-4-lite" }
 //   Response: { data: [{ embedding: [0.12, -0.34, ...], index: 0 }] }
 // ============================================================================
 
@@ -37,9 +37,9 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
   private apiKey: string;
   private model: string;
 
-  // voyage-3-lite produces 512-dimensional vectors.
+  // voyage-4-lite produces 1024-dimensional vectors.
   // This MUST match the vector column size in the database.
-  readonly dimensions = 512;
+  readonly dimensions = 1024;
 
   constructor() {
     const apiKey = process.env.VOYAGE_API_KEY;
@@ -51,7 +51,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
     }
 
     this.apiKey = apiKey;
-    this.model = process.env.EMBED_MODEL || "voyage-3-lite";
+    this.model = process.env.EMBED_MODEL || "voyage-4-lite";
   }
 
   // ---- Single text embedding ----

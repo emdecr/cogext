@@ -29,8 +29,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Brain Extension",
-  description: "Your personal second brain",
+  title: "CogExt",
+  description: "Your personal cognition extension",
 };
 
 // This script runs inline in <head> before the page renders.

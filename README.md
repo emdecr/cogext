@@ -1,6 +1,6 @@
-# Brain Extension
+# CogExt
 
-A self-hosted second brain for collecting, organizing, and rediscovering ideas. Save images, quotes, articles, links, and notes — then search, chat with, and reflect on everything you've saved using AI.
+A self-hosted cognition extension for collecting, organizing, and rediscovering ideas. Save images, quotes, articles, links, and notes — then search, chat with, and reflect on everything you've saved using AI.
 
 Built as an alternative to tools like mymind.com, with full ownership of your data and no algorithmic feed shaping what you see.
 
@@ -63,8 +63,8 @@ Built as an alternative to tools like mymind.com, with full ownership of your da
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/emdecr/brain-ext.git
-cd brain-ext
+git clone https://github.com/emdecr/cogext.git
+cd cogext
 npm install
 
 # 2. Configure environment
@@ -87,7 +87,7 @@ The app will be available at `http://localhost:3000`. Register an account to get
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | `postgres://brain:brain@localhost:5435/brain_extension` | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | `postgres://cogext:cogext@localhost:5435/cogext` | PostgreSQL connection string |
 | `JWT_SECRET` | Yes | — | Secret for signing auth tokens (≥32 chars in production) |
 | `ANTHROPIC_API_KEY` | No | — | Enables chat, image analysis, and reflections |
 | `CHAT_MODEL` | No | `claude-sonnet-4-20250514` | Claude model for chat and RAG |
@@ -124,7 +124,7 @@ npm run test:coverage
 
 ```bash
 # 1. Clone the repo on your server
-git clone https://github.com/emdecr/brain-ext.git && cd brain-ext
+git clone https://github.com/emdecr/cogext.git && cd cogext
 
 # 2. Create production env file
 cp .env.example .env.prod
@@ -172,7 +172,7 @@ To enable Docker pushes, the workflow uses `GITHUB_TOKEN` (automatic in GitHub A
 ## Project Structure
 
 ```
-brain-extension/
+cogext/
 ├── .github/workflows/     # CI pipeline
 ├── drizzle/                # Generated SQL migrations
 ├── e2e/                    # Playwright E2E tests

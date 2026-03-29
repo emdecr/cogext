@@ -35,7 +35,7 @@
 
 set -e
 
-echo "⏳ Starting Brain Extension..."
+echo "⏳ Starting CogExt..."
 
 # Run database migrations.
 # If this exits with code != 0, `set -e` stops the script here.

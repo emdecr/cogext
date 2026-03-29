@@ -21,8 +21,8 @@ set -euo pipefail
 
 REMOTE_USER="deploy"
 REMOTE_HOST="records.beforeiforgetthis.space"
-LOCAL_DIR="$HOME/Projects/Backups/brain-extension/images"
-BUCKET="brain-uploads"
+LOCAL_DIR="$HOME/Projects/Backups/cogext/images"
+BUCKET="cogext-uploads"
 TUNNEL_PORT=9099  # Use non-standard port to avoid conflicts
 
 # MinIO credentials — set these or export them before running
@@ -61,11 +61,11 @@ cleanup() {
 trap cleanup EXIT
 
 # Configure mc alias for this session
-mc alias set brain-remote "http://localhost:$TUNNEL_PORT" "$MINIO_USER" "$MINIO_PASS" --quiet
+mc alias set cogext-remote "http://localhost:$TUNNEL_PORT" "$MINIO_USER" "$MINIO_PASS" --quiet
 
 # Mirror all files from the bucket
 echo "Downloading images from $BUCKET..."
-mc mirror --overwrite "brain-remote/$BUCKET" "$LOCAL_DIR/"
+mc mirror --overwrite "cogext-remote/$BUCKET" "$LOCAL_DIR/"
 
 echo ""
 echo "Images saved to: $LOCAL_DIR"

@@ -3,11 +3,11 @@
 // =============================================================================
 //
 // One-time script to regenerate embeddings for all records after switching
-// embedding providers (e.g., Ollama nomic-embed-text → Voyage AI voyage-3-lite).
+// embedding providers (e.g., voyage-3-lite → voyage-4-lite).
 //
-// The migration (0006_rainy_beast.sql) nulls out all existing embeddings
-// because the old 768-dim vectors are incompatible with the new 512-dim
-// column. This script fills them back in.
+// The migration (0007_voyage4_upgrade.sql) nulls out all existing embeddings
+// because old vectors are incompatible with the new model/dimension.
+// This script fills them back in.
 //
 // Usage (local):
 //   set -a && source .env.local && set +a && npx tsx scripts/re-embed-all.ts
@@ -63,7 +63,7 @@ async function main() {
   const client = postgres(databaseUrl, { max: 1 });
   const db = drizzle(client);
   const provider = new VoyageEmbeddingProvider();
-  const modelName = process.env.EMBED_MODEL || "voyage-3-lite";
+  const modelName = process.env.EMBED_MODEL || "voyage-4-lite";
 
   try {
     // Get all records that need embedding

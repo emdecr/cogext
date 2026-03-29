@@ -31,7 +31,7 @@ import { createToken, verifyToken, type JwtPayload } from "./jwt";
 
 // The name of the cookie in the browser. You'd see this in
 // DevTools → Application → Cookies.
-const COOKIE_NAME = "brain-session";
+const COOKIE_NAME = "cogext-session";
 
 // 7 days in seconds. Must match the JWT expiry in jwt.ts.
 // The cookie expiry and JWT expiry serve different purposes:

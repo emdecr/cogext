@@ -15,7 +15,7 @@
 #   ./scripts/backup.sh --dry-run           # print what would happen, no writes
 #
 # Cron (daily at 2am):
-#   0 2 * * * /path/to/brain-extension/scripts/backup.sh >> /var/log/brain-backup.log 2>&1
+#   0 2 * * * /path/to/cogext/scripts/backup.sh >> /var/log/cogext-backup.log 2>&1
 #
 # Requirements on the host:
 #   - docker (to exec into containers)
@@ -38,16 +38,16 @@ set -euo pipefail
 # =============================================================================
 
 # Docker Compose project name (determined by the directory name when you run
-# `docker compose up`). Check with: docker volume ls | grep brain
-COMPOSE_PROJECT="brain-extension"
+# `docker compose up`). Check with: docker volume ls | grep cogext
+COMPOSE_PROJECT="cogext"
 
 # Absolute path to the docker-compose.prod.yml file.
 # This script must be run from a user who can run docker commands.
-COMPOSE_FILE="/opt/brain-extension/docker-compose.prod.yml"
+COMPOSE_FILE="/opt/cogext/docker-compose.prod.yml"
 
 # Where to store backups on this server.
 # Make sure this directory exists and the backup user has write access.
-BACKUP_ROOT="/opt/backups/brain-extension"
+BACKUP_ROOT="/opt/backups/cogext"
 
 # How many days of backups to keep locally.
 # At ~50MB per backup (compressed), 7 days ≈ 350MB.
@@ -55,12 +55,12 @@ RETENTION_DAYS=7
 
 # Env file path — we source it to get DB credentials.
 # Alternatively, export POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB in cron.
-ENV_FILE="/opt/brain-extension/.env.prod"
+ENV_FILE="/opt/cogext/.env.prod"
 
 # Offsite backup via rclone (optional).
 # Set OFFSITE_ENABLED=true and configure OFFSITE_REMOTE to enable.
 # rclone remote name (configure with: rclone config)
-# Example: "b2:my-bucket/brain-backups" for Backblaze B2
+# Example: "b2:my-bucket/cogext-backups" for Backblaze B2
 OFFSITE_ENABLED="${OFFSITE_ENABLED:-false}"
 OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
 
@@ -91,7 +91,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 
 echo "============================================================"
-echo "Brain Extension Backup — $(date)"
+echo "CogExt Backup — $(date)"
 echo "Destination: $BACKUP_DIR"
 echo "============================================================"
 
@@ -150,7 +150,7 @@ fi
 #   - Volume approach is simpler and doesn't depend on MinIO being up
 #
 # The volume name is: {compose_project}_{volume_name}
-#   e.g., brain-extension_minio_data
+#   e.g., cogext_minio_data
 #
 # Verify with: docker volume ls | grep minio
 # =============================================================================
@@ -165,7 +165,7 @@ echo "🗄️  [2/3] Backing up MinIO files..."
 
 if [[ "$DRY_RUN" == "false" ]]; then
   docker run --rm \
-    --name "brain-backup-minio-$$" \
+    --name "cogext-backup-minio-$$" \
     -v "${MINIO_VOLUME}:/data:ro" \
     -v "${BACKUP_DIR}:/backup" \
     alpine \

@@ -101,7 +101,7 @@ export async function embedRecord(recordId: string): Promise<void> {
       .update(records)
       .set({
         embedding,
-        embeddingModel: process.env.EMBED_MODEL || "voyage-3-lite",
+        embeddingModel: process.env.EMBED_MODEL || "voyage-4-lite",
       })
       .where(eq(records.id, recordId));
   } catch (error) {
@@ -142,7 +142,7 @@ export async function embedRecordsBatch(recordIds: string[]): Promise<void> {
     const embeddings = await provider.embedBatch(texts);
 
     // Update each record with its embedding and model name
-    const modelName = process.env.EMBED_MODEL || "voyage-3-lite";
+    const modelName = process.env.EMBED_MODEL || "voyage-4-lite";
     await Promise.all(
       validRecords.map((record, i) =>
         db

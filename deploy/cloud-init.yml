@@ -82,7 +82,7 @@ runcmd:
   - systemctl start unattended-upgrades
 
   # -- Create app directory --
-  - mkdir -p /opt/brain-extension
-  - chown deploy:deploy /opt/brain-extension
-  - mkdir -p /opt/backups/brain-extension
-  - chown deploy:deploy /opt/backups/brain-extension
+  - mkdir -p /opt/cogext
+  - chown deploy:deploy /opt/cogext
+  - mkdir -p /opt/backups/cogext
+  - chown deploy:deploy /opt/backups/cogext

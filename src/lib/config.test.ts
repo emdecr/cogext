@@ -104,7 +104,7 @@ describe("config", () => {
   it("uses default embed model when EMBED_MODEL is not set", async () => {
     delete process.env.EMBED_MODEL;
     const { config } = await import("@/lib/config");
-    expect(config.voyage.embedModel).toBe("voyage-3-lite");
+    expect(config.voyage.embedModel).toBe("voyage-4-lite");
   });
 
   it("uses EMBED_MODEL when set", async () => {

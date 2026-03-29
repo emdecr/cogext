@@ -18,8 +18,8 @@ set -euo pipefail
 
 REMOTE_USER="deploy"
 REMOTE_HOST="records.beforeiforgetthis.space"
-REMOTE_DIR="/opt/backups/brain-extension"
-LOCAL_DIR="$HOME/Projects/Backups/brain-extension"
+REMOTE_DIR="/opt/backups/cogext"
+LOCAL_DIR="$HOME/Projects/Backups/cogext"
 
 # Create local directory if it doesn't exist
 mkdir -p "$LOCAL_DIR"

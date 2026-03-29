@@ -19,7 +19,7 @@
 //
 // PROVIDER STRATEGY:
 //   All AI tasks use cloud APIs:
-//     - Embeddings:  Voyage AI (voyage-3-lite) — 1024-dim vectors
+//     - Embeddings:  Voyage AI (voyage-4-lite) — 1024-dim vectors
 //     - Tagging:     Claude (haiku) — fast, cheap, good enough for tags
 //     - Chat:        Claude (sonnet) — high quality, streaming, great at synthesis
 // ============================================================================

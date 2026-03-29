@@ -452,7 +452,7 @@ function buildSystemPrompt(
   userProfile: UserProfile | null
 ): string {
   // Start with the base instructions
-  let prompt = `You are a helpful assistant for a personal knowledge base called "Brain Extension." The user saves records (notes, quotes, articles, links, images) and you help them find connections, answer questions, and explore their saved content.
+  let prompt = `You are a helpful assistant for a personal knowledge base called "CogExt." The user saves records (notes, quotes, articles, links, images) and you help them find connections, answer questions, and explore their saved content.
 
 IMPORTANT RULES:
 - Base your answers on the retrieved records provided below. These are the user's own saved content.

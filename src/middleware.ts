@@ -27,7 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 // The cookie name — must match what session.ts uses.
-const COOKIE_NAME = "brain-session";
+const COOKIE_NAME = "cogext-session";
 
 // Routes that require authentication.
 // If the user visits any of these without a valid session, they're
