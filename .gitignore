@@ -55,6 +55,9 @@ next-env.d.ts
 *.swp
 *.swo
 
+# nginx config (server-specific, contains domain name)
+deploy/nginx/
+
 # docker volumes (if using local bind mounts instead of named volumes)
 pgdata/
 

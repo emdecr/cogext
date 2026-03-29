@@ -20,7 +20,7 @@
 set -euo pipefail
 
 REMOTE_USER="deploy"
-REMOTE_HOST="records.beforeiforgetthis.space"
+REMOTE_HOST="${DEPLOY_HOST:?Set DEPLOY_HOST to your server hostname}"
 LOCAL_DIR="$HOME/Projects/Backups/cogext/images"
 BUCKET="cogext-uploads"
 TUNNEL_PORT=9099  # Use non-standard port to avoid conflicts

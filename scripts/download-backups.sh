@@ -11,13 +11,14 @@
 #
 # Prerequisites:
 #   - SSH access to the server as the deploy user
-#   - SSH key configured (ssh deploy@records.beforeiforgetthis.space works)
+#   - SSH key configured (ssh deploy@$DEPLOY_HOST works)
+#   - DEPLOY_HOST env var set to your server hostname
 # =============================================================================
 
 set -euo pipefail
 
 REMOTE_USER="deploy"
-REMOTE_HOST="records.beforeiforgetthis.space"
+REMOTE_HOST="${DEPLOY_HOST:?Set DEPLOY_HOST to your server hostname}"
 REMOTE_DIR="/opt/backups/cogext"
 LOCAL_DIR="$HOME/Projects/Backups/cogext"
 

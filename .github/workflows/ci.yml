@@ -216,7 +216,7 @@ jobs:
   # the new image. Only runs on pushes to main (not PRs).
   #
   # Required GitHub Secrets:
-  #   DEPLOY_HOST    — server IP or hostname (records.beforeiforgetthis.space)
+  #   DEPLOY_HOST    — server IP or hostname
   #   DEPLOY_SSH_KEY — private SSH key for the "deploy" user on the server
   deploy:
     name: Deploy
