@@ -45,7 +45,7 @@ describe("config", () => {
     process.env.STORAGE_PROVIDER = "local";
 
     // Ensure production checks are off unless a test turns them on
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string>).NODE_ENV = "test";
   });
 
   afterEach(() => {
@@ -123,7 +123,7 @@ describe("config", () => {
   // These only run when NODE_ENV=production
 
   it("throws in production when JWT_SECRET is shorter than 32 chars", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string>).NODE_ENV = "production";
     process.env.JWT_SECRET = "short"; // Only 5 chars
 
     await expect(import("@/lib/config")).rejects.toThrow(
@@ -132,7 +132,7 @@ describe("config", () => {
   });
 
   it("throws in production when JWT_SECRET is a known default value", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string>).NODE_ENV = "production";
     // This is the exact string someone might copy-paste from .env.example
     process.env.JWT_SECRET = "dev-secret-change-me-in-production";
 
@@ -142,7 +142,7 @@ describe("config", () => {
   });
 
   it("accepts a strong JWT_SECRET in production", async () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string>).NODE_ENV = "production";
     // 64-char hex string — what openssl rand -hex 32 produces
     process.env.JWT_SECRET =
       "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";

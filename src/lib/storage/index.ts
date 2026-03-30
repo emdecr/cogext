@@ -63,6 +63,7 @@ async function saveFileLocal(file: File): Promise<string> {
 async function saveBufferLocal(
   buffer: Buffer,
   ext: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   contentType: string
 ): Promise<string> {
   const { writeFile, mkdir, path, randomUUID } = await getLocalModules();

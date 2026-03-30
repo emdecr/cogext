@@ -49,6 +49,7 @@ export default function AddToCollection({
   useEffect(() => {
     if (!isOpen) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getCollections().then((data) => {
       setCollections(data);

@@ -29,7 +29,7 @@
 import { eq, sql, desc, and, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { records, recordTags, tags } from "@/db/schema";
+import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider } from "@/lib/ai";
 import { redirect } from "next/navigation";

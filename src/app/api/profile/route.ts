@@ -61,6 +61,7 @@ export async function GET() {
 // POST — Generate (or regenerate) the profile
 // ============================================================================
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {

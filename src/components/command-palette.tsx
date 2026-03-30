@@ -90,6 +90,7 @@ export default function CommandPalette() {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       // Clear state when closing so it's fresh next time
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery("");
       setResults([]);
     }

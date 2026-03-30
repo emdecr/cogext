@@ -91,7 +91,7 @@ jobs:
       # The `--max-warnings 0` flag treats warnings as errors in CI —
       # this prevents warning creep (warnings pile up and everyone ignores them).
       - name: Lint
-        run: npx next lint --max-warnings 0
+        run: npx eslint . --max-warnings 0
 
       # ---- Type Check ----
       # `tsc --noEmit` runs the TypeScript compiler without producing output files.

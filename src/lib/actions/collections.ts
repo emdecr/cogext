@@ -33,8 +33,6 @@ import { db } from "@/db";
 import {
   collections,
   collectionRecords,
-  records,
-  recordTags,
 } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 

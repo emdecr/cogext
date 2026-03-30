@@ -34,7 +34,7 @@
 
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { records, aiProfile, recordTags, tags } from "@/db/schema";
+import { records, aiProfile } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
 import { logAiUsage } from "@/lib/ai/usage";
 

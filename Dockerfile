@@ -60,6 +60,15 @@ COPY . .
 #
 # NEXT_TELEMETRY_DISABLED=1 turns off Next.js anonymous usage data collection.
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Dummy build-time env vars — Next.js validates these at build time even though
+# the real values are injected at container runtime. These are NOT secrets and
+# are NOT baked into the final image (this is the builder stage, not the runner).
+ENV DATABASE_URL="postgres://build:build@localhost:5432/build"
+ENV JWT_SECRET="build-only-not-a-real-secret"
+ENV VOYAGE_API_KEY="build-only-not-a-real-key"
+ENV ANTHROPIC_API_KEY="build-only-not-a-real-key"
+
 RUN npm run build
 
 

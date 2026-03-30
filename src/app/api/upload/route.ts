@@ -53,13 +53,12 @@ import { logger } from "@/lib/logger";
 //
 // We only need to check the first 12 bytes of the file.
 // ============================================================================
-const MAGIC_SIGNATURES = {
-  jpeg: [0xff, 0xd8, 0xff],
-  png: [0x89, 0x50, 0x4e, 0x47],
-  gif87: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // "GIF87a"
-  gif89: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // "GIF89a"
-  // WebP is special: RIFF at offset 0, WEBP at offset 8
-} as const;
+// Magic byte signatures for image format validation.
+// hasValidMagicBytes checks these inline for readability:
+//   JPEG: FF D8 FF
+//   PNG:  89 50 4E 47
+//   GIF:  "GIF87a" or "GIF89a"
+//   WebP: "RIFF" at offset 0, "WEBP" at offset 8
 
 /**
  * Verify that a file's actual bytes match a known image format.

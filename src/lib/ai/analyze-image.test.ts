@@ -50,7 +50,6 @@ const mockCreate = vi.hoisted(() => vi.fn());
 vi.mock("@anthropic-ai/sdk", () => ({
   // The SDK's default export is a class: `new Anthropic({ apiKey })`.
   // We provide a constructor function (not arrow!) that installs our mock.
-  // eslint-disable-next-line prefer-arrow-callback
   default: vi.fn(function MockAnthropic(this: { messages: { create: typeof mockCreate } }) {
     this.messages = { create: mockCreate };
   }),
