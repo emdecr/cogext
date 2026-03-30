@@ -215,6 +215,13 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                 />
               )}
 
+              {/* Title */}
+              {!record.imagePath && record.title && (
+                <div className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {record.title}
+                </div>
+              )}
+
               {/* Full content */}
               {!record.imagePath && (
                 <div className="mb-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">

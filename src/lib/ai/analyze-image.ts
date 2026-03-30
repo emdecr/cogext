@@ -218,7 +218,8 @@ export async function analyzeImage(
                 "Include: main subjects, objects, colors, scene or setting, any visible text, " +
                 "mood or atmosphere, and any other notable details. " +
                 "Write as a clear, factual description. Do not start with 'This image shows' — " +
-                "just describe directly. Be thorough but concise (2-4 sentences).",
+                "just describe directly. Do not include any markdown headers or titles. " +
+                "Be thorough but concise (2-4 sentences).",
             },
           ],
         },
