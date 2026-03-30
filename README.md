@@ -162,7 +162,6 @@ The production stack runs 3 services on an internal Docker network:
 - Set up a reverse proxy (nginx) with SSL via Certbot
 - Create the MinIO bucket and set its access policy
 - Configure GitHub Actions secrets for automated deploys
-- See `DEPLOY.md` for a detailed step-by-step guide with gotchas
 
 ### CI/CD via GitHub Actions
 
