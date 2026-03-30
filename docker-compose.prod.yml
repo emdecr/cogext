@@ -47,9 +47,9 @@ services:
     ports:
       - "3000:3000"
 
-    # Runtime environment variables from .env.prod (gitignored).
+    # Runtime environment variables from .env (gitignored).
     env_file:
-      - .env.prod
+      - .env
 
     environment:
       NODE_ENV: production
@@ -93,19 +93,15 @@ services:
       -c effective_cache_size=256MB
       -c maintenance_work_mem=32MB
 
+    # Postgres reads POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB from env_file.
     env_file:
-      - .env.prod
-
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - .env
 
     volumes:
       - pgdata:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U cogext -d cogext"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -134,8 +130,9 @@ services:
 
     command: server /data --console-address ":9001"
 
+    # MinIO reads MINIO_ROOT_USER, MINIO_ROOT_PASSWORD from env_file.
     env_file:
-      - .env.prod
+      - .env
 
     ports:
       # Console on localhost only — not publicly accessible.
@@ -143,10 +140,6 @@ services:
       - "127.0.0.1:9001:9001"
       # S3 API on localhost for Nginx to proxy image requests.
       - "127.0.0.1:9000:9000"
-
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
     volumes:
       - minio_data:/data
