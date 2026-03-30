@@ -175,7 +175,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           {/* Header — shared between view and edit modes */}
           <div className="mb-4 flex items-start justify-between">
             <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {isEditing ? "Edit Record" : "Records Details"}
+              {isEditing ? "Edit Record" : "Record Details"}
             </Dialog.Title>
             <Dialog.Close className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300">
               ✕
