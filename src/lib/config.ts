@@ -33,7 +33,7 @@ function requireEnv(name: string): string {
   if (!value) {
     throw new Error(
       `Missing required environment variable: ${name}\n` +
-        `Check your .env file (dev) or .env.prod file (production).`
+        `Check your .env file.`
     );
   }
   return value;
@@ -208,7 +208,7 @@ if (config.storage.provider === "minio") {
     if (!process.env[name]) {
       throw new Error(
         `STORAGE_PROVIDER=minio requires ${name} to be set.\n` +
-          `Check your .env.prod file.`
+          `Check your .env file.`
       );
     }
   }

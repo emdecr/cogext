@@ -55,7 +55,7 @@ RETENTION_DAYS=7
 
 # Env file path — we source it to get DB credentials.
 # Alternatively, export POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB in cron.
-ENV_FILE="/opt/cogext/.env.prod"
+ENV_FILE="/opt/cogext/.env"
 
 # Offsite backup via rclone (optional).
 # Set OFFSITE_ENABLED=true and configure OFFSITE_REMOTE to enable.
@@ -77,7 +77,7 @@ for arg in "$@"; do
   esac
 done
 
-# Load environment variables from .env.prod so we have $POSTGRES_USER etc.
+# Load environment variables from .env so we have $POSTGRES_USER etc.
 if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
@@ -191,7 +191,7 @@ fi  # end DB_ONLY check
 #      - For Backblaze B2: https://rclone.org/b2/
 #      - For Cloudflare R2: https://rclone.org/s3/#cloudflare-r2
 #   3. Set OFFSITE_ENABLED=true and OFFSITE_REMOTE=<name>:<bucket>/<path>
-#      in your .env.prod or cron environment.
+#      in your .env or cron environment.
 #
 # rclone copy (not sync) — only copies new files, doesn't delete old remote ones.
 # We manage retention separately below.
@@ -213,7 +213,7 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
 else
   echo ""
   echo "⏭️  [3/3] Offsite upload skipped (OFFSITE_ENABLED=$OFFSITE_ENABLED)"
-  echo "   To enable: set OFFSITE_ENABLED=true and OFFSITE_REMOTE=<rclone-remote> in .env.prod"
+  echo "   To enable: set OFFSITE_ENABLED=true and OFFSITE_REMOTE=<rclone-remote> in .env"
 fi
 
 

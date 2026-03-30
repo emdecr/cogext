@@ -33,7 +33,7 @@ set -euo pipefail
 COMPOSE_PROJECT="cogext"
 COMPOSE_FILE="/opt/cogext/docker-compose.prod.yml"
 BACKUP_ROOT="/opt/backups/cogext"
-ENV_FILE="/opt/cogext/.env.prod"
+ENV_FILE="/opt/cogext/.env"
 
 # =============================================================================
 # VALIDATION

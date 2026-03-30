@@ -13,7 +13,7 @@
 #   - SSH access to the server as the deploy user
 #   - MinIO client (mc) installed locally:
 #       brew install minio/stable/mc
-#   - MINIO_ROOT_USER and MINIO_ROOT_PASSWORD from your .env.prod
+#   - MINIO_ROOT_USER and MINIO_ROOT_PASSWORD from your .env
 #     (set them as env vars or edit the defaults below)
 # =============================================================================
 
@@ -31,7 +31,7 @@ MINIO_PASS="${MINIO_ROOT_PASSWORD:-}"
 
 if [[ -z "$MINIO_USER" || -z "$MINIO_PASS" ]]; then
   echo "Set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD environment variables."
-  echo "These should match the values in your .env.prod on the server."
+  echo "These should match the values in your .env on the server."
   echo ""
   echo "Example:"
   echo "  MINIO_ROOT_USER=myuser MINIO_ROOT_PASSWORD=mypass ./scripts/download-minio-images.sh"
