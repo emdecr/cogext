@@ -111,6 +111,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./migrate.mjs
 # They're committed to git so they travel with the image — no CLI needed.
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 
+# Copy migration dependencies — standalone mode only traces Next.js imports,
+# so drizzle-orm and postgres (used by migrate.mjs) aren't included automatically.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
+
 # Copy the entrypoint script.
 # This runs migrations then starts the app. Must be executable.
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
