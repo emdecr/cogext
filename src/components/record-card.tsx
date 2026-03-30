@@ -135,7 +135,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
             )}
 
             {/* Content preview */}
-            {record.title && (
+            {record.title && !record.imagePath && (
               <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">{preview}</p>
             )}
 
