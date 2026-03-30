@@ -25,6 +25,10 @@ vi.mock("@anthropic-ai/sdk", () => ({
   }),
 }));
 
+vi.mock("@/db", () => ({
+  db: {},
+}));
+
 import {
   generateRecommendations,
   normalizeRecommendation,

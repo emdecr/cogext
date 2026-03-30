@@ -56,6 +56,10 @@ vi.mock("@anthropic-ai/sdk", () => ({
   }),
 }));
 
+vi.mock("@/db", () => ({
+  db: {},
+}));
+
 // ---- Mock fs/promises ----
 // analyzeImage uses readFile to load local images
 const mockReadFile = vi.fn();
