@@ -77,10 +77,11 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
       ? record.content.slice(0, 150) + "..."
       : record.content;
 
+  const titleLimit = record.type === "quote" ? 200 : 50;
   const displayTitle =
     record.title ||
-    record.content.slice(0, 50) +
-      (record.content.length > 50 ? "..." : "");
+    record.content.slice(0, titleLimit) +
+    (record.content.length > titleLimit ? "..." : "");
 
   async function handleDelete() {
     setIsDeleting(true);
@@ -127,9 +128,11 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
             </div>
 
             {/* Title */}
-            <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {displayTitle}
-            </h3>
+            {!record.imagePath && (
+              <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) ? "font-bold" : "font-medium"} ${record.type === "quote" ? "italic" : ""}`}>
+                {displayTitle}
+              </h3>
+            )}
 
             {/* Content preview */}
             {record.title && (
@@ -146,37 +149,12 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
             {/* Source URL */}
             {record.sourceUrl && (
               <p className="mb-2 truncate text-xs text-blue-500 dark:text-blue-400">
-                {record.sourceUrl}
-              </p>
-            )}
-
-            {/* Tags on card — compact pills, no remove buttons */}
-            {tags.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1">
-                {tags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-                      tag.isAi
-                        ? "bg-violet-100 text-violet-600 dark:bg-violet-900 dark:text-violet-300"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                    }`}
-                  >
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* User note */}
-            {record.note && (
-              <p className="mb-2 text-xs italic text-gray-500 dark:text-gray-400">
-                &ldquo;{record.note}&rdquo;
+                {new URL(record.sourceUrl).hostname.replace(/^www\./, "")}
               </p>
             )}
 
             {/* Timestamp */}
-            <p className="text-xs text-gray-400">
+            <p className="mt-4 text-xs text-gray-400">
               {timeAgo(new Date(record.createdAt))}
             </p>
           </div>
@@ -197,7 +175,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           {/* Header — shared between view and edit modes */}
           <div className="mb-4 flex items-start justify-between">
             <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {isEditing ? "Edit Record" : displayTitle}
+              {isEditing ? "Edit Record" : "Records Details"}
             </Dialog.Title>
             <Dialog.Close className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300">
               ✕
@@ -238,9 +216,11 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
               )}
 
               {/* Full content */}
-              <div className="mb-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                {record.content}
-              </div>
+              {!record.imagePath && (
+                <div className="mb-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                  {record.content}
+                </div>
+              )}
 
               {/* Author attribution */}
               {record.sourceAuthor && (
@@ -272,6 +252,16 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                     Your note
                   </p>
                   <p className="text-sm italic text-gray-600 dark:text-gray-300">{record.note}</p>
+                </div>
+              )}
+
+              {/* Image Description Content */}
+              {record.imagePath && (
+                <div className="mb-4 rounded-md bg-gray-50 p-3 dark:bg-gray-800">
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Image Description
+                  </p>
+                  <p className="text-xs italic whitespace-pre-wrap text-gray-600 dark:text-gray-300">{record.content}</p>
                 </div>
               )}
 
