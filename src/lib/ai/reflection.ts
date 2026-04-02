@@ -226,6 +226,7 @@ type WeeklyRecordWithTags = {
   type: string;
   title: string | null;
   content: string;
+  note: string | null;
   sourceAuthor: string | null;
   createdAt: Date;
   recordTags: Array<{ tag: { name: string } }>;
@@ -248,6 +249,7 @@ function buildReflectionRecordSummaries(
       record.title ? `"${record.title}"` : "",
       `${preview}${record.content.length > 200 ? "..." : ""}`,
       record.sourceAuthor ? `— ${record.sourceAuthor}` : "",
+      record.note ? `[User note: ${record.note}]` : "",
       tagNames.length > 0 ? `(tags: ${tagNames.join(", ")})` : "",
     ]
       .filter(Boolean)

@@ -209,12 +209,12 @@ export default function EditRecordForm({ record, onClose }: Props) {
           Note{" "}
           <span className="font-normal text-gray-400">(optional)</span>
         </label>
-        <input
+        <textarea
           id="edit-note"
-          type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Your personal annotation..."
+          rows={3}
           className={inputClass}
         />
       </div>
