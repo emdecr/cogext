@@ -23,7 +23,7 @@
 # Install ALL dependencies (including devDependencies) — we need them to build.
 # This stage is cached separately. If package.json doesn't change, Docker reuses
 # this layer even if your source code does — making rebuilds fast.
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 
 # Set working directory inside the container.
 WORKDIR /app
@@ -40,7 +40,7 @@ RUN npm ci
 
 # ---- Stage 2: builder --------------------------------------------------------
 # Copy source code and run the production build.
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -74,7 +74,7 @@ RUN npm run build
 
 # ---- Stage 3: runner ---------------------------------------------------------
 # The actual production image. Only the minimum needed to run the app.
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 # Install dumb-init: a minimal init system for containers.
 # Without it, Node is PID 1, which doesn't handle signals (SIGTERM) properly.
