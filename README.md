@@ -192,7 +192,18 @@ curl -s -X POST http://localhost:3000/api/reflections/generate \
 
 The response includes a per-user breakdown: how many reflections were generated, skipped (no records that week), or errored.
 
-**Idempotent**: calling the endpoint multiple times in the same week won't create duplicate reflections — it returns the existing one.
+**Idempotent**: calling the endpoint multiple times for the same period won't create duplicate reflections — it returns the existing one.
+
+**Backfilling a missed week**: pass a `dateRange` body to generate a reflection for a specific period instead of the current week:
+
+```bash
+curl -s -X POST http://localhost:3000/api/reflections/generate \
+  -H "Authorization: Bearer YOUR_CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"dateRange": {"start": "2026-03-30", "end": "2026-04-05"}}' | jq .
+```
+
+Both dates must be `YYYY-MM-DD` and `start` must be on or before `end`.
 
 ### Customizing AI Prompts
 
