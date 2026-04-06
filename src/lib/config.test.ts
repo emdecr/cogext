@@ -143,12 +143,36 @@ describe("config", () => {
 
   it("accepts a strong JWT_SECRET in production", async () => {
     (process.env as Record<string, string>).NODE_ENV = "production";
-    // 64-char hex string — what openssl rand -hex 32 produces
+    // 64-char hex strings — what openssl rand -hex 32 produces
     process.env.JWT_SECRET =
       "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+    process.env.CRON_SECRET =
+      "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1";
 
     // Should NOT throw
     await expect(import("@/lib/config")).resolves.toBeDefined();
+  });
+
+  it("throws in production when CRON_SECRET is missing", async () => {
+    (process.env as Record<string, string>).NODE_ENV = "production";
+    process.env.JWT_SECRET =
+      "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+    delete process.env.CRON_SECRET;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      "CRON_SECRET must be set and at least 32 characters in production"
+    );
+  });
+
+  it("throws in production when CRON_SECRET is too short", async () => {
+    (process.env as Record<string, string>).NODE_ENV = "production";
+    process.env.JWT_SECRET =
+      "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+    process.env.CRON_SECRET = "too-short";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      "CRON_SECRET must be set and at least 32 characters in production"
+    );
   });
 
   // ---- MinIO storage validation ----

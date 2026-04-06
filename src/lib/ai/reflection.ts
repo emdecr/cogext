@@ -54,21 +54,40 @@ export type GeneratedWeeklyReflection = {
 };
 
 // ============================================================================
+// DATE RANGE TYPE
+// ============================================================================
+// An explicit date range for the reflection period. Both values are ISO date
+// strings (YYYY-MM-DD). Used to override the default current-week boundaries
+// — e.g., for backfilling a missed reflection.
+
+export type ReflectionDateRange = {
+  start: string; // inclusive, e.g. "2026-03-30"
+  end: string;   // inclusive, e.g. "2026-04-05"
+};
+
+// ============================================================================
 // GENERATE WEEKLY REFLECTION
 // ============================================================================
 // Main entry point. This is intentionally a step-by-step orchestration
 // function so the feature is easy to follow in a teaching codebase.
 //
+// Accepts an optional `dateRange` to backfill a missed week. When omitted,
+// defaults to the current Monday–Sunday boundaries.
+//
 // Returns:
-//   - existing row if this week's reflection already exists
+//   - existing row if a reflection for this period already exists
 //   - new row if generation succeeds
-//   - null if the user saved nothing this week
+//   - null if the user saved nothing in the period
 
 export async function generateWeeklyReflection(
-  userId: string
+  userId: string,
+  dateRange?: ReflectionDateRange
 ): Promise<GeneratedWeeklyReflection | null> {
-  // ---- Step 1: Calculate this week's Monday → Sunday boundaries ----
-  const { periodStart, periodEnd } = getWeekBoundaries();
+  // ---- Step 1: Resolve the period boundaries ----
+  // Use the provided date range if given, otherwise default to the current week.
+  const { periodStart, periodEnd } = dateRange
+    ? { periodStart: dateRange.start, periodEnd: dateRange.end }
+    : getWeekBoundaries();
 
   // ---- Step 2: Prevent duplicates ----
   // Weekly reflections are idempotent: one row per user per week.

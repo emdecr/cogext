@@ -190,6 +190,17 @@ if (process.env.NODE_ENV === "production") {
         `Generate a strong one with: openssl rand -hex 32`
     );
   }
+
+  // CRON_SECRET protects the reflection generation endpoint from unauthorized
+  // callers. Without it, cron-triggered reflections silently won't work —
+  // better to fail loudly at startup so you know to configure it.
+  if (!config.app.cronSecret || config.app.cronSecret.length < 32) {
+    throw new Error(
+      `CRON_SECRET must be set and at least 32 characters in production.\n` +
+        `This protects the /api/reflections/generate endpoint.\n` +
+        `Generate one with: openssl rand -hex 32`
+    );
+  }
 }
 
 // =============================================================================
