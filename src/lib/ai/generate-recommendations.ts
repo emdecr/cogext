@@ -89,10 +89,11 @@ export async function generateRecommendations(
   try {
     const client = new Anthropic({ apiKey });
 
-    // We reuse the chat model env var so recommendations stay aligned with the
-    // rest of the app's Claude usage. If unset, we fall back to the repo's
-    // default Sonnet model.
-    const model = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+    // Recommendations produce a small JSON array (~400 tokens), so Haiku is
+    // plenty capable here and significantly cheaper than Sonnet — especially
+    // since web search injects large result pages into the context window.
+    // Override with RECOMMENDATIONS_MODEL if you want a different model.
+    const model = process.env.RECOMMENDATIONS_MODEL || "claude-haiku-4-5-20251001";
 
     const response = await client.messages.create({
       model,
