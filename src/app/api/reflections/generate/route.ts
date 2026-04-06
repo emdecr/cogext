@@ -4,88 +4,64 @@
 //
 // POST /api/reflections/generate
 //
-// Triggers weekly reflection generation for the authenticated user.
-// This is an API route (not a server action) because it's designed to be
-// called from external systems:
-//   - A cron job (Phase 5) — e.g., every Sunday evening
-//   - A manual trigger from the UI (a "Generate reflection" button)
-//   - curl for testing: curl -X POST http://localhost:3000/api/reflections/generate
+// Triggers weekly reflection generation for all users. Called exclusively
+// by the cron job — not from the UI. Requires a Bearer token matching
+// CRON_SECRET in the Authorization header.
 //
-// Why not a server action?
-//   Server actions are great for UI-driven mutations (form submissions,
-//   button clicks). But this endpoint needs to be callable from outside
-//   the Next.js app (cron jobs, webhooks), which requires a real HTTP
-//   endpoint. API routes give us that.
+// Accepts an optional JSON body for backfilling a missed week:
+//   { "dateRange": { "start": "2026-03-30", "end": "2026-04-05" } }
+// When omitted, defaults to the current Monday–Sunday boundaries.
 //
-// Idempotent: calling this multiple times in the same week returns the
+// Idempotent: calling multiple times for the same period returns the
 // existing reflection — it won't generate duplicates.
 // ============================================================================
 
 import { NextRequest } from "next/server";
 import { timingSafeEqual, createHash } from "crypto";
-import { getSession } from "@/lib/auth/session";
 import { generateWeeklyReflection, type ReflectionDateRange } from "@/lib/ai/reflection";
-import { aiGenerationLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { db } from "@/db";
 
 export async function POST(request: NextRequest) {
   // ---- Auth check ----
-  // Two valid callers: the UI (session cookie) or a cron job (secret header).
-  // Cron jobs can't carry session cookies, so we check for a shared secret.
-  // The secret is set in CRON_SECRET env var — include it as a Bearer token:
+  // Only cron callers are valid. The secret is set in CRON_SECRET env var —
+  // include it as a Bearer token:
   //   Authorization: Bearer <CRON_SECRET>
   const authHeader = request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
     : null;
-  const isCronCall = verifyCronSecret(bearerToken);
 
-  const session = await getSession();
-
-  if (!session && !isCronCall) {
+  if (!verifyCronSecret(bearerToken)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  // ---- UI-triggered: generate for the logged-in user ----
-  if (session && !isCronCall) {
-    const rl = aiGenerationLimiter(session.userId);
-    if (!rl.success) return rateLimitResponse(rl);
-
-    return generateForUser(session.userId);
-  }
-
-  // ---- Parse optional date range (cron calls only) ----
+  // ---- Parse optional date range ----
   // Allows backfilling a missed week:
   //   curl -X POST .../generate -H "Authorization: Bearer ..." \
   //     -d '{"dateRange": {"start": "2026-03-30", "end": "2026-04-05"}}'
   let dateRange: ReflectionDateRange | undefined;
-  try {
-    const body = await request.json().catch(() => ({}));
-    if (body.dateRange) {
-      const { start, end } = body.dateRange;
-      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-      if (!ISO_DATE.test(start) || !ISO_DATE.test(end) || start > end) {
-        return new Response(
-          JSON.stringify({ error: "dateRange.start and dateRange.end must be valid YYYY-MM-DD dates with start <= end" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
-      }
-      dateRange = { start, end };
+  const body = await request.json().catch(() => ({}));
+  if (body.dateRange) {
+    const { start, end } = body.dateRange;
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    if (!ISO_DATE.test(start) || !ISO_DATE.test(end) || start > end) {
+      return new Response(
+        JSON.stringify({ error: "dateRange.start and dateRange.end must be valid YYYY-MM-DD dates with start <= end" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
-  } catch {
-    // No body or non-JSON body — fine, proceed without a date range
+    dateRange = { start, end };
   }
 
-  // ---- Cron-triggered: generate for all users ----
-  // Cron jobs don't carry a session, so we iterate over every user.
+  // ---- Generate for all users ----
   // Each user's generation is independent — one failure doesn't block others.
   const allUsers = await db.query.users.findMany({
-    columns: { id: true, email: true },
+    columns: { id: true },
   });
 
   const results: Array<{
@@ -142,43 +118,6 @@ export async function POST(request: NextRequest) {
     }),
     { status: errors > 0 ? 207 : 200, headers: { "Content-Type": "application/json" } }
   );
-}
-
-// ============================================================================
-// GENERATE FOR A SINGLE USER
-// ============================================================================
-// Shared response builder for the UI-triggered (single-user) path.
-
-async function generateForUser(userId: string) {
-  try {
-    const result = await generateWeeklyReflection(userId);
-
-    if (!result) {
-      // No records this week — nothing to reflect on
-      return new Response(
-        JSON.stringify({
-          message: "No records saved this week — skipping reflection.",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: "Reflection generated successfully.",
-        reflectionId: result.id,
-        // Include a preview so curl users can see what was generated
-        preview: result.content.slice(0, 300),
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-  } catch (error) {
-    logger.error("Reflection generation failed", { userId, error });
-    return new Response(
-      JSON.stringify({ error: "Failed to generate reflection" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
 }
 
 // ============================================================================

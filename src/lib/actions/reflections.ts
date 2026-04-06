@@ -10,8 +10,7 @@
 //   - getUnreadCount()  → badge count for the notification dot
 //
 // Generation is NOT a server action — it's an API route (POST /api/reflections/generate)
-// because it's triggered externally (cron job) rather than from a UI interaction.
-// Server actions are for client → server calls within the app.
+// triggered exclusively by the cron job, not from the UI.
 // ============================================================================
 
 "use server";
