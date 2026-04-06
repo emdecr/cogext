@@ -66,6 +66,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # are NOT baked into the final image (this is the builder stage, not the runner).
 ENV DATABASE_URL="postgres://build:build@localhost:5432/build"
 ENV JWT_SECRET="build-only-not-a-real-secret-must-be-32-chars-long"
+ENV CRON_SECRET="build-only-not-a-real-cron-secret-must-be-32-chars"
 ENV VOYAGE_API_KEY="build-only-not-a-real-key"
 ENV ANTHROPIC_API_KEY="build-only-not-a-real-key"
 
