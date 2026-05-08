@@ -18,7 +18,7 @@
 
 import { NextRequest } from "next/server";
 import { timingSafeEqual, createHash } from "crypto";
-import { generateWeeklyReflection, type ReflectionDateRange } from "@/lib/ai/reflection";
+import { generateReflection, type ReflectionDateRange } from "@/lib/ai/reflection";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { db } from "@/db";
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   for (const user of allUsers) {
     try {
-      const result = await generateWeeklyReflection(user.id, dateRange);
+      const result = await generateReflection(user.id, dateRange);
 
       if (result) {
         results.push({

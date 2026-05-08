@@ -312,9 +312,13 @@ export function normalizeRecommendation(
   const candidate = value as Record<string, unknown>;
 
   const type = normalizeType(candidate.type);
-  const title = normalizeRequiredString(candidate.title);
-  const creator = normalizeRequiredString(candidate.creator);
-  const reason = normalizeRequiredString(candidate.reason);
+  // The web search tool wraps cited spans in <cite index="...">...</cite>.
+  // We keep the cited text but strip the tags so they don't render in the UI.
+  // Applied to every string field — citations usually land in `reason` but
+  // could in principle appear anywhere.
+  const title = stripCiteTags(normalizeRequiredString(candidate.title));
+  const creator = stripCiteTags(normalizeRequiredString(candidate.creator));
+  const reason = stripCiteTags(normalizeRequiredString(candidate.reason));
 
   if (!type || !title || !creator || !reason) {
     return null;
@@ -354,6 +358,17 @@ function normalizeOptionalString(value: unknown): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+// Removes <cite index="...">...</cite> wrappers from web-search-cited text,
+// preserving the inner content. Also collapses any double spaces that result
+// from removing the tags. Returns null if input is null (passes through).
+function stripCiteTags(value: string | null): string | null {
+  if (value === null) return null;
+  return value
+    .replace(/<cite\b[^>]*>([\s\S]*?)<\/cite>/gi, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 // Only allow https:// URLs so we never render a javascript: or data: href in

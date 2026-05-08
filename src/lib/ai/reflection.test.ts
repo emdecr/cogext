@@ -1,5 +1,5 @@
 // ============================================================================
-// UNIT TESTS — generateWeeklyReflection
+// UNIT TESTS — generateReflection
 // ============================================================================
 //
 // These tests focus on orchestration:
@@ -14,7 +14,7 @@ import { beforeEach, vi } from "vitest";
 
 const mockFindExistingReflection = vi.hoisted(() => vi.fn());
 const mockFindPreviousReflections = vi.hoisted(() => vi.fn());
-const mockFindWeeklyRecords = vi.hoisted(() => vi.fn());
+const mockFindPeriodRecords = vi.hoisted(() => vi.fn());
 const mockInsertValues = vi.hoisted(() => vi.fn());
 const mockReturning = vi.hoisted(() => vi.fn());
 const mockChat = vi.hoisted(() => vi.fn());
@@ -30,7 +30,7 @@ vi.mock("@/db", () => ({
         findMany: mockFindPreviousReflections,
       },
       records: {
-        findMany: mockFindWeeklyRecords,
+        findMany: mockFindPeriodRecords,
       },
     },
     insert: vi.fn(() => ({
@@ -51,9 +51,11 @@ vi.mock("@/lib/ai/generate-recommendations", () => ({
   generateRecommendations: mockGenerateRecommendations,
 }));
 
-import { generateWeeklyReflection } from "@/lib/ai/reflection";
+import { generateReflection } from "@/lib/ai/reflection";
 
-describe("generateWeeklyReflection", () => {
+describe("generateReflection", () => {
+  // Many of these tests use the implicit current-week default (no dateRange),
+  // since the orchestration logic is the same regardless of period length.
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -101,22 +103,22 @@ describe("generateWeeklyReflection", () => {
       recommendations: null,
     });
 
-    const result = await generateWeeklyReflection("user-123");
+    const result = await generateReflection("user-123");
 
     expect(result).toEqual({
       id: "reflection-existing",
       content: "Already generated",
       recommendations: [],
     });
-    expect(mockFindWeeklyRecords).not.toHaveBeenCalled();
+    expect(mockFindPeriodRecords).not.toHaveBeenCalled();
     expect(mockChat).not.toHaveBeenCalled();
   });
 
   it("returns null when no records were saved this week", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
-    mockFindWeeklyRecords.mockResolvedValue([]);
+    mockFindPeriodRecords.mockResolvedValue([]);
 
-    const result = await generateWeeklyReflection("user-123");
+    const result = await generateReflection("user-123");
 
     expect(result).toBeNull();
     expect(mockChat).not.toHaveBeenCalled();
@@ -127,7 +129,7 @@ describe("generateWeeklyReflection", () => {
     mockFindExistingReflection.mockResolvedValue(null);
     // First call: this week's records. Second call: recent titled records
     // from previous weeks (empty here — no older saves in this scenario).
-    mockFindWeeklyRecords
+    mockFindPeriodRecords
       .mockResolvedValueOnce([
         {
           type: "article",
@@ -140,7 +142,7 @@ describe("generateWeeklyReflection", () => {
       ])
       .mockResolvedValueOnce([]);
 
-    const result = await generateWeeklyReflection("user-123");
+    const result = await generateReflection("user-123");
 
     expect(mockGenerateRecommendations).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -182,7 +184,7 @@ describe("generateWeeklyReflection", () => {
 
   it("still saves the reflection when recommendations come back empty", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
-    mockFindWeeklyRecords
+    mockFindPeriodRecords
       .mockResolvedValueOnce([
         {
           type: "note",
@@ -196,7 +198,7 @@ describe("generateWeeklyReflection", () => {
       .mockResolvedValueOnce([]);
     mockGenerateRecommendations.mockResolvedValue([]);
 
-    await generateWeeklyReflection("user-123");
+    await generateReflection("user-123");
 
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({

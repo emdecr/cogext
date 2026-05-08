@@ -195,7 +195,7 @@ The response includes a per-user breakdown: how many reflections were generated,
 
 **Idempotent**: calling the endpoint multiple times for the same period won't create duplicate reflections — it returns the existing one.
 
-**Backfilling a missed week**: pass a `dateRange` body to generate a reflection for a specific period instead of the current week:
+**Custom periods (backfill or multi-week synthesis)**: pass a `dateRange` body to generate a reflection for any period instead of the current week. The range can be a single week (backfilling a missed cron run) or span multiple weeks if you'd rather run reflections less frequently and let records compile:
 
 ```bash
 curl -s -X POST http://localhost:3000/api/reflections/generate \
