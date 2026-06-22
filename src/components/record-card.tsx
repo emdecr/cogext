@@ -168,24 +168,17 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]" />
 
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-4 shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 md:p-6"
+          className={
+            isEditing
+              ? "fixed left-1/2 top-1/2 z-50 flex h-[90vh] w-[90vw] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900"
+              : "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-4 shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 md:p-6"
+          }
           // Reset edit mode when the modal closes so it always opens in view mode.
           onCloseAutoFocus={() => setIsEditing(false)}
         >
-          {/* Header — shared between view and edit modes */}
-          <div className="mb-4 flex items-start justify-between">
-            <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {isEditing ? "Edit Record" : "Record Details"}
-            </Dialog.Title>
-            <Dialog.Close className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300">
-              ✕
-            </Dialog.Close>
-          </div>
-
           {isEditing ? (
             /* ============================================================
-               EDIT MODE — shows the form with pre-filled values.
-               When the form saves or cancels, we switch back to view mode.
+               EDIT MODE — fullscreen form with its own header/body/footer.
                ============================================================ */
             <EditRecordForm
               record={record}
@@ -196,6 +189,15 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                VIEW MODE — the original detail view content.
                ============================================================ */
             <>
+              {/* View-mode header */}
+              <div className="mb-4 flex items-start justify-between">
+                <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Record Details
+                </Dialog.Title>
+                <Dialog.Close className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300">
+                  ✕
+                </Dialog.Close>
+              </div>
               {/* Type badge */}
               <div className="mb-4">
                 <span
