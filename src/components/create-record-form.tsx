@@ -345,13 +345,16 @@ export default function CreateRecordForm() {
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
                     >
-                      <label className={labelClass}>Image</label>
+                      <label htmlFor="image-file-input" className={labelClass}>
+                        Image
+                      </label>
                       <input
                         ref={fileInputRef}
+                        id="image-file-input"
                         type="file"
                         accept="image/jpeg,image/png,image/gif,image/webp"
                         onChange={handleFileSelect}
-                        className="hidden"
+                        className="sr-only"
                       />
                       {imagePreview ? (
                         <div className="relative">
@@ -379,23 +382,23 @@ export default function CreateRecordForm() {
                           )}
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`w-full rounded-md border-2 border-dashed px-4 py-12 text-sm transition-colors ${
+                        <label
+                          htmlFor="image-file-input"
+                          className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-md -outline-offset-2 outline-2 outline-dashed px-4 py-12 text-center text-sm transition-colors ${
                             isDragging
-                              ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                              : "border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                              ? "bg-blue-50 text-blue-700 outline-blue-500 dark:bg-blue-950/30 dark:text-blue-300"
+                              : "text-gray-500 outline-gray-300 hover:text-gray-600 hover:outline-gray-400 dark:text-gray-400 dark:outline-gray-600 dark:hover:text-gray-500 dark:hover:outline-gray-500"
                           }`}
                         >
-                          {isDragging
-                            ? "Drop image here"
-                            : "Click to select an image, or drag and drop"}
-                          <br />
-                          <span className="text-xs text-gray-400">
+                          <span>
+                            {isDragging
+                              ? "Drop image here"
+                              : "Click to select an image, or drag and drop"}
+                          </span>
+                          <span className="mt-1 text-xs text-gray-400">
                             JPEG, PNG, GIF, or WebP • Max 5MB
                           </span>
-                        </button>
+                        </label>
                       )}
                     </div>
                   )}
