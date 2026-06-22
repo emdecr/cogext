@@ -231,17 +231,6 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                         </div>
                       )}
 
-                      {record.content && (
-                        <div>
-                          <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            Image Description
-                          </p>
-                          <p className="whitespace-pre-wrap text-sm italic text-gray-700 dark:text-gray-300">
-                            {record.content}
-                          </p>
-                        </div>
-                      )}
-
                       {record.note && (
                         <div className="rounded-md bg-gray-50 p-3 dark:bg-gray-800">
                           <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -249,6 +238,17 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                           </p>
                           <p className="text-sm italic text-gray-600 dark:text-gray-300">
                             {record.note}
+                          </p>
+                        </div>
+                      )}
+
+                      {record.content && (
+                        <div>
+                          <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            Image Description
+                          </p>
+                          <p className="whitespace-pre-wrap text-sm italic text-gray-700 dark:text-gray-300">
+                            {record.content}
                           </p>
                         </div>
                       )}
@@ -284,8 +284,18 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
                         <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                           Content
                         </p>
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                          {record.content}
+                        <div
+                          className={`whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300 ${
+                            record.type === "quote"
+                              ? record.content.length < 140
+                                ? "text-3xl font-serif italic leading-snug"
+                                : record.content.length < 320
+                                  ? "text-xl font-serif italic"
+                                  : "text-base italic"
+                              : "text-sm"
+                          }`}
+                        >
+                          {record.type === "quote" ? `“${record.content}”` : record.content}
                         </div>
                       </div>
                     </div>
