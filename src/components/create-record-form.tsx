@@ -67,10 +67,7 @@ export default function CreateRecordForm() {
     };
   }, []);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  function acceptFile(file: File) {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setError("Please select a JPEG, PNG, GIF, or WebP image");
@@ -82,9 +79,47 @@ export default function CreateRecordForm() {
       return;
     }
 
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
     setError(null);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    acceptFile(file);
+  }
+
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepthRef = useRef(0);
+
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    acceptFile(file);
   }
 
   function clearImage() {
@@ -304,7 +339,12 @@ export default function CreateRecordForm() {
                   )}
 
                   {type === "image" && (
-                    <div>
+                    <div
+                      onDragEnter={handleDragEnter}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
                       <label className={labelClass}>Image</label>
                       <input
                         ref={fileInputRef}
@@ -319,7 +359,11 @@ export default function CreateRecordForm() {
                           <img
                             src={imagePreview}
                             alt="Preview"
-                            className="max-h-96 w-full rounded-md border border-gray-200 object-cover dark:border-gray-700"
+                            className={`max-h-96 w-full rounded-md border object-cover ${
+                              isDragging
+                                ? "border-blue-500 ring-2 ring-blue-500"
+                                : "border-gray-200 dark:border-gray-700"
+                            }`}
                           />
                           <button
                             type="button"
@@ -328,14 +372,25 @@ export default function CreateRecordForm() {
                           >
                             Remove
                           </button>
+                          {isDragging && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-blue-500/20 text-sm font-medium text-blue-900 dark:text-blue-100">
+                              Drop to replace
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full rounded-md border-2 border-dashed border-gray-300 px-4 py-12 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                          className={`w-full rounded-md border-2 border-dashed px-4 py-12 text-sm transition-colors ${
+                            isDragging
+                              ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                              : "border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                          }`}
                         >
-                          Click to select an image
+                          {isDragging
+                            ? "Drop image here"
+                            : "Click to select an image, or drag and drop"}
                           <br />
                           <span className="text-xs text-gray-400">
                             JPEG, PNG, GIF, or WebP • Max 5MB
