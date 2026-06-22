@@ -174,6 +174,7 @@ jobs:
   # Registry (ghcr.io) so your server can pull it for deployment.
   docker:
     name: Docker Build
+    needs: [lint-and-typecheck, test, build]
     runs-on: ubuntu-latest
 
     steps:
@@ -221,7 +222,7 @@ jobs:
   #   DEPLOY_SSH_KEY — private SSH key for the "deploy" user on the server
   deploy:
     name: Deploy
-    needs: [docker]
+    needs: [lint-and-typecheck, test, build, docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
