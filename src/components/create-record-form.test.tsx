@@ -160,7 +160,7 @@ describe("CreateRecordForm", () => {
       // We detect this via aria or text — not CSS classes.
       // Since the form renders type buttons, we check that
       // note-specific UI is present (no file upload for notes).
-      expect(screen.queryByText("Click to select an image")).not.toBeInTheDocument();
+      expect(screen.queryByText("Click to select an image, or drag and drop")).not.toBeInTheDocument();
     });
 
     it("shows image upload area when 'image' type is selected", async () => {
@@ -169,7 +169,7 @@ describe("CreateRecordForm", () => {
       await user.click(screen.getByRole("button", { name: "image" }));
 
       expect(
-        screen.getByText("Click to select an image")
+        screen.getByText("Click to select an image, or drag and drop")
       ).toBeInTheDocument();
     });
 
@@ -180,17 +180,16 @@ describe("CreateRecordForm", () => {
       await user.click(screen.getByRole("button", { name: "note" }));
 
       expect(
-        screen.queryByText("Click to select an image")
+        screen.queryByText("Click to select an image, or drag and drop")
       ).not.toBeInTheDocument();
     });
 
-    it("labels content field as 'Description (optional)' for image type", async () => {
+    it("hides the Content field for image type (AI fills description)", async () => {
       const user = await renderAndOpenForm();
 
       await user.click(screen.getByRole("button", { name: "image" }));
 
-      // The label text changes based on type — test that it changes correctly
-      expect(screen.getByText("Description")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Content")).not.toBeInTheDocument();
     });
 
     it("shows Source URL field for link type", async () => {
