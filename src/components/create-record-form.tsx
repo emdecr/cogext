@@ -274,43 +274,34 @@ export default function CreateRecordForm() {
                     )}
                   </div>
 
-                  <div>
-                    <label htmlFor="content" className={labelClass}>
-                      {type === "image" ? (
-                        <>
-                          Description{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </>
-                      ) : (
-                        "Content"
-                      )}
-                    </label>
-                    <textarea
-                      id="content"
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder={
-                        type === "image"
-                          ? "Describe the image..."
-                          : type === "quote"
+                  {type !== "image" && (
+                    <div>
+                      <label htmlFor="content" className={labelClass}>
+                        Content
+                      </label>
+                      <textarea
+                        id="content"
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder={
+                          type === "quote"
                             ? "Paste the quote..."
                             : type === "link"
                               ? "What is this link about?"
                               : type === "article"
                                 ? "Paste an excerpt or summary..."
                                 : "Write your note..."
-                      }
-                      rows={type === "image" ? 4 : 12}
-                      className={inputClass}
-                    />
-                    {fieldErrors?.content && (
-                      <p className="mt-1 text-sm text-red-500">
-                        {fieldErrors.content[0]}
-                      </p>
-                    )}
-                  </div>
+                        }
+                        rows={12}
+                        className={inputClass}
+                      />
+                      {fieldErrors?.content && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {fieldErrors.content[0]}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {type === "image" && (
                     <div>
