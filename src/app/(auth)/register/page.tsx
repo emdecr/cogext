@@ -62,17 +62,20 @@ export default function RegisterPage() {
       // If the API returned an error (4xx or 5xx status), show it.
       if (!response.ok) {
         setError(data.error || "Registration failed");
+        setLoading(false);
         return;
       }
 
       // Success — the API set the session cookie automatically
       // (cookies set in the response are saved by the browser).
       // Redirect to the dashboard.
+      //
+      // Deliberately DO NOT clear `loading` here: router.push() only
+      // starts the navigation, so resetting loading would flash the form
+      // back over the spinner before the dashboard loads.
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
-      // Always stop the loading state, whether success or failure.
       setLoading(false);
     }
   }

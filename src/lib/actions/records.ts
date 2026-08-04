@@ -308,6 +308,15 @@ export async function getRecord(id: string) {
 
   const record = await db.query.records.findFirst({
     where: and(eq(records.id, id), eq(records.userId, userId)),
+    // Include tags so the detail page/modal can render the tag editor,
+    // matching the shape getRecords() returns.
+    with: {
+      recordTags: {
+        with: {
+          tag: true,
+        },
+      },
+    },
   });
 
   return record || null;

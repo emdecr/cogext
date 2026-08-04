@@ -52,17 +52,24 @@ function LoginForm() {
 
       if (!response.ok) {
         setError(data.error || "Login failed");
+        setLoading(false);
         return;
       }
 
       // Redirect to where the user was trying to go, or dashboard
       // as the default. The "redirect" param is set by middleware
       // when it redirects an unauthenticated user to /login.
+      //
+      // Deliberately DO NOT clear `loading` here. router.push() only
+      // *starts* the client navigation and returns immediately; if we
+      // reset loading now, the form re-renders over the spinner and
+      // flashes the login inputs before the dashboard finishes loading.
+      // Leaving loading=true keeps the spinner up until this page is
+      // replaced by the destination.
       const redirectTo = searchParams.get("redirect") || "/dashboard";
       router.push(redirectTo);
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   }
