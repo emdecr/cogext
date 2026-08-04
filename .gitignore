@@ -71,6 +71,7 @@ pgdata/
 SPEC.md
 PLAN.md
 DEPLOY.md
+plans/
 
 #deploy
 deploy/cloud-init-prod.yml
