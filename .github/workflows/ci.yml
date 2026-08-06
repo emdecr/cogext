@@ -100,6 +100,22 @@ jobs:
       - name: Type Check
         run: npx tsc --noEmit
 
+      # ---- Migration drift check ----
+      # Guards against the silent foot-gun where someone edits src/db/schema.ts
+      # but forgets to generate + commit the migration. `drizzle-kit generate`
+      # compares the schema to the snapshots in drizzle/meta (no database
+      # needed); if the schema changed without a committed migration, it writes
+      # a new file and `git diff --exit-code` then fails the build.
+      #
+      # Note: a column RENAME makes drizzle-kit prompt interactively, which
+      # would hang here — generate those locally and commit; this step only
+      # verifies the result is committed.
+      - name: Check for uncommitted migrations
+        run: |
+          npx drizzle-kit generate
+          git diff --exit-code drizzle/ \
+            || (echo "::error::Schema changed but no migration committed. Run 'npm run db:generate' and commit the drizzle/ changes." && exit 1)
+
   # =============================================================================
   # JOB 2: Unit + Component Tests
   # =============================================================================

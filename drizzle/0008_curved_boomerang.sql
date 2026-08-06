@@ -1,0 +1,1 @@
+ALTER TABLE "records" ALTER COLUMN "embedding" SET DATA TYPE vector(1024);
