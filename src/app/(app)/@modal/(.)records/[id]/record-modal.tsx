@@ -48,7 +48,10 @@ export default function RecordModal({ record }: { record: RecordWithTags }) {
     <Dialog.Root open onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex h-[90vh] w-[90vw] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900">
+        {/* Full-screen sheet on phones/tablets (incl. iPad portrait); centered
+            floating card only at lg (≥1024px). Matches the create-record modal
+            so touch navigation is consistent. */}
+        <Dialog.Content className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[90dvh] lg:w-[90vw] lg:max-w-6xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-xl">
           {/* Accessible title required by Radix Dialog; visually hidden since
               RecordDetail renders its own visible "Record Details" heading. */}
           <Dialog.Title asChild>

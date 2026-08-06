@@ -40,7 +40,7 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
+  "w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
 
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -84,7 +84,10 @@ export default function EditRecordForm({ record, onClose }: Props) {
     onClose();
   }
 
-  const showSourceUrl = record.type === "link" || record.type === "article";
+  const showSourceUrl =
+    record.type === "link" ||
+    record.type === "article" ||
+    record.type === "quote";
   const showAuthor =
     record.type === "quote" ||
     record.type === "article" ||
@@ -100,7 +103,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
         <Dialog.Close asChild>
           <button
             type="button"
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="-mr-2 rounded-md p-2 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             aria-label="Close form"
           >
             ✕
@@ -109,14 +112,14 @@ export default function EditRecordForm({ record, onClose }: Props) {
       </div>
 
       {/* ---- Scrollable body ---- */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
             {error}
           </div>
         )}
 
-        <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
           {/* Left column: primary content */}
           <div className="space-y-6">
             <div>
@@ -220,14 +223,14 @@ export default function EditRecordForm({ record, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+          className="rounded-md px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
+          className="rounded-md bg-gray-900 px-5 py-2.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
         >
           {isSubmitting ? "Saving..." : "Save Changes"}
         </button>

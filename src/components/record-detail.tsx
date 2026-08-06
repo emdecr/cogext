@@ -127,7 +127,7 @@ export default function RecordDetail({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="-mr-2 rounded-md p-2 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             aria-label="Close"
           >
             ✕
@@ -136,10 +136,10 @@ export default function RecordDetail({
       </div>
 
       {/* ---- Scrollable body ---- */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
         {record.imagePath ? (
           /* Image type: image on left, meta on right */
-          <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+          <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -197,7 +197,7 @@ export default function RecordDetail({
           </div>
         ) : (
           /* Non-image types: content on left, meta on right (mirrors create form) */
-          <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+          <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div className="space-y-6">
               {record.title && (
                 <div>
@@ -296,7 +296,7 @@ export default function RecordDetail({
 
           <button
             onClick={() => setIsEditing(true)}
-            className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="rounded-md px-3 py-2 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             Edit
           </button>
@@ -304,7 +304,7 @@ export default function RecordDetail({
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
-            className="rounded-md px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950"
+            className="rounded-md px-3 py-2 text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950"
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </button>

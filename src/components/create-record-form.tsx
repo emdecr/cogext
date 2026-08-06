@@ -17,7 +17,7 @@ import { RECORD_TYPES } from "@/lib/validations/records";
 import TagInput from "@/components/tag-input";
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
+  "w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
 
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -210,7 +210,8 @@ export default function CreateRecordForm() {
     setIsOpen(false);
   }
 
-  const showSourceUrl = type === "link" || type === "article";
+  const showSourceUrl =
+    type === "link" || type === "article" || type === "quote";
   const showAuthor = type === "quote" || type === "article" || type === "link";
 
   return (
@@ -233,7 +234,12 @@ export default function CreateRecordForm() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]" />
 
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex h-[90vh] w-[90vw] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900">
+        {/* Full-screen sheet on phones/tablets (incl. iPad portrait): using
+            inset-0 + 100dvh instead of a translate-centered box lets iOS Safari
+            scroll a focused input above the on-screen keyboard, and gives the
+            body room so the two-column layout can stack. Switches to a centered
+            floating card only at lg (≥1024px: iPad landscape + desktop). */}
+        <Dialog.Content className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[90dvh] lg:w-[90vw] lg:max-w-6xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-xl">
           <form onSubmit={handleSubmit} className="flex h-full flex-col">
             {/* ---- Header ---- */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
@@ -243,7 +249,7 @@ export default function CreateRecordForm() {
               <Dialog.Close asChild>
                 <button
                   type="button"
-                  className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  className="-mr-2 rounded-md p-2 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   aria-label="Close form"
                 >
                   ✕
@@ -252,7 +258,7 @@ export default function CreateRecordForm() {
             </div>
 
             {/* ---- Scrollable body ---- */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
               {error && (
                 <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
                   {error}
@@ -271,7 +277,7 @@ export default function CreateRecordForm() {
                         setType(t);
                         if (t !== "image") clearImage();
                       }}
-                      className={`rounded-full px-3 py-1 text-sm capitalize transition-colors ${
+                      className={`rounded-full px-4 py-2 text-sm capitalize transition-colors ${
                         type === t
                           ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -283,8 +289,8 @@ export default function CreateRecordForm() {
                 </div>
               </div>
 
-              {/* Two-column body */}
-              <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+              {/* Two-column body — stacks until lg so iPad portrait isn't cramped */}
+              <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
                 {/* ---- Left column: primary content ---- */}
                 <div className="space-y-6">
                   <div>
@@ -503,14 +509,14 @@ export default function CreateRecordForm() {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="rounded-md px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                className="rounded-md px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || (type === "image" && !imageFile)}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
+                className="rounded-md bg-gray-900 px-5 py-2.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
               >
                 {isUploading
                   ? "Uploading..."
