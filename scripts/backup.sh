@@ -118,15 +118,20 @@ echo ""
 echo "📦 [1/3] Backing up PostgreSQL..."
 
 if [[ "$DRY_RUN" == "false" ]]; then
+  # Flag notes (kept off the continuation lines — an inline `# comment` after a
+  # trailing backslash breaks the line-continuation and truncates the command):
+  #   --clean      include DROP statements before CREATE (safe for restore)
+  #   --if-exists  makes DROP statements non-fatal if table doesn't exist
+  #   --format=plain  plain SQL (readable, portable, restorable with psql)
   docker compose \
     -f "$COMPOSE_FILE" \
     exec -T db \
     pg_dump \
       --username="$POSTGRES_USER" \
       --no-password \
-      --clean \            # include DROP statements before CREATE (safe for restore)
-      --if-exists \        # makes DROP statements non-fatal if table doesn't exist
-      --format=plain \     # plain SQL (readable, portable, restorable with psql)
+      --clean \
+      --if-exists \
+      --format=plain \
       "$POSTGRES_DB" \
   | gzip -9 > "$POSTGRES_BACKUP"
 

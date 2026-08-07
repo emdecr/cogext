@@ -34,12 +34,40 @@ name: CI
 on:
   push:
     branches: [main]
+    # If a push touches ONLY these paths, the whole workflow is skipped
+    # (no build, no deploy) — the commit just lands. A push touching any
+    # other path runs the full pipeline. Note: '**.md' matches markdown at
+    # any depth (plain '*.md' only matched root-level files).
     paths-ignore:
-      - '*.md'
+      - '**.md'
+      - 'docs/**'
+      - 'plans/**'
+      - 'LICENSE'
+      # download-*.sh run from your Mac (they pull backups TO local), so they
+      # never touch the server or the image — nothing for CI to do when they
+      # change. backup.sh / restore.sh are deliberately NOT ignored: they run
+      # on the server, so a change triggers the lightweight sync-scripts job
+      # (see below) that copies them to the host — no image build.
+      - 'scripts/download-backups.sh'
+      - 'scripts/download-minio-images.sh'
   pull_request:
     branches: [main]
+    # If a push touches ONLY these paths, the whole workflow is skipped
+    # (no build, no deploy) — the commit just lands. A push touching any
+    # other path runs the full pipeline. Note: '**.md' matches markdown at
+    # any depth (plain '*.md' only matched root-level files).
     paths-ignore:
-      - '*.md'
+      - '**.md'
+      - 'docs/**'
+      - 'plans/**'
+      - 'LICENSE'
+      # download-*.sh run from your Mac (they pull backups TO local), so they
+      # never touch the server or the image — nothing for CI to do when they
+      # change. backup.sh / restore.sh are deliberately NOT ignored: they run
+      # on the server, so a change triggers the lightweight sync-scripts job
+      # (see below) that copies them to the host — no image build.
+      - 'scripts/download-backups.sh'
+      - 'scripts/download-minio-images.sh'
 
 # ---- Permissions ----
 # The deploy job needs write access to push Docker images to GHCR.
@@ -60,6 +88,47 @@ permissions:
 #   different bugs than tests do. Running them in parallel with tests
 #   gives faster feedback.
 jobs:
+  # =============================================================================
+  # JOB 0: Detect what changed (routes the rest of the pipeline)
+  # =============================================================================
+  # Classifies the push so the heavy jobs (build → docker → deploy) only run
+  # when APP code changed, and the lightweight script sync only runs when the
+  # server-side ops scripts changed. dorny/paths-filter needs no database and
+  # runs in a few seconds.
+  #
+  # Fail-safe note: the `app` list is an allow-list of things that require an
+  # image rebuild. If you add a NEW app-relevant path, add it here too — a path
+  # that matches neither filter is treated as "no build, no sync".
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      scripts: ${{ steps.filter.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'src/**'
+              - 'public/**'
+              - 'drizzle/**'
+              - 'scripts/migrate.mjs'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'next.config.*'
+              - 'tsconfig.json'
+              - 'drizzle.config.ts'
+              - 'Dockerfile'
+              - 'docker-entrypoint.sh'
+              - 'docker-compose*.yml'
+              - '.github/workflows/**'
+            scripts:
+              - 'scripts/backup.sh'
+              - 'scripts/restore.sh'
+
   lint-and-typecheck:
     name: Lint & Type Check
     runs-on: ubuntu-latest
@@ -153,6 +222,10 @@ jobs:
   # for Next.js to compile. The real values are injected at runtime.
   build:
     name: Next.js Build
+    needs: changes
+    # Only build when app code changed. docker + deploy `need` this job, so a
+    # skipped build cascades — they skip automatically on script-only pushes.
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -254,3 +327,46 @@ jobs:
             docker compose -f docker-compose.prod.yml pull app
             docker compose -f docker-compose.prod.yml up -d app
             docker image prune -f
+
+  # =============================================================================
+  # JOB 6: Sync ops scripts (lightweight — no image build)
+  # =============================================================================
+  # backup.sh / restore.sh run ON the server and are NOT baked into the Docker
+  # image, so an image rebuild can't deliver them. When they change, we skip the
+  # whole build/deploy and just copy them to /opt/cogext/scripts/ over SSH.
+  # Runs only on push to main, and only when the `scripts` filter matched.
+  #
+  # Uses the same DEPLOY_HOST / DEPLOY_SSH_KEY secrets as the deploy job, and the
+  # `deploy` user already owns /opt/cogext — no new access required.
+  sync-scripts:
+    name: Sync ops scripts
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Never ship a syntactically broken script to prod — this is exactly the
+      # class of bug (an inline comment breaking line-continuation) that silently
+      # disabled backup.sh before. `bash -n` parses without executing.
+      - name: Syntax-check scripts
+        run: |
+          for f in scripts/backup.sh scripts/restore.sh; do
+            bash -n "$f"
+          done
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Copy scripts to server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          SSH_OPTS="-i $HOME/.ssh/id_deploy -o StrictHostKeyChecking=accept-new"
+          rsync -az -e "ssh $SSH_OPTS" \
+            scripts/backup.sh scripts/restore.sh \
+            "deploy@${DEPLOY_HOST}:/opt/cogext/scripts/"
+          ssh $SSH_OPTS "deploy@${DEPLOY_HOST}" 'chmod +x /opt/cogext/scripts/*.sh'
