@@ -55,6 +55,9 @@ describe("createRecordSchema", () => {
       const result = createRecordSchema.safeParse({
         type,
         content: "some content",
+        // Link records require a Source URL (see the link rule below); every
+        // other type leaves it optional.
+        sourceUrl: type === "link" ? "https://example.com" : undefined,
       });
       // Use a custom message so if this fails, we know WHICH type broke
       expect(result.success, `type "${type}" should be valid`).toBe(true);
@@ -135,13 +138,51 @@ describe("createRecordSchema", () => {
   });
 
   it("accepts an empty string for sourceUrl (unfilled form field)", () => {
-    // The form sends "" when the URL field is left blank.
-    // The schema allows this via .or(z.literal("")) and the server
-    // action converts it to undefined before writing to the DB.
+    // The form sends "" when the URL field is left blank. The schema allows
+    // this via .or(z.literal("")) and the server action converts it to
+    // undefined before writing to the DB. Uses a non-link type — links now
+    // require a URL (see the link rule tests below).
+    const result = createRecordSchema.safeParse({
+      type: "quote",
+      content: "Some content",
+      sourceUrl: "",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  // ---- Link requires a Source URL ----
+
+  it("rejects a link record with no sourceUrl", () => {
+    const result = createRecordSchema.safeParse({
+      type: "link",
+      content: "Some content",
+      // sourceUrl omitted
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.sourceUrl).toContain(
+        "Source URL is required for links",
+      );
+    }
+  });
+
+  it("rejects a link record with an empty/whitespace sourceUrl", () => {
     const result = createRecordSchema.safeParse({
       type: "link",
       content: "Some content",
       sourceUrl: "",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a link record with a sourceUrl", () => {
+    const result = createRecordSchema.safeParse({
+      type: "link",
+      content: "Some content",
+      sourceUrl: "https://example.com",
     });
 
     expect(result.success).toBe(true);
@@ -254,6 +295,17 @@ describe("updateRecordSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("enforces the link sourceUrl rule when type is provided", () => {
+    // The edit form sends `type` for links so clearing the URL is rejected.
+    const result = updateRecordSchema.safeParse({
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      type: "link",
+      sourceUrl: "",
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

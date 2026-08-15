@@ -65,11 +65,12 @@ export const READING_STATUS_LABELS: Record<ReadingStatus, string> = {
 //   - An "image" needs imagePath (handled separately via file upload)
 //   - A "quote" needs content (the quote text)
 //
-// For now we keep validation simple — we'll add conditional logic
-// (e.g., "sourceUrl is required when type is 'link'") in a later pass
-// using Zod's .refine() or .superRefine() methods.
+// The shared field shape. Kept as a plain object (no cross-field refinement)
+// so updateRecordSchema can still call .partial() on it — a .refine() turns
+// the schema into a ZodEffects, which has no .partial(). The link rule below
+// is layered on top for both create and update.
 
-export const createRecordSchema = z.object({
+const recordFieldsSchema = z.object({
   // z.enum() restricts the value to the exact strings in the array.
   // Anything else (like "banana") will fail validation.
   type: z.enum(RECORD_TYPES, {
@@ -131,6 +132,26 @@ export const createRecordSchema = z.object({
   dateRead: z.iso.date().optional().or(z.literal("")),
 });
 
+// Cross-field rule: a link record must carry a Source URL — the URL is the
+// whole point of a link. Enforced on both create and update; the error is
+// attached to the `sourceUrl` field so forms show it in the right place.
+// (Other types keep sourceUrl optional.)
+function linkRequiresSourceUrl(data: {
+  type?: string;
+  sourceUrl?: string;
+}): boolean {
+  return !(data.type === "link" && !data.sourceUrl?.trim());
+}
+const linkSourceUrlIssue = {
+  path: ["sourceUrl"],
+  message: "Source URL is required for links",
+};
+
+export const createRecordSchema = recordFieldsSchema.refine(
+  linkRequiresSourceUrl,
+  linkSourceUrlIssue,
+);
+
 // Infer the TypeScript type from the schema.
 // This is equivalent to writing the type manually, but stays in sync
 // automatically if we change the schema.
@@ -146,9 +167,15 @@ export type CreateRecordInput = z.infer<typeof createRecordSchema>;
 // We extend it with a required `id` field since you need to know
 // WHICH record to update.
 
-export const updateRecordSchema = createRecordSchema.partial().extend({
-  id: z.uuid("Invalid record ID"),
-});
+// The link rule applies to updates too. It only triggers when `type` is
+// present in the payload — so the edit form sends `type` for link records to
+// keep the rule enforceable when clearing the URL.
+export const updateRecordSchema = recordFieldsSchema
+  .partial()
+  .extend({
+    id: z.uuid("Invalid record ID"),
+  })
+  .refine(linkRequiresSourceUrl, linkSourceUrlIssue);
 
 export type UpdateRecordInput = z.infer<typeof updateRecordSchema>;
 

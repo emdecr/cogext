@@ -116,6 +116,9 @@ export default function EditRecordForm({ record, onClose }: Props) {
 
     const result = await updateRecord({
       id: record.id,
+      // Sent so server-side validation knows the record type (e.g. to enforce
+      // "links require a Source URL"). The type itself can't change here.
+      type: record.type,
       title: title || undefined,
       content,
       sourceUrl: sourceUrl || undefined,
@@ -204,7 +207,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
 
             <div>
               <label htmlFor="edit-content" className={labelClass}>
-                Content
+                {record.type === "book" ? "Description" : "Content"}
               </label>
               <textarea
                 id="edit-content"
@@ -226,7 +229,10 @@ export default function EditRecordForm({ record, onClose }: Props) {
             {showSourceUrl && (
               <div>
                 <label htmlFor="edit-sourceUrl" className={labelClass}>
-                  Source URL
+                  Source URL{" "}
+                  {record.type !== "link" && (
+                    <span className="font-normal text-gray-400">(optional)</span>
+                  )}
                 </label>
                 <input
                   id="edit-sourceUrl"
@@ -268,7 +274,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
                   <label htmlFor="edit-rating" className={labelClass}>
                     Rating{" "}
                     <span className="font-normal text-gray-400">
-                      (0–5, decimals ok)
+                      (optional · 0–5)
                     </span>
                   </label>
                   <input
@@ -295,7 +301,8 @@ export default function EditRecordForm({ record, onClose }: Props) {
 
                 <div>
                   <label htmlFor="edit-readingStatus" className={labelClass}>
-                    Status
+                    Status{" "}
+                    <span className="font-normal text-gray-400">(optional)</span>
                   </label>
                   <select
                     id="edit-readingStatus"

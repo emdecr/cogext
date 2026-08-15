@@ -235,7 +235,7 @@ export default function RecordDetail({
 
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {record.type === "book" ? "Review / notes" : "Content"}
+                  {record.type === "book" ? "Description" : "Content"}
                 </p>
                 <div
                   className={`whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300 ${

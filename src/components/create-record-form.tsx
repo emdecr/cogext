@@ -355,7 +355,7 @@ export default function CreateRecordForm() {
                   {type !== "image" && (
                     <div>
                       <label htmlFor="content" className={labelClass}>
-                        {type === "book" ? "Review / notes" : "Content"}
+                        {type === "book" ? "Description" : "Content"}
                         {type === "book" && (
                           <span className="font-normal text-gray-400">
                             {" "}
@@ -375,7 +375,7 @@ export default function CreateRecordForm() {
                               : type === "article"
                                 ? "Paste an excerpt or summary..."
                                 : type === "book"
-                                  ? "Your review or notes (leave blank to just log it)..."
+                                  ? "A short description or summary (leave blank to just log it)..."
                                   : "Write your note..."
                         }
                         rows={12}
@@ -460,7 +460,12 @@ export default function CreateRecordForm() {
                   {showSourceUrl && (
                     <div>
                       <label htmlFor="sourceUrl" className={labelClass}>
-                        Source URL
+                        Source URL{" "}
+                        {type !== "link" && (
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        )}
                       </label>
                       <input
                         id="sourceUrl"
@@ -509,7 +514,7 @@ export default function CreateRecordForm() {
                         <label htmlFor="rating" className={labelClass}>
                           Rating{" "}
                           <span className="font-normal text-gray-400">
-                            (0–5, decimals ok)
+                            (optional · 0–5)
                           </span>
                         </label>
                         <input
@@ -538,7 +543,10 @@ export default function CreateRecordForm() {
 
                       <div>
                         <label htmlFor="readingStatus" className={labelClass}>
-                          Status
+                          Status{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
                         </label>
                         <select
                           id="readingStatus"

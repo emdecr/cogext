@@ -137,7 +137,10 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
               {record.rating !== null && (
                 <StarRating value={record.rating} className="text-sm" />
               )}
-              {record.readingStatus && (
+              {/* Skip the "Read" chip — the date below already conveys it.
+                  Keep "Want to read" / "Currently reading" since those have no
+                  date and the chip is their only signal on the card. */}
+              {record.readingStatus && record.readingStatus !== "read" && (
                 <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                   {READING_STATUS_LABELS[record.readingStatus]}
                 </span>
