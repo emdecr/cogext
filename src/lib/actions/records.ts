@@ -132,6 +132,11 @@ export async function createRecord(
         sourceAuthor: parsed.data.sourceAuthor || null,
         note: parsed.data.note || null,
         imagePath: parsed.data.imagePath || null,
+        // Book-only fields — null for every other type. `?? null` (not `||`)
+        // so a rating of 0 is preserved rather than coerced to null.
+        rating: parsed.data.rating ?? null,
+        readingStatus: parsed.data.readingStatus || null,
+        dateRead: parsed.data.dateRead || null,
       })
       .returning();
 
@@ -370,6 +375,19 @@ export async function updateRecord(
         sourceAuthor: updates.sourceAuthor || null,
         note: updates.note || null,
         title: updates.title || null,
+        // Book-only fields. The edit form sends these from state for book
+        // records; for other types they're absent → normalized to null (which
+        // they already are). `?? null` keeps a 0 rating intact.
+        rating: updates.rating ?? null,
+        readingStatus: updates.readingStatus || null,
+        dateRead: updates.dateRead || null,
+        // Cover image: ONLY touch it when the client actually sent imagePath
+        // (a book cover add/replace/remove). "" clears it, a path sets it, and
+        // absence leaves it untouched — otherwise a metadata-only edit would
+        // wipe an image record's or book's existing cover.
+        ...("imagePath" in updates
+          ? { imagePath: (updates.imagePath as string) || null }
+          : {}),
         // Manually set updatedAt since Postgres doesn't auto-update it
         updatedAt: new Date(),
       })

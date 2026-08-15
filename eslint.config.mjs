@@ -7,11 +7,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
+    // Build output — un-anchored (**/) so nested copies are ignored too,
+    // e.g. a stale .next inside a .claude/worktrees/* worktree. A root-anchored
+    // ".next/**" misses those and floods lint with minified-chunk noise.
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
     "next-env.d.ts",
+    // Claude Code's working dir (worktrees, memory, its own builds) — never
+    // our source, never lint it.
+    ".claude/**",
   ]),
 ]);
 

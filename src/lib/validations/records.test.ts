@@ -40,7 +40,16 @@ describe("createRecordSchema", () => {
   });
 
   it("accepts all valid record types", () => {
-    const types = ["image", "quote", "article", "link", "note"] as const;
+    // "article" stays valid at the schema level even though it's retired from
+    // the create UI — existing article records must still validate on edit.
+    const types = [
+      "image",
+      "quote",
+      "article",
+      "link",
+      "note",
+      "book",
+    ] as const;
 
     for (const type of types) {
       const result = createRecordSchema.safeParse({
@@ -50,6 +59,55 @@ describe("createRecordSchema", () => {
       // Use a custom message so if this fails, we know WHICH type broke
       expect(result.success, `type "${type}" should be valid`).toBe(true);
     }
+  });
+
+  // ---- Book fields ----
+
+  it("accepts a book record with rating, status, and date read", () => {
+    const result = createRecordSchema.safeParse({
+      type: "book",
+      content: "A great read",
+      title: "Sum",
+      sourceAuthor: "David Eagleman",
+      rating: 4.5,
+      readingStatus: "read",
+      dateRead: "2009-02-07",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a rating above 5", () => {
+    const result = createRecordSchema.safeParse({
+      type: "book",
+      content: "some content",
+      rating: 6,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.rating).toBeDefined();
+    }
+  });
+
+  it("rejects an invalid reading status", () => {
+    const result = createRecordSchema.safeParse({
+      type: "book",
+      content: "some content",
+      readingStatus: "on-hold",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an empty string for dateRead (unfilled form field)", () => {
+    const result = createRecordSchema.safeParse({
+      type: "book",
+      content: "some content",
+      dateRead: "",
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("accepts optional fields when provided", () => {

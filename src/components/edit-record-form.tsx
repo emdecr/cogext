@@ -13,7 +13,13 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { updateRecord } from "@/lib/actions/records";
-import { RECORD_TYPES } from "@/lib/validations/records";
+import {
+  READING_STATUSES,
+  READING_STATUS_LABELS,
+  type RecordType,
+  type ReadingStatus,
+} from "@/lib/validations/records";
+import { CoverImageInput } from "@/components/cover-image-input";
 
 type Tag = {
   id: string;
@@ -23,13 +29,16 @@ type Tag = {
 
 type RecordWithTags = {
   id: string;
-  type: (typeof RECORD_TYPES)[number];
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;
   sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
+  rating: number | null;
+  readingStatus: ReadingStatus | null;
+  dateRead: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };
@@ -52,6 +61,18 @@ export default function EditRecordForm({ record, onClose }: Props) {
   const [sourceAuthor, setSourceAuthor] = useState(record.sourceAuthor ?? "");
   const [note, setNote] = useState(record.note ?? "");
 
+  // Book-only fields.
+  const [rating, setRating] = useState<number | null>(record.rating);
+  const [readingStatus, setReadingStatus] = useState<ReadingStatus | "">(
+    record.readingStatus ?? "",
+  );
+  const [dateRead, setDateRead] = useState(record.dateRead ?? "");
+
+  // Book cover. `coverFile` is a newly-picked file (not yet uploaded);
+  // `coverRemoved` marks the existing saved cover for deletion.
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverRemoved, setCoverRemoved] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
@@ -64,6 +85,35 @@ export default function EditRecordForm({ record, onClose }: Props) {
     setFieldErrors(undefined);
     setIsSubmitting(true);
 
+    // Resolve the cover change (book only). `undefined` = leave unchanged;
+    // "" = remove; a path = new/replaced cover.
+    let imagePath: string | undefined;
+    if (record.type === "book") {
+      if (coverFile) {
+        const formData = new FormData();
+        formData.append("file", coverFile);
+        try {
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadRes.ok) {
+            const data = await uploadRes.json();
+            setError(data.error || "Failed to upload cover");
+            setIsSubmitting(false);
+            return;
+          }
+          imagePath = (await uploadRes.json()).path;
+        } catch {
+          setError("Failed to upload cover. Please try again.");
+          setIsSubmitting(false);
+          return;
+        }
+      } else if (coverRemoved) {
+        imagePath = "";
+      }
+    }
+
     const result = await updateRecord({
       id: record.id,
       title: title || undefined,
@@ -71,6 +121,13 @@ export default function EditRecordForm({ record, onClose }: Props) {
       sourceUrl: sourceUrl || undefined,
       sourceAuthor: sourceAuthor || undefined,
       note: note || undefined,
+      rating: record.type === "book" && rating !== null ? rating : undefined,
+      readingStatus:
+        record.type === "book" && readingStatus ? readingStatus : undefined,
+      dateRead: record.type === "book" && dateRead ? dateRead : undefined,
+      // Only include when the cover actually changed, so the action leaves an
+      // untouched cover alone.
+      ...(imagePath !== undefined ? { imagePath } : {}),
     });
 
     setIsSubmitting(false);
@@ -87,11 +144,14 @@ export default function EditRecordForm({ record, onClose }: Props) {
   const showSourceUrl =
     record.type === "link" ||
     record.type === "article" ||
-    record.type === "quote";
+    record.type === "quote" ||
+    record.type === "image" ||
+    record.type === "book";
   const showAuthor =
     record.type === "quote" ||
     record.type === "article" ||
-    record.type === "link";
+    record.type === "link" ||
+    record.type === "book";
 
   return (
     <form onSubmit={handleSubmit} className="flex h-full flex-col">
@@ -187,7 +247,9 @@ export default function EditRecordForm({ record, onClose }: Props) {
             {showAuthor && (
               <div>
                 <label htmlFor="edit-sourceAuthor" className={labelClass}>
-                  {record.type === "quote" ? "Author" : "Author / Source"}{" "}
+                  {record.type === "quote" || record.type === "book"
+                    ? "Author"
+                    : "Author / Source"}{" "}
                   <span className="font-normal text-gray-400">(optional)</span>
                 </label>
                 <input
@@ -197,6 +259,100 @@ export default function EditRecordForm({ record, onClose }: Props) {
                   onChange={(e) => setSourceAuthor(e.target.value)}
                   className={inputClass}
                 />
+              </div>
+            )}
+
+            {record.type === "book" && (
+              <div className="space-y-6 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+                <div>
+                  <label htmlFor="edit-rating" className={labelClass}>
+                    Rating{" "}
+                    <span className="font-normal text-gray-400">
+                      (0–5, decimals ok)
+                    </span>
+                  </label>
+                  <input
+                    id="edit-rating"
+                    type="number"
+                    min={0}
+                    max={5}
+                    step="any"
+                    value={rating ?? ""}
+                    onChange={(e) =>
+                      setRating(
+                        e.target.value === "" ? null : Number(e.target.value),
+                      )
+                    }
+                    placeholder="e.g. 4.25"
+                    className={inputClass}
+                  />
+                  {fieldErrors?.rating && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {fieldErrors.rating[0]}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="edit-readingStatus" className={labelClass}>
+                    Status
+                  </label>
+                  <select
+                    id="edit-readingStatus"
+                    value={readingStatus}
+                    onChange={(e) =>
+                      setReadingStatus(e.target.value as ReadingStatus | "")
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">—</option>
+                    {READING_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {READING_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="edit-dateRead" className={labelClass}>
+                    Date read{" "}
+                    <span className="font-normal text-gray-400">
+                      (optional)
+                    </span>
+                  </label>
+                  <input
+                    id="edit-dateRead"
+                    type="date"
+                    value={dateRead}
+                    onChange={(e) => setDateRead(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Cover{" "}
+                    <span className="font-normal text-gray-400">
+                      (optional)
+                    </span>
+                  </label>
+                  <CoverImageInput
+                    existingUrl={coverRemoved ? null : record.imagePath}
+                    file={coverFile}
+                    onSelect={(f) => {
+                      setCoverFile(f);
+                      setCoverRemoved(false);
+                      setError(null);
+                    }}
+                    onClear={() => {
+                      setCoverFile(null);
+                      setCoverRemoved(true);
+                    }}
+                    onError={setError}
+                    disabled={isSubmitting}
+                  />
+                </div>
               </div>
             )}
 

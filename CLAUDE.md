@@ -11,7 +11,7 @@ Self-hosted personal knowledge base. Save records (images, quotes, articles, lin
 - [README.md](README.md) — user-facing setup and feature overview. **Current.**
 - [SPEC.md](SPEC.md) — architectural decisions and rationale. **Canonical.** When code disagrees with SPEC.md, code wins; flag the drift.
 - [DEPLOY.md](DEPLOY.md) — production deploy, backup, restore, teardown. Includes the DR runbook.
-- [plans/PLAN.md](plans/PLAN.md) — improvement backlog and historical implementation notes.
+- [plans/2026-03-24-PLAN.md](plans/2026-03-24-PLAN.md) — improvement backlog and historical implementation notes. **Plan files are datestamped `YYYY-MM-DD-<name>.md`.**
 
 ## Non-obvious things to know before editing
 

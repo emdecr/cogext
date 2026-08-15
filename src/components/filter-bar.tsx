@@ -12,7 +12,7 @@
 
 "use client";
 
-import { RECORD_TYPES } from "@/lib/validations/records";
+import { CREATABLE_RECORD_TYPES } from "@/lib/validations/records";
 
 type FilterBarProps = {
   // Type filter
@@ -52,7 +52,7 @@ export default function FilterBar({
         All
       </button>
 
-      {RECORD_TYPES.map((type) => (
+      {CREATABLE_RECORD_TYPES.map((type) => (
         <button
           key={type}
           onClick={() => onTypeChange(activeType === type ? null : type)}

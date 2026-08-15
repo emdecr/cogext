@@ -16,6 +16,7 @@
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import RecordDetail from "@/components/record-detail";
+import type { RecordType, ReadingStatus } from "@/lib/validations/records";
 
 type Tag = {
   id: string;
@@ -25,13 +26,16 @@ type Tag = {
 
 type RecordWithTags = {
   id: string;
-  type: "image" | "quote" | "article" | "link" | "note";
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;
   sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
+  rating: number | null;
+  readingStatus: ReadingStatus | null;
+  dateRead: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };

@@ -12,6 +12,12 @@
 "use client";
 
 import Link from "next/link";
+import {
+  READING_STATUS_LABELS,
+  type RecordType,
+  type ReadingStatus,
+} from "@/lib/validations/records";
+import { StarRating } from "@/components/star-rating";
 
 // TypeScript type for the record prop, now including tags
 // from the relational query.
@@ -23,13 +29,16 @@ type Tag = {
 
 type RecordWithTags = {
   id: string;
-  type: "image" | "quote" | "article" | "link" | "note";
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;
   sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
+  rating: number | null;
+  readingStatus: ReadingStatus | null;
+  dateRead: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };
@@ -41,6 +50,7 @@ const TYPE_COLORS: Record<string, string> = {
   article: "bg-green-100 text-green-700",
   link: "bg-purple-100 text-purple-700",
   image: "bg-pink-100 text-pink-700",
+  book: "bg-indigo-100 text-indigo-700",
 };
 
 function timeAgo(date: Date): string {
@@ -76,8 +86,14 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={record.imagePath}
-          alt={record.title || "Uploaded image"}
-          className="h-36 w-full object-cover sm:h-48"
+          alt={record.title || (record.type === "book" ? "Cover" : "Uploaded image")}
+          // Book covers are portrait — contain them (no crop) on a neutral
+          // backer. Other images fill the card top edge-to-edge.
+          className={
+            record.type === "book"
+              ? "max-h-72 w-full bg-gray-50 object-contain dark:bg-gray-800"
+              : "h-36 w-full object-cover sm:h-48"
+          }
         />
       )}
 
@@ -91,8 +107,10 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
           </span>
         </div>
 
-        {/* Title */}
-        {!record.imagePath && (
+        {/* Title — always shown for books (even with a cover) so the shelf
+            reads as title + author + rating; hidden for other image records
+            where the image is the content. */}
+        {(!record.imagePath || record.type === "book") && (
           <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) ? "font-bold" : "font-medium"} ${record.type === "quote" ? "italic" : ""}`}>
             {displayTitle}
           </h3>
@@ -109,6 +127,26 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
             — {record.sourceAuthor}
           </p>
         )}
+
+        {/* Book shelf meta — rating, status, date read */}
+        {record.type === "book" &&
+          (record.rating !== null ||
+            record.readingStatus ||
+            record.dateRead) && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              {record.rating !== null && (
+                <StarRating value={record.rating} className="text-sm" />
+              )}
+              {record.readingStatus && (
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                  {READING_STATUS_LABELS[record.readingStatus]}
+                </span>
+              )}
+              {record.dateRead && (
+                <span>Read {new Date(record.dateRead).toLocaleDateString()}</span>
+              )}
+            </div>
+          )}
 
         {/* Source URL */}
         {record.sourceUrl && (

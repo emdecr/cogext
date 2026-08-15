@@ -31,41 +31,33 @@ name: CI
 # ---- Triggers ----
 # push to main: runs full pipeline including deploy
 # pull_request: runs CI checks only (no deploy)
+#
+# paths-ignore: if a push/PR touches ONLY these paths, the whole workflow is
+# skipped (commit just lands — no build, no deploy); anything else runs normally.
+# The identical list is repeated under each event on purpose: GitHub Actions
+# filters are per-event and its parser doesn't support YAML anchors to share them.
+#   - '**.md' matches markdown at any depth ('*.md' would be root-level only).
+#   - download-*.sh run from your Mac (they pull backups TO local), so they never
+#     touch the server or the image. backup.sh / restore.sh are deliberately NOT
+#     ignored — they run on the server, so a change triggers the lightweight
+#     sync-scripts job (below) that copies them to the host, no image build.
 on:
   push:
     branches: [main]
-    # If a push touches ONLY these paths, the whole workflow is skipped
-    # (no build, no deploy) — the commit just lands. A push touching any
-    # other path runs the full pipeline. Note: '**.md' matches markdown at
-    # any depth (plain '*.md' only matched root-level files).
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'plans/**'
       - 'LICENSE'
-      # download-*.sh run from your Mac (they pull backups TO local), so they
-      # never touch the server or the image — nothing for CI to do when they
-      # change. backup.sh / restore.sh are deliberately NOT ignored: they run
-      # on the server, so a change triggers the lightweight sync-scripts job
-      # (see below) that copies them to the host — no image build.
       - 'scripts/download-backups.sh'
       - 'scripts/download-minio-images.sh'
   pull_request:
     branches: [main]
-    # If a push touches ONLY these paths, the whole workflow is skipped
-    # (no build, no deploy) — the commit just lands. A push touching any
-    # other path runs the full pipeline. Note: '**.md' matches markdown at
-    # any depth (plain '*.md' only matched root-level files).
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'plans/**'
       - 'LICENSE'
-      # download-*.sh run from your Mac (they pull backups TO local), so they
-      # never touch the server or the image — nothing for CI to do when they
-      # change. backup.sh / restore.sh are deliberately NOT ignored: they run
-      # on the server, so a change triggers the lightweight sync-scripts job
-      # (see below) that copies them to the host — no image build.
       - 'scripts/download-backups.sh'
       - 'scripts/download-minio-images.sh'
 

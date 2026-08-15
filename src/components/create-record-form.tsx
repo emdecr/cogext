@@ -13,8 +13,15 @@ import { useState, useRef, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { createRecord } from "@/lib/actions/records";
 import { addTagToRecord } from "@/lib/actions/tags";
-import { RECORD_TYPES } from "@/lib/validations/records";
+import {
+  CREATABLE_RECORD_TYPES,
+  READING_STATUSES,
+  READING_STATUS_LABELS,
+  type RecordType,
+  type ReadingStatus,
+} from "@/lib/validations/records";
 import TagInput from "@/components/tag-input";
+import { CoverImageInput } from "@/components/cover-image-input";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
@@ -23,12 +30,17 @@ const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
 export default function CreateRecordForm() {
-  const [type, setType] = useState<(typeof RECORD_TYPES)[number]>("note");
+  const [type, setType] = useState<RecordType>("note");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceAuthor, setSourceAuthor] = useState("");
   const [note, setNote] = useState("");
+
+  // Book-only fields.
+  const [rating, setRating] = useState<number | null>(null);
+  const [readingStatus, setReadingStatus] = useState<ReadingStatus | "">("");
+  const [dateRead, setDateRead] = useState("");
 
   const [pendingTags, setPendingTags] = useState<
     { id: string; name: string; isAi: boolean }[]
@@ -135,6 +147,9 @@ export default function CreateRecordForm() {
     setSourceUrl("");
     setSourceAuthor("");
     setNote("");
+    setRating(null);
+    setReadingStatus("");
+    setDateRead("");
     setType("note");
     setPendingTags([]);
     clearImage();
@@ -150,7 +165,10 @@ export default function CreateRecordForm() {
 
     let imagePath: string | undefined;
 
-    if (type === "image" && imageFile) {
+    // Both image records and book covers upload through /api/upload. The route
+    // only stores the file; Claude Vision analysis runs later only for
+    // type === "image", so book covers are never analyzed.
+    if ((type === "image" || type === "book") && imageFile) {
       setIsUploading(true);
 
       const formData = new FormData();
@@ -185,11 +203,20 @@ export default function CreateRecordForm() {
     const result = await createRecord({
       type,
       title: title || undefined,
-      content: content || (type === "image" ? "Image" : ""),
+      // Content is required. For images we default to a placeholder (Vision
+      // fills it in later); for books with no review yet we fall back to the
+      // title so "want to read" entries save without writing a review.
+      content:
+        content ||
+        (type === "image" ? "Image" : type === "book" ? title : ""),
       sourceUrl: sourceUrl || undefined,
       sourceAuthor: sourceAuthor || undefined,
       note: note || undefined,
       imagePath,
+      rating: type === "book" && rating !== null ? rating : undefined,
+      readingStatus:
+        type === "book" && readingStatus ? readingStatus : undefined,
+      dateRead: type === "book" && dateRead ? dateRead : undefined,
     });
 
     setIsSubmitting(false);
@@ -211,8 +238,16 @@ export default function CreateRecordForm() {
   }
 
   const showSourceUrl =
-    type === "link" || type === "article" || type === "quote";
-  const showAuthor = type === "quote" || type === "article" || type === "link";
+    type === "link" ||
+    type === "article" ||
+    type === "quote" ||
+    type === "image" ||
+    type === "book";
+  const showAuthor =
+    type === "quote" ||
+    type === "article" ||
+    type === "link" ||
+    type === "book";
 
   return (
     <Dialog.Root
@@ -269,13 +304,15 @@ export default function CreateRecordForm() {
               <div className="mb-6">
                 <label className={labelClass}>Type</label>
                 <div className="flex flex-wrap gap-2">
-                  {RECORD_TYPES.map((t) => (
+                  {CREATABLE_RECORD_TYPES.map((t) => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => {
+                        // Clear any picked image when switching types so an
+                        // image-record photo and a book cover never cross over.
+                        if (t !== type) clearImage();
                         setType(t);
-                        if (t !== "image") clearImage();
                       }}
                       className={`rounded-full px-4 py-2 text-sm capitalize transition-colors ${
                         type === t
@@ -318,7 +355,13 @@ export default function CreateRecordForm() {
                   {type !== "image" && (
                     <div>
                       <label htmlFor="content" className={labelClass}>
-                        Content
+                        {type === "book" ? "Review / notes" : "Content"}
+                        {type === "book" && (
+                          <span className="font-normal text-gray-400">
+                            {" "}
+                            (optional)
+                          </span>
+                        )}
                       </label>
                       <textarea
                         id="content"
@@ -331,7 +374,9 @@ export default function CreateRecordForm() {
                               ? "What is this link about?"
                               : type === "article"
                                 ? "Paste an excerpt or summary..."
-                                : "Write your note..."
+                                : type === "book"
+                                  ? "Your review or notes (leave blank to just log it)..."
+                                  : "Write your note..."
                         }
                         rows={12}
                         className={inputClass}
@@ -436,7 +481,9 @@ export default function CreateRecordForm() {
                   {showAuthor && (
                     <div>
                       <label htmlFor="sourceAuthor" className={labelClass}>
-                        {type === "quote" ? "Author" : "Author / Source"}{" "}
+                        {type === "quote" || type === "book"
+                          ? "Author"
+                          : "Author / Source"}{" "}
                         <span className="font-normal text-gray-400">
                           (optional)
                         </span>
@@ -453,6 +500,100 @@ export default function CreateRecordForm() {
                         }
                         className={inputClass}
                       />
+                    </div>
+                  )}
+
+                  {type === "book" && (
+                    <div className="space-y-6 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+                      <div>
+                        <label htmlFor="rating" className={labelClass}>
+                          Rating{" "}
+                          <span className="font-normal text-gray-400">
+                            (0–5, decimals ok)
+                          </span>
+                        </label>
+                        <input
+                          id="rating"
+                          type="number"
+                          min={0}
+                          max={5}
+                          step="any"
+                          value={rating ?? ""}
+                          onChange={(e) =>
+                            setRating(
+                              e.target.value === ""
+                                ? null
+                                : Number(e.target.value),
+                            )
+                          }
+                          placeholder="e.g. 4.25"
+                          className={inputClass}
+                        />
+                        {fieldErrors?.rating && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {fieldErrors.rating[0]}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label htmlFor="readingStatus" className={labelClass}>
+                          Status
+                        </label>
+                        <select
+                          id="readingStatus"
+                          value={readingStatus}
+                          onChange={(e) =>
+                            setReadingStatus(
+                              e.target.value as ReadingStatus | "",
+                            )
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">—</option>
+                          {READING_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {READING_STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dateRead" className={labelClass}>
+                          Date read{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          id="dateRead"
+                          type="date"
+                          value={dateRead}
+                          onChange={(e) => setDateRead(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>
+                          Cover{" "}
+                          <span className="font-normal text-gray-400">
+                            (optional)
+                          </span>
+                        </label>
+                        <CoverImageInput
+                          existingUrl={null}
+                          file={imageFile}
+                          onSelect={(f) => {
+                            setImageFile(f);
+                            setError(null);
+                          }}
+                          onClear={clearImage}
+                          onError={setError}
+                          disabled={isSubmitting}
+                        />
+                      </div>
                     </div>
                   )}
 

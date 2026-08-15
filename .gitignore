@@ -64,6 +64,9 @@ pgdata/
 # uploaded files (local dev file storage for images etc.)
 /public/uploads/
 
+# local one-off import data (book CSV exports — not committed)
+/scripts/data/
+
 # claude code (personal AI context, memory files)
 .claude/
 
@@ -72,6 +75,7 @@ SPEC.md
 PLAN.md
 DEPLOY.md
 plans/
+env-backup/
 
 #deploy
 deploy/cloud-init-prod.yml

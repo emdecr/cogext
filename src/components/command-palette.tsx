@@ -23,11 +23,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { searchRecords } from "@/lib/actions/search";
 import Skeleton from "@/components/skeleton";
 import EmptyState from "@/components/empty-state";
+import type { RecordType } from "@/lib/validations/records";
 
 // Type for search results (matches what the server action returns)
 type SearchResult = {
   id: string;
-  type: "image" | "quote" | "article" | "link" | "note";
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;
@@ -46,6 +47,7 @@ const TYPE_COLORS: Record<string, string> = {
   article: "bg-green-100 text-green-700",
   link: "bg-purple-100 text-purple-700",
   image: "bg-pink-100 text-pink-700",
+  book: "bg-indigo-100 text-indigo-700",
 };
 
 // Match type labels for showing which search method found the result

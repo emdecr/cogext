@@ -32,6 +32,7 @@ import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider } from "@/lib/ai";
+import type { RecordType } from "@/lib/validations/records";
 import { redirect } from "next/navigation";
 
 // ============================================================================
@@ -40,7 +41,7 @@ import { redirect } from "next/navigation";
 
 type SearchResult = {
   id: string;
-  type: "image" | "quote" | "article" | "link" | "note";
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;

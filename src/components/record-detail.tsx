@@ -27,6 +27,12 @@ import TagInput from "@/components/tag-input";
 import EditRecordForm from "@/components/edit-record-form";
 import AddToCollection from "@/components/add-to-collection";
 import ConfirmDialog from "@/components/confirm-dialog";
+import { StarRating } from "@/components/star-rating";
+import {
+  READING_STATUS_LABELS,
+  type RecordType,
+  type ReadingStatus,
+} from "@/lib/validations/records";
 
 type Tag = {
   id: string;
@@ -36,13 +42,16 @@ type Tag = {
 
 type RecordWithTags = {
   id: string;
-  type: "image" | "quote" | "article" | "link" | "note";
+  type: RecordType;
   title: string | null;
   content: string;
   sourceUrl: string | null;
   sourceAuthor: string | null;
   imagePath: string | null;
   note: string | null;
+  rating: number | null;
+  readingStatus: ReadingStatus | null;
+  dateRead: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };
@@ -54,6 +63,7 @@ const TYPE_COLORS: Record<string, string> = {
   article: "bg-green-100 text-green-700",
   link: "bg-purple-100 text-purple-700",
   image: "bg-pink-100 text-pink-700",
+  book: "bg-indigo-100 text-indigo-700",
 };
 
 export default function RecordDetail({
@@ -137,8 +147,10 @@ export default function RecordDetail({
 
       {/* ---- Scrollable body ---- */}
       <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-        {record.imagePath ? (
-          /* Image type: image on left, meta on right */
+        {record.imagePath && record.type !== "book" ? (
+          /* Image type: image on left, meta on right. Books also have an
+             imagePath (cover) but use the normal layout below so their shelf
+             metadata still renders — the cover is drawn inside that layout. */
           <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -199,6 +211,17 @@ export default function RecordDetail({
           /* Non-image types: content on left, meta on right (mirrors create form) */
           <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div className="space-y-6">
+              {record.type === "book" && record.imagePath && (
+                <div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={record.imagePath}
+                    alt={record.title ? `Cover of ${record.title}` : "Cover"}
+                    className="max-h-96 rounded-lg border border-gray-200 bg-gray-50 object-contain dark:border-gray-700 dark:bg-gray-800"
+                  />
+                </div>
+              )}
+
               {record.title && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -212,7 +235,7 @@ export default function RecordDetail({
 
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Content
+                  {record.type === "book" ? "Review / notes" : "Content"}
                 </p>
                 <div
                   className={`whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300 ${
@@ -250,10 +273,43 @@ export default function RecordDetail({
               {record.sourceAuthor && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {record.type === "quote" ? "Author" : "Author / Source"}
+                    {record.type === "quote" || record.type === "book"
+                      ? "Author"
+                      : "Author / Source"}
                   </p>
                   <p className="text-sm text-gray-700 dark:text-gray-300">
                     {record.sourceAuthor}
+                  </p>
+                </div>
+              )}
+
+              {record.type === "book" && record.rating !== null && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Rating
+                  </p>
+                  <StarRating value={record.rating} className="text-lg" />
+                </div>
+              )}
+
+              {record.type === "book" && record.readingStatus && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Status
+                  </p>
+                  <span className="inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    {READING_STATUS_LABELS[record.readingStatus]}
+                  </span>
+                </div>
+              )}
+
+              {record.type === "book" && record.dateRead && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Date read
+                  </p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {new Date(record.dateRead).toLocaleDateString()}
                   </p>
                 </div>
               )}
