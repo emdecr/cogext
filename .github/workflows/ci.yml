@@ -293,10 +293,30 @@ jobs:
             ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
 
   # =============================================================================
-  # JOB 5: Deploy to Linode
+  # JOB 5: Deploy to Linode (smoke-checked, self-rolling-back)
   # =============================================================================
-  # After the Docker image is pushed to GHCR, SSH into the server and pull
-  # the new image. Only runs on pushes to main (not PRs).
+  # After the Docker image is pushed to GHCR, SSH into the server, pull the new
+  # image, bring it up, and then PROVE it's actually serving before declaring
+  # success. Only runs on pushes to main (not PRs).
+  #
+  # Why the smoke check: `up -d` returns the moment the container is *created*,
+  # not when the app is *healthy*. A bad migration, a missing env var, or a
+  # crash-on-boot would previously sail through as a green deploy. Now we poll
+  # /api/health/ready (200 = DB reachable; degraded MinIO still returns 200 so
+  # we don't roll back for non-critical blips) until it's ready or we give up.
+  #
+  # Auto-rollback: before pulling we capture the currently-running image ID.
+  # If the new image never becomes ready, we re-tag that previous image as
+  # :latest and recreate the container — no registry round-trip needed because
+  # the compose file has no pull_policy, so `up -d` reuses the local image.
+  # The job then exits non-zero so the run goes red and you get notified.
+  #
+  # CAVEAT — database migrations are NOT rolled back. The entrypoint runs
+  # migrations forward on boot; rolling the image back does not revert them.
+  # For a deploy that fails *after* a forward migration applied, the rolled-back
+  # (older) image may be running against a newer schema. That's usually fine for
+  # additive migrations but can bite on destructive ones — treat a rollback as
+  # "site is up on old code" and investigate, not "nothing happened."
   #
   # Required GitHub Secrets:
   #   DEPLOY_HOST    — server IP or hostname
@@ -308,17 +328,73 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Linode
+      - name: Deploy to Linode (smoke check + auto-rollback)
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Guard against a hung health-check loop holding the runner open.
+          command_timeout: 15m
           script: |
+            set -u
             cd /opt/cogext
-            docker compose -f docker-compose.prod.yml pull app
-            docker compose -f docker-compose.prod.yml up -d app
-            docker image prune -f
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+            IMAGE="ghcr.io/emdecr/cogext"
+            HEALTH_URL="http://localhost:3000/api/health/ready"
+
+            # Poll readiness: 24 tries x 5s = up to 2 min, on top of the
+            # container's own healthcheck start_period. Returns 0 once we see
+            # HTTP 200, 1 if it never comes.
+            wait_ready() {
+              for i in $(seq 1 24); do
+                code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL" || echo 000)"
+                if [ "$code" = "200" ]; then
+                  echo "  ready after attempt ${i} (HTTP $code)"
+                  return 0
+                fi
+                echo "  attempt ${i}: HTTP ${code} — retrying in 5s"
+                sleep 5
+              done
+              return 1
+            }
+
+            # Capture the currently-running image so we can roll back to it.
+            # Empty on the very first deploy (no container yet) — rollback then
+            # becomes a no-op and we just report the failure.
+            PREV_IMAGE="$($COMPOSE images -q app || true)"
+            echo "Previous app image: ${PREV_IMAGE:-<none>}"
+
+            # Pull + deploy the new image.
+            $COMPOSE pull app
+            $COMPOSE up -d app
+
+            # Smoke check.
+            echo "Waiting for $HEALTH_URL ..."
+            if wait_ready; then
+              docker image prune -f
+              echo "Deploy succeeded and is serving."
+              exit 0
+            fi
+
+            # Failed readiness — roll back if we have something to roll back to.
+            echo "::error::New image failed readiness check."
+            if [ -z "$PREV_IMAGE" ]; then
+              echo "No previous image to roll back to (first deploy?). Leaving new image up for debugging."
+              exit 1
+            fi
+
+            echo "Rolling back to previous image ${PREV_IMAGE}..."
+            docker tag "$PREV_IMAGE" "${IMAGE}:latest"
+            $COMPOSE up -d --force-recreate app
+
+            echo "Verifying rollback ..."
+            if wait_ready; then
+              echo "::error::Deploy failed; rolled back to previous image, which is healthy."
+            else
+              echo "::error::Deploy failed AND rollback is not healthy — manual intervention required."
+            fi
+            exit 1
 
   # =============================================================================
   # JOB 6: Sync ops scripts (lightweight — no image build)
