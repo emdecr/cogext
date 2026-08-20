@@ -313,8 +313,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Dev mode doesn't run migrations on boot, so seed the schema first.
+      # Use drizzle-kit (reads out:"./drizzle" from drizzle.config.ts) — NOT
+      # scripts/migrate.mjs, which is the prod-only runner that resolves its
+      # migrations folder relative to itself (scripts/drizzle) and only works
+      # inside the Docker standalone layout.
       - name: Apply database migrations
-        run: node scripts/migrate.mjs
+        run: npm run db:migrate
 
       - name: Run E2E tests
         run: npm run test:e2e
