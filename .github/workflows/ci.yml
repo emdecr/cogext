@@ -3,16 +3,21 @@
 # =============================================================================
 #
 # This workflow runs on every push and pull request. It catches bugs BEFORE
-# they reach production by running four checks:
+# they reach production by running these checks:
 #
 #   1. lint-and-typecheck — ESLint + TypeScript compiler (catches syntax,
 #      type errors, and code quality issues)
 #   2. test — Vitest unit + component tests (catches logic bugs)
+#   2a. integration — Vitest integration tests against a real pgvector Postgres
+#      service (catches schema/migration/DB-layer bugs)
+#   2b. e2e — Playwright drives the running app in a real browser (catches
+#      routing, middleware, and rendering breakage)
 #   3. build — Next.js production build (catches import errors, build failures)
 #   4. docker — Docker image build (catches Dockerfile / dependency issues)
 #
 # Each job runs independently in parallel. If ANY job fails, the overall
-# check fails and the PR gets a red X.
+# check fails and the PR gets a red X. The deploy job waits on the test jobs
+# (including integration + e2e), so a failing test blocks the production deploy.
 #
 # DEPLOY JOB: only runs on pushes to main (not PRs). Builds a Docker image
 # and pushes it to GitHub Container Registry (ghcr.io). Your server pulls
@@ -202,6 +207,128 @@ jobs:
         run: npm run test:unit
 
   # =============================================================================
+  # JOB 2a: Integration Tests (real Postgres + pgvector)
+  # =============================================================================
+  # Runs Vitest integration tests (*.integration.test.ts) against a REAL
+  # database — a pgvector Postgres service container spun up just for this job.
+  # setup.integration.ts applies all migrations before the suite; the tests then
+  # exercise the actual connection, schema, and pgvector extension.
+  #
+  # Gated on app changes (same as build) so doc/script-only pushes skip it.
+  integration:
+    name: Integration Tests
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: cogext
+          POSTGRES_PASSWORD: cogext
+          POSTGRES_DB: cogext_test
+        ports:
+          - 5432:5432
+        # Hold each step until Postgres is actually accepting connections.
+        options: >-
+          --health-cmd "pg_isready -U cogext -d cogext_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Run integration tests
+        env:
+          # localhost:5432 — the service container's mapped port on the runner.
+          DATABASE_URL: postgres://cogext:cogext@localhost:5432/cogext_test
+        run: npm run test:integration
+
+  # =============================================================================
+  # JOB 2b: E2E Tests (Playwright — real browser + running app)
+  # =============================================================================
+  # Boots the app (Playwright's webServer runs `npm run dev` on :3100) against a
+  # real pgvector Postgres, launches headless Chromium, and drives the app like
+  # a user. Catches breakage unit/integration tests can't — routing, middleware,
+  # rendering.
+  #
+  # Dummy secrets are fine: `next dev` runs with NODE_ENV=development, so
+  # config.ts skips its production secret-strength checks. STORAGE_PROVIDER=local
+  # avoids needing a MinIO container. Migrations are applied explicitly first
+  # (dev mode doesn't auto-migrate — only the prod entrypoint does).
+  #
+  # Gated on app changes (same as build).
+  e2e:
+    name: E2E Tests
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: cogext
+          POSTGRES_PASSWORD: cogext
+          POSTGRES_DB: cogext_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cogext -d cogext_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://cogext:cogext@localhost:5432/cogext_e2e
+      # Dummy runtime secrets — dev mode doesn't enforce strength, and these
+      # flows don't call the real AI providers.
+      JWT_SECRET: e2e-not-a-real-secret
+      CRON_SECRET: e2e-not-a-real-cron-secret
+      VOYAGE_API_KEY: e2e-not-a-real-key
+      ANTHROPIC_API_KEY: e2e-not-a-real-key
+      STORAGE_PROVIDER: local
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Only Chromium — matches the single enabled project in playwright.config.ts.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # Dev mode doesn't run migrations on boot, so seed the schema first.
+      - name: Apply database migrations
+        run: node scripts/migrate.mjs
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      # Keep the report even on failure — it's how you debug a CI-only break.
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # =============================================================================
   # JOB 3: Production Build
   # =============================================================================
   # Verifies the Next.js production build succeeds. This catches:
@@ -323,7 +450,7 @@ jobs:
   #   DEPLOY_SSH_KEY — private SSH key for the "deploy" user on the server
   deploy:
     name: Deploy
-    needs: [lint-and-typecheck, test, build, docker]
+    needs: [lint-and-typecheck, test, integration, e2e, build, docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 

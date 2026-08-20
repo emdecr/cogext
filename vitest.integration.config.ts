@@ -56,15 +56,9 @@ export default defineConfig({
     // Global test functions without imports (describe, it, expect)
     globals: true,
 
-    // NOTE: When you write your first integration test, create
-    // src/test/setup.integration.ts to handle DB setup/teardown:
-    //
-    //   import { runMigrations } from "@/db"
-    //   beforeAll(async () => { await runMigrations() })
-    //   afterAll(async () => { await db.$client.end() })
-    //
-    // Then uncomment this line:
-    // setupFiles: ["./src/test/setup.integration.ts"],
+    // Applies migrations before the suite and closes the pool after.
+    // See src/test/setup.integration.ts.
+    setupFiles: ["./src/test/setup.integration.ts"],
   },
 
   resolve: {
