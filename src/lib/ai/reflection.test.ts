@@ -182,6 +182,51 @@ describe("generateReflection", () => {
     });
   });
 
+  it("resolves inline record markers to /records/<id> links and strips hallucinated ones", async () => {
+    mockFindExistingReflection.mockResolvedValue(null);
+    // Two records → markers R1, R2 are valid; R9 is not in the map.
+    mockFindPeriodRecords
+      .mockResolvedValueOnce([
+        {
+          id: "rec-1",
+          type: "article",
+          title: "The Essay",
+          content: "On focus and attention.",
+          sourceAuthor: null,
+          note: null,
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [],
+        },
+        {
+          id: "rec-2",
+          type: "quote",
+          title: "A Quote",
+          content: "Some words.",
+          sourceAuthor: null,
+          note: null,
+          createdAt: new Date("2026-03-25T12:00:00Z"),
+          recordTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    // The model links a real record (R1) and hallucinates one (R9).
+    mockChat.mockResolvedValueOnce(
+      "Loved [the essay](R1), and [a ghost record](R9) too."
+    );
+
+    await generateReflection("user-123");
+
+    const saved = mockInsertValues.mock.calls[0][0];
+    // Valid marker → real URL; marker itself is gone.
+    expect(saved.content).toContain("[the essay](/records/rec-1)");
+    expect(saved.content).not.toContain("(R1)");
+    // Hallucinated marker → link stripped, visible text kept.
+    expect(saved.content).toContain("a ghost record");
+    expect(saved.content).not.toContain("(R9)");
+    expect(saved.content).not.toContain("](R9)");
+  });
+
   it("still saves the reflection when recommendations come back empty", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
     mockFindPeriodRecords

@@ -144,7 +144,10 @@ export async function generateReflection(
   const userProfile = await getProfile(userId);
 
   // ---- Step 5: Build the compact summary sent to the reflection model ----
-  const recordSummaries = buildReflectionRecordSummaries(periodRecords);
+  // markerToId lets us resolve the inline record markers the model emits (R1…Rn)
+  // back into real /records/<uuid> links after generation.
+  const { summaries: recordSummaries, markerToId } =
+    buildReflectionRecordSummaries(periodRecords);
 
   // ---- Step 6: Generate the reflection markdown ----
   const reflectionPrompt = buildReflectionPrompt(
@@ -168,6 +171,12 @@ export async function generateReflection(
       "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base over a given period. Write in a warm, observant tone. Use markdown formatting. The period may be a single week or span several weeks — let the prompt's stated range and record count guide your framing.",
       (usage) => { reflectionUsage = usage; }
     );
+
+    // Resolve inline record markers (e.g. "(R7)") into real /records/<uuid>
+    // links, stripping any hallucinated marker. Everything downstream — the
+    // recommendation context, the saved row, and the return value — uses the
+    // resolved version so links are stored ready to render.
+    const resolvedContent = resolveRecordMarkers(content, markerToId);
 
     // ---- Step 7: Build compact recommendation input ----
     // Important token-saving choice: we do NOT resend raw record content here.
@@ -196,7 +205,7 @@ export async function generateReflection(
     // This call is intentionally non-fatal. If it fails, we still save the
     // reflection — recommendations are a bonus layer, not the core artifact.
     const recommendations = await generateRecommendations({
-      reflectionContent: content,
+      reflectionContent: resolvedContent,
       userProfile,
       recordSummaries: recommendationSeeds,
       previousRecommendationTitles,
@@ -208,7 +217,7 @@ export async function generateReflection(
       .insert(reflections)
       .values({
         userId,
-        content,
+        content: resolvedContent,
         recommendations,
         periodStart,
         periodEnd,
@@ -230,7 +239,7 @@ export async function generateReflection(
 
     return {
       id: saved.id,
-      content,
+      content: resolvedContent,
       recommendations,
     };
   } catch (error) {
@@ -249,6 +258,7 @@ export async function generateReflection(
 // because explicit shapes are easier to read in a teaching codebase.
 
 type RecordWithTags = {
+  id: string;
   type: string;
   title: string | null;
   content: string;
@@ -258,10 +268,20 @@ type RecordWithTags = {
   recordTags: Array<{ tag: { name: string } }>;
 };
 
+// Each summary line is prefixed with a stable marker (R1, R2, …) that the model
+// is instructed to use as the href when it references a record inline. We return
+// the marker → record-id map so the generated markdown can be post-processed
+// into real `/records/<uuid>` links (see resolveRecordMarkers). The markers
+// exist only in the prompt/response; nothing marker-shaped is ever stored.
 function buildReflectionRecordSummaries(
   periodRecords: RecordWithTags[]
-): string[] {
-  return periodRecords.map((record) => {
+): { summaries: string[]; markerToId: Map<string, string> } {
+  const markerToId = new Map<string, string>();
+
+  const summaries = periodRecords.map((record, index) => {
+    const marker = `R${index + 1}`;
+    markerToId.set(marker, record.id);
+
     const tagNames = record.recordTags.map((rt) => rt.tag.name);
     const preview = record.content.slice(0, 200);
     const date = record.createdAt.toLocaleDateString("en-US", {
@@ -271,7 +291,7 @@ function buildReflectionRecordSummaries(
     });
 
     return [
-      `- [${record.type}] (${date})`,
+      `- ${marker} [${record.type}] (${date})`,
       record.title ? `"${record.title}"` : "",
       `${preview}${record.content.length > 200 ? "..." : ""}`,
       record.sourceAuthor ? `— ${record.sourceAuthor}` : "",
@@ -281,6 +301,32 @@ function buildReflectionRecordSummaries(
       .filter(Boolean)
       .join(" ");
   });
+
+  return { summaries, markerToId };
+}
+
+// ============================================================================
+// RESOLVE RECORD MARKERS
+// ============================================================================
+// The model is told to link records inline using their marker as the URL, e.g.
+// `[that essay on focus](R7)`. This turns each such link into a real record URL
+// (`](/records/<uuid>)`). Any marker not in the map is a hallucination — we
+// strip the link wrapper but keep the visible text so the sentence still reads.
+// Links are stored already resolved, so Phase 3 (hover popovers) is a pure
+// rendering change with no regeneration needed.
+
+function resolveRecordMarkers(
+  markdown: string,
+  markerToId: Map<string, string>
+): string {
+  // Matches a markdown link whose URL is exactly a record marker: [text](R12)
+  return markdown.replace(
+    /\[([^\]]+)\]\((R\d+)\)/g,
+    (_full, text: string, marker: string) => {
+      const id = markerToId.get(marker);
+      return id ? `[${text}](/records/${id})` : text;
+    }
+  );
 }
 
 // ============================================================================
@@ -427,6 +473,11 @@ function buildReflectionPrompt(
 Important framing rules:
 - Do NOT assume the period is one week. The actual span is ${spanLabel}; phrasing like "this week" is only appropriate when ${spanDays} is around 7. For longer spans, prefer "over the past ${spanLabel}", "across these ${spanLabel}", or similar.
 - Do NOT start with "This week", "Here's your reflection", or any meta opener — jump straight into the observations.
+
+Linking to specific records:
+- Each record above is prefixed with a marker like R1, R2, R3. When you mention a specific saved record, link it inline as a markdown link using its marker as the URL — e.g. [that essay on focus](R7) or [the Didion quote](R3).
+- Only use markers that appear in the list above. Never invent a marker, and don't add a marker to the visible link text — the marker goes in the URL only.
+- Link naturally and sparingly: only when you're pointing at a specific record. Not every sentence needs a link, and it's fine to write a paragraph with none.
 
 Keep the tone warm and observant — like a thoughtful friend reviewing a stretch of your saves, not a corporate summary. Use **bold** for emphasis and keep paragraphs short. Don't use headers — write it as flowing prose paragraphs.`;
 
