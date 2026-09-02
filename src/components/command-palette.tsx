@@ -20,6 +20,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { searchRecords } from "@/lib/actions/search";
 import Skeleton from "@/components/skeleton";
 import EmptyState from "@/components/empty-state";
@@ -209,11 +210,14 @@ export default function CommandPalette() {
           {/* Result list */}
           {!isSearching &&
             results.map((result) => (
-              <button
+              <Link
                 key={result.id}
+                href={`/records/${result.id}`}
                 onClick={() => {
-                  // Close palette — in a future pass, this could scroll
-                  // to the record or open the detail modal directly
+                  // Navigate to the record's canonical URL. Clicking is
+                  // intercepted by the modal route (same as record cards),
+                  // so it opens the detail overlay. Close the palette so it
+                  // isn't stacked on top of the record.
                   setIsOpen(false);
                 }}
                 className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -254,7 +258,7 @@ export default function CommandPalette() {
                     matched by {MATCH_LABELS[result.matchType]}
                   </p>
                 </div>
-              </button>
+              </Link>
             ))}
         </div>
       </div>
