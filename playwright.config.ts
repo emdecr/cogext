@@ -84,7 +84,11 @@ export default defineConfig({
     // The --port flag pins Next.js to this exact port instead of
     // letting it pick a random one when 3000 is taken.
     command: "npm run dev -- --port 3100",
-    url: "http://localhost:3100",
+    // Readiness probe MUST hit a path that returns 200. We use the liveness
+    // endpoint (not "/") because the middleware now returns 404 for "/" when
+    // logged out — Playwright treats a 404 here as "server not ready" and would
+    // time out. /api/health is excluded from middleware and always 200s.
+    url: "http://localhost:3100/api/health",
     // Reuse an already-running dev server if you have one open.
     // Saves time during development.
     reuseExistingServer: !process.env.CI,

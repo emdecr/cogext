@@ -7,12 +7,13 @@
 //
 //   Browser → Middleware → Page/API Route
 //
-// We use it for ONE job: checking if the user is authenticated.
-//   - If they're visiting a protected page and have no valid session →
-//     redirect to /login
-//   - If they're visiting login/register and already have a session →
-//     redirect to /dashboard (no need to log in again)
-//   - Everything else → let it through
+// We use it to enforce a strict auth surface:
+//   - Unauthenticated: /login is the only real page (plus /register while
+//     registration is temporarily enabled). Every other path redirects to
+//     /nothing-to-see-here — never to /login — so the app's surface isn't
+//     advertised.
+//   - Authenticated: /login and /register redirect to /dashboard; everything
+//     else is allowed through.
 //
 // IMPORTANT: This file MUST be at `src/middleware.ts` (not inside app/).
 // Next.js looks for it at the project root or src root specifically.
@@ -28,16 +29,6 @@ import { jwtVerify } from "jose";
 
 // The cookie name — must match what session.ts uses.
 const COOKIE_NAME = "cogext-session";
-
-// Routes that require authentication.
-// If the user visits any of these without a valid session, they're
-// redirected to /login.
-const PROTECTED_ROUTES = ["/dashboard", "/reflections", "/collections"];
-
-// Routes that are for unauthenticated users only.
-// If a logged-in user visits these, redirect them to /dashboard
-// (they don't need to see the login page again).
-const AUTH_ROUTES = ["/login", "/register"];
 
 // jose needs the secret as a Uint8Array, not a plain string.
 // TextEncoder converts our string to bytes.
@@ -78,34 +69,28 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = await verifySession(request);
 
-  // ---- Protected routes: redirect to login if no session ----
-  const isProtectedRoute = PROTECTED_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + "/")
-  );
-
-  if (isProtectedRoute && !session) {
-    // Build the redirect URL. We preserve the original URL as a
-    // "redirect" query param so after login we can send them back
-    // to where they were trying to go.
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+  // ---- Unauthenticated: /login is the only real page ----
+  // Deliberately NO redirect to /login from other paths — we don't advertise
+  // that the app (or a login page) exists. Every non-public path is sent to the
+  // playful dead-end /nothing-to-see-here instead. /register is public only
+  // while ALLOW_REGISTRATION is on, so a new account can still be created;
+  // otherwise it's redirected like everything else. /nothing-to-see-here itself
+  // must be public, or the redirect would loop. (Read process.env directly —
+  // middleware runs on the Edge runtime and can't import the Node config.)
+  if (!session) {
+    const registrationOpen = process.env.ALLOW_REGISTRATION === "true";
+    const publicPath =
+      pathname === "/login" ||
+      pathname === "/nothing-to-see-here" ||
+      (registrationOpen && pathname === "/register");
+    if (publicPath) return NextResponse.next();
+    return NextResponse.redirect(
+      new URL("/nothing-to-see-here", request.url)
+    );
   }
 
-  // ---- Registration disabled: send /register visitors to /login ----
-  // This is a personal instance; public sign-up is off unless opted in.
-  // Read process.env directly — middleware runs on the Edge runtime and can't
-  // import the Node config module. Keep the "=== 'true'" check in sync with
-  // config.auth.allowRegistration. (The API route is the real security gate;
-  // this just keeps the page from rendering a dead form.)
-  if (pathname === "/register" && process.env.ALLOW_REGISTRATION !== "true") {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // ---- Auth routes: redirect to dashboard if already logged in ----
-  const isAuthRoute = AUTH_ROUTES.some((route) => pathname === route);
-
-  if (isAuthRoute && session) {
+  // ---- Authenticated: keep them off the auth pages ----
+  if (pathname === "/login" || pathname === "/register") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
