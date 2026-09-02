@@ -89,6 +89,17 @@ export const aiFeatureEnum = pgEnum("ai_feature", [
 // Which AI provider handled the request.
 export const aiProviderEnum = pgEnum("ai_provider", ["claude", "ollama"]);
 
+// Auth/audit events — what happened on the authentication surface. Kept as an
+// enum for validation; adding a new event type is a one-line change here plus a
+// migration.
+export const authEventTypeEnum = pgEnum("auth_event_type", [
+  "login_success",
+  "login_failure",
+  "register",
+  "register_blocked",
+  "logout",
+]);
+
 // ============================================================================
 // USERS
 // ============================================================================
@@ -484,6 +495,47 @@ export const aiUsage = pgTable("ai_usage", {
     .notNull()
     .defaultNow(),
 });
+
+// ============================================================================
+// AUTH EVENTS (audit log)
+// ============================================================================
+// Append-only log of authentication activity — logins (success + failure),
+// registrations, blocked-registration attempts, and logouts. Powers
+// admin/observability: "did anyone sign up?", "is someone brute-forcing a
+// login?". Failed logins are the security-valuable rows, and they persist
+// across restarts (unlike the in-memory rate limiter).
+//
+// No FK on user_id on purpose: the audit trail should survive even if the user
+// row is later deleted, and failed logins reference emails with no user at all.
+export const authEvents = pgTable(
+  "auth_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    eventType: authEventTypeEnum("event_type").notNull(),
+
+    // The email involved. For login_failure this is the ATTEMPTED email, which
+    // may not correspond to any user — stored separately from userId.
+    email: text("email"),
+
+    // The user, when known. Null for failed logins against a non-existent
+    // email and for register_blocked.
+    userId: uuid("user_id"),
+
+    // Request context, for spotting patterns (scanning, brute force).
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Reads are "most recent events" and "events of type X" — index both.
+    index("auth_events_created_at_idx").on(table.createdAt),
+    index("auth_events_event_type_idx").on(table.eventType),
+  ]
+);
 
 // ============================================================================
 // RELATIONS

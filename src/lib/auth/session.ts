@@ -28,6 +28,7 @@
 
 import { cookies } from "next/headers";
 import { createToken, verifyToken, type JwtPayload } from "./jwt";
+import { logAuthEventFromHeaders } from "./auth-log";
 
 // The name of the cookie in the browser. You'd see this in
 // DevTools → Application → Cookies.
@@ -99,6 +100,17 @@ export async function getSession(): Promise<JwtPayload | null> {
  */
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
+
+  // Capture who's logging out — read the (still-present) cookie before we
+  // delete it so the auth log has a userId. Best-effort; logAuthEvent* never
+  // throws, so this can't block logout.
+  const cookie = cookieStore.get(COOKIE_NAME);
+  if (cookie?.value) {
+    const payload = verifyToken(cookie.value);
+    if (payload) {
+      await logAuthEventFromHeaders("logout", { userId: payload.userId });
+    }
+  }
 
   // .delete() tells the browser to remove the cookie.
   // Under the hood, it sets the cookie with maxAge=0.

@@ -19,6 +19,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
 import { loginLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { logAuthEvent } from "@/lib/auth/auth-log";
 
 // Generic error message — intentionally vague for security.
 const INVALID_CREDENTIALS = "Invalid email or password";
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     // User not found — but we don't say that.
     if (!user) {
+      await logAuthEvent(request, "login_failure", { email });
       return NextResponse.json(
         { error: INVALID_CREDENTIALS },
         { status: 401 } // 401 = Unauthorized
@@ -63,6 +65,10 @@ export async function POST(request: NextRequest) {
 
     // Wrong password — same message as "user not found."
     if (!isValid) {
+      await logAuthEvent(request, "login_failure", {
+        email: user.email,
+        userId: user.id,
+      });
       return NextResponse.json(
         { error: INVALID_CREDENTIALS },
         { status: 401 }
@@ -71,6 +77,10 @@ export async function POST(request: NextRequest) {
 
     // ---- 4. Create a session ----
     await setSession(user.id);
+    await logAuthEvent(request, "login_success", {
+      email: user.email,
+      userId: user.id,
+    });
 
     // ---- 5. Return success ----
     return NextResponse.json({
