@@ -27,6 +27,7 @@ Self-hosted personal knowledge base. Save records (images, quotes, articles, lin
 ## Local dev
 
 - Postgres runs in Docker on **host port 5435** → container 5432 (avoids collision with a system Postgres). Use `postgres://…@localhost:5435/…` in `.env`.
+- **MinIO runs locally too** (`minio` + one-shot `minio-init` in compose) so dev exercises the same S3 storage path as prod. API on `localhost:9000`, console `:9001`, creds `minioadmin`/`minioadmin`, bucket `cogext-uploads` (anonymous-download policy applied by `minio-init`). `.env` uses `STORAGE_PROVIDER=minio`; set it to `local` to fall back to `public/uploads/`. **Prod stores absolute URLs in `records.image_path`**, so loading a prod backup requires the URL rewrite in `scripts/restore-local.sh` — don't hand-run `restore.sh` locally (it's wired for the prod compose file).
 - Start the stack: `docker compose up -d` then `npm run dev`.
 - Migrations: `npm run db:generate` (create from schema), `npm run db:migrate` (apply locally), `npm run db:migrate:prod` (used inside the prod image; `scripts/migrate.mjs`).
 - Ollama is optional — only needed if you flip `src/lib/ai/index.ts` to the local providers.

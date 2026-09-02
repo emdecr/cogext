@@ -49,6 +49,76 @@ services:
       retries: 5
 
   # ======================================================================
+  # MINIO — S3-compatible object storage (mirrors prod locally)
+  # ======================================================================
+  # Prod stores uploaded images in MinIO (STORAGE_PROVIDER=minio). Running
+  # MinIO locally too means dev exercises the exact same S3 code path in
+  # src/lib/storage/index.ts instead of the filesystem branch — so storage
+  # bugs surface here, not in prod. It also lets you restore a prod backup
+  # (which is a MinIO volume tar) and actually see the images locally.
+  #
+  # To use it, set these in .env (see .env for the full block):
+  #   STORAGE_PROVIDER=minio
+  #   STORAGE_ENDPOINT=http://localhost:9000
+  #   STORAGE_PUBLIC_URL=http://localhost:9000/cogext-uploads
+  #   STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY = minioadmin / minioadmin
+  #
+  # The app runs on the host (npm run dev), so it reaches MinIO over the
+  # published port at localhost:9000 — both for uploads (server-side) and
+  # for serving images to the browser (STORAGE_PUBLIC_URL).
+  #
+  # Prod: credentials are strong secrets, the API port is NOT published to
+  # the host (Nginx proxies /uploads → minio:9000 on the internal network),
+  # and STORAGE_PUBLIC_URL is the public https domain. See DEPLOY.md.
+  minio:
+    image: minio/minio:latest
+
+    # `server /data` starts the object server; --console-address pins the
+    # web console to 9001 (otherwise it picks a random port).
+    command: server /data --console-address ":9001"
+
+    # 9000 = S3 API (what the app talks to), 9001 = web console (browser).
+    # Dev-only defaults for credentials — fine because the port is only
+    # reachable from your machine. NEVER use minioadmin/minioadmin in prod.
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+    # Persist objects across restarts (same idea as pgdata for Postgres).
+    # A prod backup restore extracts its tar directly into this volume.
+    volumes:
+      - minio_data:/data
+
+  # ----------------------------------------------------------------------
+  # MINIO-INIT — one-shot bucket + policy bootstrap
+  # ----------------------------------------------------------------------
+  # The MinIO server image has no `mc` client, so bucket creation is done
+  # by a throwaway container using the official mc image. It:
+  #   1. waits for the server to accept connections (retry loop)
+  #   2. creates the cogext-uploads bucket (idempotent)
+  #   3. sets anonymous "download" policy so the browser can GET images
+  #      directly from localhost:9000/cogext-uploads/<file> — this mirrors
+  #      the `mc anonymous set download` step in DEPLOY.md #9.
+  # It exits 0 when done; re-running `up` re-applies it harmlessly.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo 'waiting for minio...'; sleep 1;
+      done;
+      mc mb --ignore-existing local/cogext-uploads;
+      mc anonymous set download local/cogext-uploads;
+      echo 'minio bucket ready';
+      "
+
+  # ======================================================================
   # OLLAMA — Local AI inference server
   # ======================================================================
   # Ollama runs LLMs and embedding models locally. We use it for:
@@ -87,4 +157,5 @@ services:
 # Top-level declaration of named volumes.
 volumes:
   pgdata:
+  minio_data:
   ollama_data:

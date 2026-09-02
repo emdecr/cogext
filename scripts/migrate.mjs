@@ -29,6 +29,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -62,12 +63,28 @@ try {
   // __drizzle_migrations table in your database to see which ones have
   // already been applied. It only runs new ones.
   //
-  // migrationsFolder path: when this script runs from .next/standalone/
-  // in production, the drizzle/ folder is copied there too (see Dockerfile).
-  // So __dirname + "/drizzle" works in both dev and prod.
-  await migrate(db, {
-    migrationsFolder: path.join(__dirname, "drizzle"),
-  });
+  // Locate the drizzle/ folder. In prod (standalone) this script lives at
+  // /app/migrate.mjs beside /app/drizzle. In dev it lives at scripts/, so
+  // drizzle/ is one level up at the repo root. Try both.
+  const candidates = [
+    path.join(__dirname, "drizzle"), // prod: standalone root
+    path.join(__dirname, "..", "drizzle"), // dev: repo root
+  ];
+  const migrationsFolder = candidates.find((p) =>
+    fs.existsSync(path.join(p, "meta", "_journal.json"))
+  );
+  if (!migrationsFolder) {
+    console.error(
+      "❌ Could not find the drizzle/ migrations folder. Looked in:",
+      candidates
+    );
+    process.exit(1);
+  }
+
+  // NOTE: this uses drizzle-orm's runtime migrate() — the SAME path prod uses.
+  // Prefer this over `drizzle-kit migrate` when applying over restored data:
+  // drizzle-kit chokes on `ALTER TYPE ... ADD VALUE` migrations, this doesn't.
+  await migrate(db, { migrationsFolder });
 
   console.log("✅ Migrations complete.");
 } catch (error) {
