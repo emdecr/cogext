@@ -15,11 +15,20 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Tell the browser which scheme the page uses, so the UA-painted backdrop
+     (the overscroll/canvas area behind the page), scrollbars, and native form
+     controls match. Without this the backdrop renders in the default scheme and
+     shows as a mismatched band at the top/bottom on some browsers. */
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
+  /* Paint the root element itself (not just body) so the canvas/overscroll
+     area is unambiguously --background — no reliance on background propagation. */
+  background: var(--background);
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0a0a0a;
   --foreground: #ededed;
 }
