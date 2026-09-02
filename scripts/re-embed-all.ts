@@ -10,10 +10,10 @@
 // This script fills them back in.
 //
 // Usage (local):
-//   set -a && source .env.local && set +a && npx tsx scripts/re-embed-all.ts
+//   set -a && source .env && set +a && npx tsx scripts/re-embed-all.ts
 //
 //   set -a / set +a ensures sourced variables are exported to child processes.
-//   Next.js loads .env.local automatically, but standalone scripts need this.
+//   Next.js loads .env automatically, but standalone scripts need this.
 //
 // Usage (prod):
 //   docker compose exec app npx tsx re-embed-all.ts  (if tsx available)

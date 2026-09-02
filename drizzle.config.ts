@@ -31,8 +31,9 @@ export default defineConfig({
   dialect: "postgresql",
 
   // Connection details for drizzle-kit to talk to the database.
-  // This uses the same DATABASE_URL env var, but drizzle-kit doesn't
-  // auto-load .env.local like Next.js does. We load it explicitly here.
+  // drizzle-kit doesn't auto-load .env the way Next.js does, so the
+  // `import "dotenv/config"` at the top of this file loads the same single
+  // .env both the app and this CLI read — keeping dev and tooling in sync.
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },

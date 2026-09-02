@@ -1,0 +1,26 @@
+#!/bin/sh
+# =============================================================================
+# PRE-PUSH GATE
+# =============================================================================
+# Runs the same fast checks CI runs — lint + typecheck + unit tests — before
+# anything leaves your machine. If they fail, the push is aborted before it
+# reaches GitHub. Fix the errors and push again.
+#
+# These checks need NOTHING running: no Docker, no Postgres, no dev server.
+# They're pure Node, so the hook can't be blocked by missing infrastructure.
+# (The DB-backed integration + Playwright e2e suites are deliberately NOT here —
+# run them with `npm run check:full` / `npm run test:e2e` when you want them.)
+#
+# Escape hatch, for a WIP branch or an emergency:  git push --no-verify
+# =============================================================================
+
+echo "▶ pre-push: running npm run check (lint · typecheck · unit) — no services needed…"
+
+if ! npm run check; then
+  echo ""
+  echo "✖ pre-push checks failed — push aborted."
+  echo "  Fix the errors above, or bypass for a WIP branch: git push --no-verify"
+  exit 1
+fi
+
+echo "✓ pre-push checks passed — pushing."

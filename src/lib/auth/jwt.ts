@@ -39,12 +39,12 @@ import jwt from "jsonwebtoken";
 // If someone gets this key, they can forge tokens for any user.
 //
 // We read it from an env var so it's never in the codebase.
-// We'll add a JWT_SECRET to .env.local.
+// We'll add a JWT_SECRET to .env.
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
   throw new Error(
-    "JWT_SECRET is not set. Add it to .env.local:\n" +
+    "JWT_SECRET is not set. Add it to .env:\n" +
       'JWT_SECRET=some-long-random-string-change-me-in-production'
   );
 }

@@ -10,7 +10,7 @@ import * as schema from "./schema";
 // Format: postgres://USER:PASSWORD@HOST:PORT/DATABASE
 //
 // We read it from an environment variable so we never hardcode credentials.
-// In dev, this comes from .env.local (which Next.js loads automatically).
+// In dev, this comes from .env (which Next.js loads automatically).
 // In production, it comes from your hosting platform's env config.
 //
 // The `!` at the end is a TypeScript non-null assertion — it tells TS
@@ -20,7 +20,7 @@ const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
-    "DATABASE_URL is not set. Add it to .env.local:\n" +
+    "DATABASE_URL is not set. Add it to .env:\n" +
       "DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DATABASE"
   );
 }

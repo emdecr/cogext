@@ -24,7 +24,11 @@ export default function AuthLayout({
   return (
     // Full viewport height, centered both horizontally and vertically.
     // This gives us the classic "form floating in the middle of the page" look.
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+    // bg-background matches the app's --background token (globals.css) so the
+    // auth screen is one uniform color. Don't hardcode a Tailwind gray here —
+    // gray-950 is blue-tinted and #0a0a0a (the body background) is neutral, so
+    // the two read as different colors and leave a visible seam.
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md p-4 md:p-8">{children}</div>
     </div>
   );
