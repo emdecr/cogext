@@ -24,7 +24,7 @@ Built as an alternative to tools like mymind.com or Pinterest, with full ownersh
 | Embeddings | Voyage AI (voyage-4-lite) | High-quality embeddings via API — no GPU or local model server needed. Swappable via provider interface (Ollama included as alternative) |
 | Tagging / Chat / Vision | Claude API (Anthropic) | Auto-tagging, RAG chat, image analysis, and weekly reflections. Swappable via provider interface (Ollama included as alternative) |
 | Object Storage | Local filesystem (dev) / MinIO (prod) | S3-compatible, self-hosted — provider pattern abstracts the switch |
-| Auth | Custom JWT + bcrypt | HTTP-only cookies, middleware-based route protection, no third-party auth dependency |
+| Auth | Custom JWT + bcrypt | HTTP-only cookies, proxy-based route protection, no third-party auth dependency |
 | Styling | Tailwind CSS + Radix UI | Utility-first CSS with accessible, unstyled primitives |
 | Containerization | Docker + Docker Compose | Multi-stage build (~150MB image), single `docker compose up` for the full stack |
 
@@ -275,7 +275,7 @@ cogext/
 │   │   ├── config.ts      # Centralized env var config with validation
 │   │   ├── logger.ts      # Structured logging (JSON in prod)
 │   │   └── rate-limit.ts  # In-memory rate limiting
-│   ├── middleware.ts       # Auth middleware for route protection
+│   ├── proxy.ts            # Auth proxy for route protection (Next 16 middleware)
 │   └── test/              # Test setup, helpers, and mocks
 ├── Dockerfile             # Multi-stage build (node:24-alpine, ~150MB)
 ├── docker-compose.yml     # Dev services (Postgres)

@@ -79,7 +79,7 @@ export const config = {
     // this is a personal instance, so /register and POST /api/auth/register are
     // closed unless you explicitly opt in. To add a user: set
     // ALLOW_REGISTRATION=true in .env, register, then set it back to false.
-    // NOTE: middleware.ts reads ALLOW_REGISTRATION from process.env directly
+    // NOTE: src/proxy.ts reads ALLOW_REGISTRATION from process.env directly
     // (it runs on the Edge runtime and can't import this Node config) — keep
     // the "=== 'true'" semantics in sync if you change them here.
     allowRegistration: optionalEnv("ALLOW_REGISTRATION", "false") === "true",

@@ -1,11 +1,13 @@
 // ============================================================================
-// MIDDLEWARE
+// PROXY (route middleware)
 // ============================================================================
 //
-// Next.js middleware runs BEFORE every request — before your page or API
-// route code executes. It sits between the browser and your app:
+// Next.js 16 renamed the "middleware" file convention to "proxy" (same Edge
+// runtime, same NextRequest/NextResponse API, same config.matcher). This file
+// runs BEFORE every matched request — before your page or API route code
+// executes. It sits between the browser and your app:
 //
-//   Browser → Middleware → Page/API Route
+//   Browser → Proxy → Page/API Route
 //
 // We use it to enforce a strict auth surface:
 //   - Unauthenticated: /login is the only real page (plus /register while
@@ -15,10 +17,10 @@
 //   - Authenticated: /login and /register redirect to /dashboard; everything
 //     else is allowed through.
 //
-// IMPORTANT: This file MUST be at `src/middleware.ts` (not inside app/).
+// IMPORTANT: This file MUST be at `src/proxy.ts` (not inside app/).
 // Next.js looks for it at the project root or src root specifically.
 //
-// IMPORTANT: Middleware runs on the Edge Runtime, which is a lightweight
+// IMPORTANT: The proxy runs on the Edge Runtime, which is a lightweight
 // environment (not full Node.js). Some Node.js APIs aren't available.
 // That's why we use jose instead of jsonwebtoken here — jose is
 // Edge-compatible. We'll handle this below.
@@ -60,12 +62,12 @@ async function verifySession(
 }
 
 // ============================================================================
-// THE MIDDLEWARE FUNCTION
+// THE PROXY FUNCTION
 // ============================================================================
 // Next.js calls this for every request that matches the `config.matcher`
 // pattern below. We check the session and redirect accordingly.
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = await verifySession(request);
 
@@ -76,7 +78,7 @@ export async function middleware(request: NextRequest) {
   // while ALLOW_REGISTRATION is on, so a new account can still be created;
   // otherwise it's redirected like everything else. /nothing-to-see-here itself
   // must be public, or the redirect would loop. (Read process.env directly —
-  // middleware runs on the Edge runtime and can't import the Node config.)
+  // the proxy runs on the Edge runtime and can't import the Node config.)
   if (!session) {
     const registrationOpen = process.env.ALLOW_REGISTRATION === "true";
     const publicPath =
@@ -101,8 +103,8 @@ export async function middleware(request: NextRequest) {
 // ============================================================================
 // MATCHER CONFIG
 // ============================================================================
-// This tells Next.js WHICH requests should run through the middleware.
-// Without this, middleware would run on EVERY request (including static
+// This tells Next.js WHICH requests should run through the proxy.
+// Without this, the proxy would run on EVERY request (including static
 // files like images, CSS, JS bundles), which is wasteful.
 //
 // The pattern below excludes:

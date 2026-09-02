@@ -2,7 +2,7 @@
 // NOTHING TO SEE HERE ( /nothing-to-see-here )
 // ============================================================================
 // Where unauthenticated visitors land for any non-public path (see the redirect
-// in src/middleware.ts). Deliberately gives nothing away — just a pair of eyes
+// in src/proxy.ts). Deliberately gives nothing away — just a pair of eyes
 // glancing off to the side and a shrug. It's a public route (allowlisted in the
 // middleware) so it stays reachable while logged out without causing a loop.
 

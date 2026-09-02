@@ -19,7 +19,7 @@ Self-hosted personal knowledge base. Save records (images, quotes, articles, lin
 - **Two chat providers, not one.** `getLLMProvider()` is used for auto-tagging (cheap/local-friendly); `getChatProvider()` is used for RAG chat and reflections (Claude). Don't collapse them.
 - **Streaming shape.** `chatStream()` returns an `AsyncGenerator<string>`. Convert to `ReadableStream` only at the API route boundary (`/api/chat`).
 - **Server Actions vs API routes.** CRUD goes through server actions in `src/lib/actions/`. API routes are reserved for auth, file uploads, and streaming (chat, reflections). Don't add mutation logic to routes without a reason.
-- **JWT in middleware uses `jose`, not `jsonwebtoken`.** Next.js middleware runs on the Edge Runtime. Both verify the same tokens; pick by runtime.
+- **JWT in the proxy (`src/proxy.ts`) uses `jose`, not `jsonwebtoken`.** Next.js's proxy (the Next 16 rename of middleware) runs on the Edge Runtime. Both verify the same tokens; pick by runtime.
 - **Rate limiting is in-memory** (`src/lib/rate-limit.ts`). Single-instance only. Don't scale horizontally without swapping this.
 - **Background AI work must not call `revalidatePath`.** Embedding and auto-tagging run async after save; calling `revalidatePath` from that context throws.
 - **`src/lib/config.ts` is the only place to read env vars.** `requireEnv()` fails loudly at startup.
