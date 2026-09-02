@@ -10,7 +10,7 @@
 #   1. Restores the Postgres dump into the local `db` container.
 #   2. Restores the MinIO tar into the local `minio_data` volume.
 #   3. REWRITES records.image_path — prod stores absolute URLs
-#      (https://records.beforeiforgetthis.space/uploads/<uuid>.ext); locally
+#      (https://<prod-domain>/uploads/<uuid>.ext); locally
 #      those must point at the local MinIO (http://localhost:9000/cogext-uploads/
 #      <uuid>.ext). The object filenames are preserved by the tar, so only the
 #      base URL changes.
