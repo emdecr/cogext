@@ -21,6 +21,8 @@ import { hashPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
 import { registerLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { config } from "@/lib/config";
+import { logAuthEvent } from "@/lib/auth/auth-log";
 
 // ============================================================================
 // INPUT VALIDATION SCHEMA
@@ -48,6 +50,20 @@ const registerSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Registration is disabled by default on this personal instance. Reject
+  // before doing any work (or leaking timing/rate-limit signal). Flip
+  // ALLOW_REGISTRATION=true in .env to open it temporarily. The middleware
+  // also redirects the /register page away, but this is the real security
+  // boundary — middleware doesn't run on /api routes.
+  if (!config.auth.allowRegistration) {
+    // Record the attempt — a closed endpoint getting probed is worth seeing.
+    await logAuthEvent(request, "register_blocked");
+    return NextResponse.json(
+      { error: "Registration is disabled" },
+      { status: 403 }
+    );
+  }
+
   // Rate limit by IP — prevents mass account creation from a single source.
   // 5 registrations per hour is generous for a real user, tight for a bot.
   const ip = getClientIp(request);
@@ -140,6 +156,10 @@ export async function POST(request: NextRequest) {
     // This creates a JWT and sets it as an HTTP-only cookie.
     // After this, the browser will send the cookie with every request.
     await setSession(newUser.id);
+    await logAuthEvent(request, "register", {
+      email: newUser.email,
+      userId: newUser.id,
+    });
 
     // ---- 7. Return success ----
     // We return the user data (minus the password hash!) so the

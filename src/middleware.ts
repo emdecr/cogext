@@ -92,6 +92,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // ---- Registration disabled: send /register visitors to /login ----
+  // This is a personal instance; public sign-up is off unless opted in.
+  // Read process.env directly — middleware runs on the Edge runtime and can't
+  // import the Node config module. Keep the "=== 'true'" check in sync with
+  // config.auth.allowRegistration. (The API route is the real security gate;
+  // this just keeps the page from rendering a dead form.)
+  if (pathname === "/register" && process.env.ALLOW_REGISTRATION !== "true") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   // ---- Auth routes: redirect to dashboard if already logged in ----
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname === route);
 
