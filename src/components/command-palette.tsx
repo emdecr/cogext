@@ -22,6 +22,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { searchRecords } from "@/lib/actions/search";
+import { stripMarkdown } from "@/lib/strip-markdown";
 import Skeleton from "@/components/skeleton";
 import EmptyState from "@/components/empty-state";
 import type { RecordType } from "@/lib/validations/records";
@@ -242,15 +243,17 @@ export default function CommandPalette() {
                     </span>
                     <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                       {result.title ||
-                        result.content.slice(0, 50) +
-                          (result.content.length > 50 ? "..." : "")}
+                        stripMarkdown(result.content).slice(0, 50) +
+                          (stripMarkdown(result.content).length > 50
+                            ? "..."
+                            : "")}
                     </span>
                   </div>
 
-                  {/* Content preview */}
+                  {/* Content preview (markdown stripped to plain text) */}
                   <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-                    {result.content.slice(0, 100)}
-                    {result.content.length > 100 ? "..." : ""}
+                    {stripMarkdown(result.content).slice(0, 100)}
+                    {stripMarkdown(result.content).length > 100 ? "..." : ""}
                   </p>
 
                   {/* Match type indicator */}

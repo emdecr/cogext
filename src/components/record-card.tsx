@@ -18,6 +18,7 @@ import {
   type ReadingStatus,
 } from "@/lib/validations/records";
 import { StarRating } from "@/components/star-rating";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 // TypeScript type for the record prop, now including tags
 // from the relational query.
@@ -66,16 +67,20 @@ function timeAgo(date: Date): string {
 }
 
 export default function RecordCard({ record }: { record: RecordWithTags }) {
+  // Content is authored as markdown; strip it to plain text so previews and
+  // fallback titles never leak "##" / "**" etc.
+  const plainContent = stripMarkdown(record.content);
+
   const preview =
-    record.content.length > 150
-      ? record.content.slice(0, 150) + "..."
-      : record.content;
+    plainContent.length > 150
+      ? plainContent.slice(0, 150) + "..."
+      : plainContent;
 
   const titleLimit = record.type === "quote" ? 200 : 50;
   const displayTitle =
     record.title ||
-    record.content.slice(0, titleLimit) +
-    (record.content.length > titleLimit ? "..." : "");
+    plainContent.slice(0, titleLimit) +
+    (plainContent.length > titleLimit ? "..." : "");
 
   return (
     <Link

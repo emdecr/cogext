@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { deleteRecord } from "@/lib/actions/records";
 import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
 import TagInput from "@/components/tag-input";
+import Markdown from "@/components/markdown";
 import EditRecordForm from "@/components/edit-record-form";
 import AddToCollection from "@/components/add-to-collection";
 import ConfirmDialog from "@/components/confirm-dialog";
@@ -178,9 +179,9 @@ export default function RecordDetail({
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Your note
                   </p>
-                  <p className="text-sm italic text-gray-600 dark:text-gray-300">
+                  <Markdown className="prose prose-sm prose-gray dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                     {record.note}
-                  </p>
+                  </Markdown>
                 </div>
               )}
 
@@ -189,9 +190,9 @@ export default function RecordDetail({
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Image Description
                   </p>
-                  <p className="whitespace-pre-wrap text-sm italic text-gray-700 dark:text-gray-300">
+                  <Markdown className="prose prose-sm prose-gray dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                     {record.content}
-                  </p>
+                  </Markdown>
                 </div>
               )}
 
@@ -237,19 +238,25 @@ export default function RecordDetail({
                 <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                   {record.type === "book" ? "Description" : "Content"}
                 </p>
-                <div
-                  className={`whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300 ${
-                    record.type === "quote"
-                      ? record.content.length < 140
+                {record.type === "quote" ? (
+                  // Quotes stay styled plain text (rarely markdown), with the
+                  // size heuristic + typographic quotation marks.
+                  <div
+                    className={`whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300 ${
+                      record.content.length < 140
                         ? "text-3xl font-serif italic leading-snug"
                         : record.content.length < 320
                           ? "text-xl font-serif italic"
                           : "text-base italic"
-                      : "text-sm"
-                  }`}
-                >
-                  {record.type === "quote" ? `“${record.content}”` : record.content}
-                </div>
+                    }`}
+                  >
+                    {`“${record.content}”`}
+                  </div>
+                ) : (
+                  <Markdown className="prose prose-sm prose-gray dark:prose-invert max-w-none leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                    {record.content}
+                  </Markdown>
+                )}
               </div>
             </div>
 
@@ -319,9 +326,9 @@ export default function RecordDetail({
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Your note
                   </p>
-                  <p className="text-sm italic text-gray-600 dark:text-gray-300">
+                  <Markdown className="prose prose-sm prose-gray dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                     {record.note}
-                  </p>
+                  </Markdown>
                 </div>
               )}
 

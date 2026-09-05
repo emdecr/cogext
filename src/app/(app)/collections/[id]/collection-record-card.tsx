@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import { removeRecordFromCollection } from "@/lib/actions/collections";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 type CollectionRecord = {
   id: string;
@@ -46,14 +47,17 @@ type Props = {
 export default function CollectionRecordCard({ record, collectionId }: Props) {
   const [isRemoving, setIsRemoving] = useState(false);
 
+  // Content is authored as markdown; strip it for plain-text previews/titles.
+  const plainContent = stripMarkdown(record.content);
+
   const displayTitle =
     record.title ||
-    record.content.slice(0, 50) + (record.content.length > 50 ? "..." : "");
+    plainContent.slice(0, 50) + (plainContent.length > 50 ? "..." : "");
 
   const preview =
-    record.content.length > 150
-      ? record.content.slice(0, 150) + "..."
-      : record.content;
+    plainContent.length > 150
+      ? plainContent.slice(0, 150) + "..."
+      : plainContent;
 
   async function handleRemove() {
     setIsRemoving(true);
