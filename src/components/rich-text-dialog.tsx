@@ -89,8 +89,18 @@ export default function RichTextDialog({
       <Dialog.Root open={open} onOpenChange={handleOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 animate-[fadeIn_150ms_ease-out]" />
-          {/* Full-screen sheet on phones/tablets; large centered card at lg. */}
-          <Dialog.Content className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[85dvh] lg:w-[90vw] lg:max-w-3xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-xl">
+          {/* Full-screen sheet on phones/tablets; large centered card at lg.
+              This dialog is opened from *inside* the record create/edit modal
+              (itself a Radix Dialog). Stop Esc / outside-interaction events from
+              bubbling to that parent, or a single Esc would close both and
+              discard the whole form. The dirty-guard still runs via
+              handleOpenChange below. */}
+          <Dialog.Content
+            onEscapeKeyDown={(e) => e.stopPropagation()}
+            onPointerDownOutside={(e) => e.stopPropagation()}
+            onInteractOutside={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[85dvh] lg:w-[90vw] lg:max-w-3xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-xl"
+          >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
               <Dialog.Title className="text-base font-semibold text-gray-900 dark:text-gray-100">

@@ -20,6 +20,7 @@ import {
   type ReadingStatus,
 } from "@/lib/validations/records";
 import { CoverImageInput } from "@/components/cover-image-input";
+import MarkdownField from "@/components/markdown-field";
 
 type Tag = {
   id: string;
@@ -205,23 +206,17 @@ export default function EditRecordForm({ record, onClose }: Props) {
               )}
             </div>
 
-            <div>
-              <label htmlFor="edit-content" className={labelClass}>
-                {record.type === "book" ? "Description" : "Content"}
-              </label>
-              <textarea
-                id="edit-content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={12}
-                className={inputClass}
-              />
-              {fieldErrors?.content && (
-                <p className="mt-1 text-sm text-red-500">
-                  {fieldErrors.content[0]}
-                </p>
-              )}
-            </div>
+            <MarkdownField
+              id="edit-content"
+              label={record.type === "book" ? "Description" : "Content"}
+              value={content}
+              onChange={setContent}
+              rows={12}
+              error={fieldErrors?.content?.[0]}
+              dialogTitle={
+                record.type === "book" ? "Edit description" : "Edit content"
+              }
+            />
           </div>
 
           {/* Right column: metadata */}
@@ -363,20 +358,20 @@ export default function EditRecordForm({ record, onClose }: Props) {
               </div>
             )}
 
-            <div>
-              <label htmlFor="edit-note" className={labelClass}>
-                Note{" "}
-                <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <textarea
-                id="edit-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Your personal annotation..."
-                rows={5}
-                className={inputClass}
-              />
-            </div>
+            <MarkdownField
+              id="edit-note"
+              label={
+                <>
+                  Note{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </>
+              }
+              value={note}
+              onChange={setNote}
+              placeholder="Your personal annotation..."
+              rows={5}
+              dialogTitle="Edit note"
+            />
           </div>
         </div>
       </div>

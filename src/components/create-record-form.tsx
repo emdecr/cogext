@@ -22,6 +22,7 @@ import {
 } from "@/lib/validations/records";
 import TagInput from "@/components/tag-input";
 import { CoverImageInput } from "@/components/cover-image-input";
+import MarkdownField from "@/components/markdown-field";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
@@ -353,40 +354,38 @@ export default function CreateRecordForm() {
                   </div>
 
                   {type !== "image" && (
-                    <div>
-                      <label htmlFor="content" className={labelClass}>
-                        {type === "book" ? "Description" : "Content"}
-                        {type === "book" && (
-                          <span className="font-normal text-gray-400">
-                            {" "}
-                            (optional)
-                          </span>
-                        )}
-                      </label>
-                      <textarea
-                        id="content"
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder={
-                          type === "quote"
-                            ? "Paste the quote..."
-                            : type === "link"
-                              ? "What is this link about?"
-                              : type === "article"
-                                ? "Paste an excerpt or summary..."
-                                : type === "book"
-                                  ? "A short description or summary (leave blank to just log it)..."
-                                  : "Write your note..."
-                        }
-                        rows={12}
-                        className={inputClass}
-                      />
-                      {fieldErrors?.content && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {fieldErrors.content[0]}
-                        </p>
-                      )}
-                    </div>
+                    <MarkdownField
+                      id="content"
+                      label={
+                        <>
+                          {type === "book" ? "Description" : "Content"}
+                          {type === "book" && (
+                            <span className="font-normal text-gray-400">
+                              {" "}
+                              (optional)
+                            </span>
+                          )}
+                        </>
+                      }
+                      value={content}
+                      onChange={setContent}
+                      placeholder={
+                        type === "quote"
+                          ? "Paste the quote..."
+                          : type === "link"
+                            ? "What is this link about?"
+                            : type === "article"
+                              ? "Paste an excerpt or summary..."
+                              : type === "book"
+                                ? "A short description or summary (leave blank to just log it)..."
+                                : "Write your note..."
+                      }
+                      rows={12}
+                      error={fieldErrors?.content?.[0]}
+                      dialogTitle={
+                        type === "book" ? "Edit description" : "Edit content"
+                      }
+                    />
                   )}
 
                   {type === "image" && (
@@ -605,22 +604,22 @@ export default function CreateRecordForm() {
                     </div>
                   )}
 
-                  <div>
-                    <label htmlFor="note" className={labelClass}>
-                      Note{" "}
-                      <span className="font-normal text-gray-400">
-                        (optional)
-                      </span>
-                    </label>
-                    <textarea
-                      id="note"
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Your personal annotation..."
-                      rows={5}
-                      className={inputClass}
-                    />
-                  </div>
+                  <MarkdownField
+                    id="note"
+                    label={
+                      <>
+                        Note{" "}
+                        <span className="font-normal text-gray-400">
+                          (optional)
+                        </span>
+                      </>
+                    }
+                    value={note}
+                    onChange={setNote}
+                    placeholder="Your personal annotation..."
+                    rows={5}
+                    dialogTitle="Edit note"
+                  />
 
                   <div>
                     <label className={labelClass}>
