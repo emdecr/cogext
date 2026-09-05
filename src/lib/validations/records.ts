@@ -15,6 +15,12 @@
 
 import { z } from "zod";
 
+// Upper bound for long-form text fields (content, note). Generous enough for
+// real long-form prose (~16k words) while bounding request payload size — the
+// rate limiter and DB are single-instance (see CLAUDE.md), so an unbounded
+// body is a real DoS lever. Not a product limit anyone should hit in practice.
+const MAX_TEXT_LENGTH = 100_000;
+
 // The allowed record types — must match our Postgres ENUM in schema.ts.
 // This is the CANONICAL set used for validation and the shared RecordType.
 // It includes "article" even though we no longer offer it in the create UI
@@ -90,7 +96,8 @@ const recordFieldsSchema = z.object({
   content: z
     .string()
     .trim()
-    .min(1, "Content is required"),
+    .min(1, "Content is required")
+    .max(MAX_TEXT_LENGTH, "Content is too long"),
 
   // URL validation: .url() checks that it's a valid URL format.
   // .optional() because not all record types have a source URL.
@@ -106,7 +113,7 @@ const recordFieldsSchema = z.object({
   sourceAuthor: z.string().trim().optional(),
 
   // User's personal note/annotation on the record.
-  note: z.string().trim().optional(),
+  note: z.string().trim().max(MAX_TEXT_LENGTH, "Note is too long").optional(),
 
   // Path to uploaded image in storage (e.g., "/uploads/abc-123.jpg").
   // Set by the upload API route, not by the user directly.
