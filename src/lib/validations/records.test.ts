@@ -198,6 +198,44 @@ describe("createRecordSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts long-form content up to the length cap", () => {
+    const result = createRecordSchema.safeParse({
+      type: "note",
+      content: "a".repeat(100_000),
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects content that exceeds the length cap", () => {
+    const result = createRecordSchema.safeParse({
+      type: "note",
+      content: "a".repeat(100_001),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.content).toContain(
+        "Content is too long",
+      );
+    }
+  });
+
+  it("rejects a note that exceeds the length cap", () => {
+    const result = createRecordSchema.safeParse({
+      type: "note",
+      content: "ok",
+      note: "a".repeat(100_001),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.note).toContain(
+        "Note is too long",
+      );
+    }
+  });
+
   // ---- Invalid inputs ----
 
   it("rejects when content is missing", () => {

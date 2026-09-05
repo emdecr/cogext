@@ -22,8 +22,8 @@
 "use client";
 
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { Markdown, type MarkdownStorage } from "tiptap-markdown";
+import { type MarkdownStorage } from "tiptap-markdown";
+import { richTextExtensions } from "@/components/rich-text-extensions";
 
 // tiptap-markdown adds a `markdown` storage bucket but doesn't augment Tiptap's
 // Storage type, so read it through this typed accessor.
@@ -177,14 +177,7 @@ export default function RichTextEditor({ initialValue, onReady, onChange }: Prop
     // Client-only (loaded via ssr:false dynamic import), but false is the safe
     // default and avoids any hydration edge case.
     immediatelyRender: false,
-    extensions: [
-      StarterKit,
-      Markdown.configure({
-        html: false, // emit markdown, never embedded HTML (security)
-        transformPastedText: true,
-        transformCopiedText: true,
-      }),
-    ],
+    extensions: richTextExtensions,
     content: initialValue, // parsed as markdown thanks to the Markdown extension
     editorProps: {
       attributes: {
