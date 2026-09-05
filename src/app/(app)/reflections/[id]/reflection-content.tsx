@@ -25,7 +25,7 @@
 
 "use client";
 
-import Markdown from "react-markdown";
+import Markdown from "@/components/markdown";
 import type { Recommendation } from "@/lib/ai/recommendations";
 
 type Props = {
@@ -52,8 +52,9 @@ export default function ReflectionContent({
   return (
     <div className="space-y-10">
       {/* ---- Reflection markdown ----
-          Tailwind Typography handles the long-form prose nicely. */}
-      <div
+          Tailwind Typography handles the long-form prose nicely. The shared
+          <Markdown> wrapper owns the container; we pass the reflection flavor. */}
+      <Markdown
         className="
           prose prose-gray dark:prose-invert
           max-w-none
@@ -68,8 +69,8 @@ export default function ReflectionContent({
           [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
         "
       >
-        <Markdown>{content}</Markdown>
-      </div>
+        {content}
+      </Markdown>
 
       {/* ---- Recommendations ----
           Omit the section entirely when no recommendations exist. This keeps

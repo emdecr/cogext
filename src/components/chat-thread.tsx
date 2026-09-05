@@ -26,7 +26,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Markdown from "react-markdown";
+import Markdown from "@/components/markdown";
 import {
   addMessage,
   type ConversationWithMessages,
@@ -313,12 +313,11 @@ function MessageBubble({
           <p className="whitespace-pre-wrap">{content}</p>
         ) : (
           // Assistant messages: render markdown so bold, lists, code, etc.
-          // show up formatted. The `prose` class from Tailwind Typography
-          // gives us sensible defaults for all HTML elements markdown produces.
-          // We constrain it with prose-sm and max-w-none so it fits the bubble.
-          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            <Markdown>{content}</Markdown>
-          </div>
+          // show up formatted. The shared <Markdown> wrapper owns the prose
+          // container; we pass the prose-sm flavor so it fits the bubble.
+          <Markdown className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            {content}
+          </Markdown>
         )}
 
         {/* Streaming indicator — a blinking cursor after the text */}
