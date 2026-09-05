@@ -2,8 +2,10 @@
 // EDIT RECORD FORM
 // ============================================================================
 //
-// Rendered inside the record detail Radix Dialog (record-card.tsx).
-// Owns its own header/body/footer layout so the dialog can expand to
+// Rendered by RecordDetail in edit mode. Like RecordDetail, it is
+// Dialog-agnostic (plain heading + button, close driven by `onClose`) so it
+// works on both the standalone /records/[id] page and the intercepting modal.
+// Owns its own header/body/footer layout so the surface can expand to
 // near-fullscreen while editing. Image upload is intentionally not
 // supported here — only metadata edits.
 // ============================================================================
@@ -11,7 +13,6 @@
 "use client";
 
 import { useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 import { updateRecord } from "@/lib/actions/records";
 import {
   READING_STATUSES,
@@ -161,18 +162,17 @@ export default function EditRecordForm({ record, onClose }: Props) {
     <form onSubmit={handleSubmit} className="flex h-full flex-col">
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-        <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Edit Record
-        </Dialog.Title>
-        <Dialog.Close asChild>
-          <button
-            type="button"
-            className="-mr-2 rounded-md p-2 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-            aria-label="Close form"
-          >
-            ✕
-          </button>
-        </Dialog.Close>
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="-mr-2 rounded-md p-2 text-lg leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+          aria-label="Close form"
+        >
+          ✕
+        </button>
       </div>
 
       {/* ---- Scrollable body ---- */}
