@@ -199,13 +199,32 @@ export default function RecordDetail({
               )}
 
               {record.content && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <span className="transition-transform group-open:rotate-90">
+                      ▸
+                    </span>
                     Image Description
-                  </p>
-                  <Markdown className="prose prose-sm prose-gray dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  </summary>
+                  <Markdown className="prose prose-sm prose-gray dark:prose-invert mt-2 max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                     {record.content}
                   </Markdown>
+                </details>
+              )}
+
+              {record.sourceUrl && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Source
+                  </p>
+                  <a
+                    href={record.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all text-sm text-blue-500 hover:underline dark:text-blue-400"
+                  >
+                    {record.sourceUrl}
+                  </a>
                 </div>
               )}
 
