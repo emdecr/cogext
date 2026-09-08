@@ -28,7 +28,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ne, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { records, recordTags, collectionRecords } from "@/db/schema";
@@ -37,11 +37,13 @@ import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
 import { addTagToRecord } from "@/lib/actions/tags";
+import { stripMarkdown } from "@/lib/strip-markdown";
 import {
   createRecordSchema,
   updateRecordSchema,
   deleteRecordSchema,
   type CreateRecordInput,
+  type RelatedRecord,
 } from "@/lib/validations/records";
 
 // ============================================================================
@@ -325,6 +327,105 @@ export async function getRecord(id: string) {
   });
 
   return record || null;
+}
+
+// ============================================================================
+// GET RELATED RECORDS (emergent, on-demand)
+// ============================================================================
+// Phase 4 of plans/2026-07-24-record-urls-and-reflection-refs.md.
+//
+// Finds the nearest neighbors of a record by embedding cosine similarity —
+// the "Related" section on the record page/modal. Computed on-demand at view
+// time using the existing pgvector HNSW index (no schema change, no background
+// job, always fresh). Mirrors the semantic-search pattern in
+// src/lib/actions/search.ts (the `<=>` cosine-distance operator, 1 - distance
+// = similarity, userId-scoped, embedding-not-null).
+//
+// Quality-first (a product decision — see the plan): we apply a similarity
+// FLOOR so a niche record shows nothing rather than noise, and de-dupe
+// near-identical neighbors (e.g. the same clip saved five times) so the list
+// isn't repetitive. Returns at most 5.
+
+// Cosine-similarity floor below which a neighbor is considered unrelated.
+// TUNABLE: calibrated for voyage-4-lite embeddings; adjust after seeing real
+// results (or if the embedding model changes). Higher = stricter/emptier.
+const RELATED_SIMILARITY_FLOOR = 0.5;
+const RELATED_LIMIT = 5;
+
+// RelatedRecord type lives in validations/records.ts (this is a "use server"
+// module — only async functions may be exported).
+
+export async function getRelatedRecords(
+  recordId: string,
+): Promise<RelatedRecord[]> {
+  const userId = await requireUserId();
+
+  // Fetch just this record's own embedding (user-scoped). If it isn't embedded
+  // yet — e.g. a brand-new record still embedding async, or an old record from
+  // before the voyage-4 re-embed — there's nothing to compare against.
+  const target = await db.query.records.findFirst({
+    where: and(eq(records.id, recordId), eq(records.userId, userId)),
+    columns: { embedding: true },
+  });
+
+  if (!target?.embedding) return [];
+
+  // pgvector wants the vector as a bracketed string literal, same as search.ts.
+  const embeddingStr = `[${target.embedding.join(",")}]`;
+  const distance = sql`${records.embedding} <=> ${embeddingStr}::vector`;
+
+  // Over-fetch a little so the JS de-dupe below still leaves us up to
+  // RELATED_LIMIT distinct neighbors.
+  const candidates = await db
+    .select({
+      id: records.id,
+      type: records.type,
+      title: records.title,
+      content: records.content,
+      imagePath: records.imagePath,
+      sourceAuthor: records.sourceAuthor,
+    })
+    .from(records)
+    .where(
+      and(
+        eq(records.userId, userId),
+        ne(records.id, recordId),
+        isNotNull(records.embedding),
+        // Apply the similarity floor in SQL so we never even rank noise.
+        sql`1 - (${distance}) >= ${RELATED_SIMILARITY_FLOOR}`,
+      ),
+    )
+    .orderBy(distance)
+    .limit(RELATED_LIMIT * 3);
+
+  // De-dupe near-identical neighbors (the "five versions of the same clip"
+  // case). Cheap proxy: collapse by normalized title, or by a content prefix
+  // for untitled records. Candidates are distance-ordered, so we keep the
+  // closest of each group.
+  const seen = new Set<string>();
+  const deduped: RelatedRecord[] = [];
+
+  for (const c of candidates) {
+    const titleKey = (c.title ?? "").trim().toLowerCase();
+    const key = titleKey
+      ? `t:${titleKey}`
+      : `c:${c.content.slice(0, 100).trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    deduped.push({
+      id: c.id,
+      type: c.type,
+      title: c.title,
+      // Truncate here to keep the payload small; the card also CSS-clamps.
+      preview: stripMarkdown(c.content).slice(0, 160).trim(),
+      imagePath: c.imagePath,
+      sourceAuthor: c.sourceAuthor,
+    });
+    if (deduped.length >= RELATED_LIMIT) break;
+  }
+
+  return deduped;
 }
 
 // ============================================================================

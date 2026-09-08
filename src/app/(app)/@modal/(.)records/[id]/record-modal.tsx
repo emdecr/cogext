@@ -16,7 +16,11 @@
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import RecordDetail from "@/components/record-detail";
-import type { RecordType, ReadingStatus } from "@/lib/validations/records";
+import type {
+  RecordType,
+  ReadingStatus,
+  RelatedRecord,
+} from "@/lib/validations/records";
 
 type Tag = {
   id: string;
@@ -40,7 +44,13 @@ type RecordWithTags = {
   recordTags: { tag: Tag }[];
 };
 
-export default function RecordModal({ record }: { record: RecordWithTags }) {
+export default function RecordModal({
+  record,
+  related,
+}: {
+  record: RecordWithTags;
+  related: RelatedRecord[];
+}) {
   const router = useRouter();
 
   // Any close intent (Esc / overlay / ✕) navigates back to the underlying page.
@@ -61,7 +71,11 @@ export default function RecordModal({ record }: { record: RecordWithTags }) {
           <Dialog.Title asChild>
             <span className="sr-only">Record Details</span>
           </Dialog.Title>
-          <RecordDetail record={record} onClose={() => router.back()} />
+          <RecordDetail
+            record={record}
+            related={related}
+            onClose={() => router.back()}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

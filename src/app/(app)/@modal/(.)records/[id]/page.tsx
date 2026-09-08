@@ -14,7 +14,7 @@
 
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { getRecord } from "@/lib/actions/records";
+import { getRecord, getRelatedRecords } from "@/lib/actions/records";
 import RecordModal from "./record-modal";
 
 type Props = {
@@ -30,5 +30,9 @@ export default async function RecordModalPage({ params }: Props) {
 
   if (!record) notFound();
 
-  return <RecordModal record={record} />;
+  // Same emergent "Related" neighbors as the standalone page, so the modal and
+  // the full page render identically.
+  const related = await getRelatedRecords(id);
+
+  return <RecordModal record={record} related={related} />;
 }

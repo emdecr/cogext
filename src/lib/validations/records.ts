@@ -61,6 +61,21 @@ export const READING_STATUS_LABELS: Record<ReadingStatus, string> = {
   read: "Read",
 };
 
+// Compact DTO for the emergent "Related" list (Phase 4). Lives here rather than
+// in the records server-actions module because that file is "use server" (only
+// async functions may be exported) and this type is imported by client
+// components. Produced by getRelatedRecords().
+export type RelatedRecord = {
+  id: string;
+  type: string;
+  title: string | null;
+  // Plain-text (markdown-stripped), truncated content — shown on non-image
+  // cards. Image records render the image alone, so this is ignored for them.
+  preview: string;
+  imagePath: string | null;
+  sourceAuthor: string | null;
+};
+
 // ============================================================================
 // CREATE RECORD
 // ============================================================================
