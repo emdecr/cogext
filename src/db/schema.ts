@@ -15,7 +15,7 @@
 // your actual database.
 // ============================================================================
 
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,    // creates a Postgres table definition
   uuid,       // UUID column type (e.g., '550e8400-e29b-41d4-a716-446655440000')
@@ -30,6 +30,8 @@ import {
   primaryKey, // composite primary key (for join tables)
   vector,     // pgvector column — stores embeddings as arrays of floats
   index,      // database index for query performance
+  uniqueIndex,// unique index (used for the undirected record-link pair)
+  check,      // table-level CHECK constraint
 } from "drizzle-orm/pg-core";
 import type { Recommendation } from "@/lib/ai/recommendations";
 
@@ -283,6 +285,48 @@ export const recordTags = pgTable(
   // is the PK. This means the same tag can't be applied to the same record
   // twice, but the same tag CAN appear in multiple rows (for different records).
   (table) => [primaryKey({ columns: [table.recordId, table.tagId] })],
+);
+
+// ============================================================================
+// RECORD LINKS (manual, user-authored connections)
+// ============================================================================
+// Phase 5 of plans/2026-07-24-record-urls-and-reflection-refs.md. A deliberate
+// connection the user draws between two of their records, with an optional
+// free-text `note` explaining WHY they connect (the point of the feature).
+//
+// Stored as a single DIRECTED row (recordId = the record it was added from),
+// but displayed UNDIRECTED — queries look at both columns so a backlink shows
+// on both records without a second row. The unique index below is on the
+// unordered pair so (A→B) and a later (B→A) collide rather than duplicating.
+export const recordLinks = pgTable(
+  "record_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => records.id),
+    relatedRecordId: uuid("related_record_id")
+      .notNull()
+      .references(() => records.id),
+    // Why these two connect. Nullable — a link without a note is still valid.
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // A record can't link to itself.
+    check("record_links_no_self", sql`${t.recordId} <> ${t.relatedRecordId}`),
+    // Undirected uniqueness: index the unordered pair (least, greatest) so the
+    // same connection can't be stored twice in either direction.
+    uniqueIndex("record_links_pair_uniq").on(
+      sql`least(${t.recordId}, ${t.relatedRecordId})`,
+      sql`greatest(${t.recordId}, ${t.relatedRecordId})`,
+    ),
+  ],
 );
 
 // ============================================================================
@@ -584,6 +628,25 @@ export const recordTagsRelations = relations(recordTags, ({ one }) => ({
   tag: one(tags, {
     fields: [recordTags.tagId],
     references: [tags.id],
+  }),
+}));
+
+export const recordLinksRelations = relations(recordLinks, ({ one }) => ({
+  user: one(users, {
+    fields: [recordLinks.userId],
+    references: [users.id],
+  }),
+  // Two FKs to records — disambiguated by relationName so Drizzle can tell the
+  // "from" side apart from the "to" side.
+  record: one(records, {
+    fields: [recordLinks.recordId],
+    references: [records.id],
+    relationName: "recordLinkSource",
+  }),
+  relatedRecord: one(records, {
+    fields: [recordLinks.relatedRecordId],
+    references: [records.id],
+    relationName: "recordLinkTarget",
   }),
 }));
 

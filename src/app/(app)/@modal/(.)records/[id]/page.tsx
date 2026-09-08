@@ -15,6 +15,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getRecord, getRelatedRecords } from "@/lib/actions/records";
+import { getRecordConnections } from "@/lib/actions/record-links";
 import RecordModal from "./record-modal";
 
 type Props = {
@@ -30,9 +31,14 @@ export default async function RecordModalPage({ params }: Props) {
 
   if (!record) notFound();
 
-  // Same emergent "Related" neighbors as the standalone page, so the modal and
-  // the full page render identically.
-  const related = await getRelatedRecords(id);
+  // Same "Related" + "Connections" data as the standalone page, so the modal
+  // and the full page render identically.
+  const [related, connections] = await Promise.all([
+    getRelatedRecords(id),
+    getRecordConnections(id),
+  ]);
 
-  return <RecordModal record={record} related={related} />;
+  return (
+    <RecordModal record={record} related={related} connections={connections} />
+  );
 }

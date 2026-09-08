@@ -20,6 +20,7 @@ import type {
   RecordType,
   ReadingStatus,
   RelatedRecord,
+  RecordConnection,
 } from "@/lib/validations/records";
 
 type Tag = {
@@ -47,9 +48,11 @@ type RecordWithTags = {
 export default function RecordModal({
   record,
   related,
+  connections,
 }: {
   record: RecordWithTags;
   related: RelatedRecord[];
+  connections: RecordConnection[];
 }) {
   const router = useRouter();
 
@@ -74,6 +77,7 @@ export default function RecordModal({
           <RecordDetail
             record={record}
             related={related}
+            connections={connections}
             onClose={() => router.back()}
           />
         </Dialog.Content>

@@ -20,7 +20,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteRecord } from "@/lib/actions/records";
 import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
@@ -29,12 +28,15 @@ import Markdown from "@/components/markdown";
 import EditRecordForm from "@/components/edit-record-form";
 import AddToCollection from "@/components/add-to-collection";
 import ConfirmDialog from "@/components/confirm-dialog";
+import RecordMiniCard from "@/components/record-mini-card";
+import RecordConnections from "@/components/record-connections";
 import { StarRating } from "@/components/star-rating";
 import {
   READING_STATUS_LABELS,
   type RecordType,
   type ReadingStatus,
   type RelatedRecord,
+  type RecordConnection,
 } from "@/lib/validations/records";
 
 type Tag = {
@@ -72,6 +74,7 @@ const TYPE_COLORS: Record<string, string> = {
 export default function RecordDetail({
   record,
   related = [],
+  connections = [],
   onClose,
 }: {
   record: RecordWithTags;
@@ -79,6 +82,9 @@ export default function RecordDetail({
   // passed in by both surfaces (page + modal); empty when the record has no
   // embedding or nothing clears the similarity floor.
   related?: RelatedRecord[];
+  // Manual user-authored connections (Phase 5), computed server-side and passed
+  // in by both surfaces.
+  connections?: RecordConnection[];
   // Provided when rendered inside the modal (closes it). Absent on the
   // standalone page, where no close button is rendered.
   onClose?: () => void;
@@ -353,6 +359,10 @@ export default function RecordDetail({
           </div>
         )}
 
+        {/* ---- Connections (manual, user-authored — Phase 5) ----
+            Above Related: your deliberate links come before AI suggestions. */}
+        <RecordConnections recordId={record.id} connections={connections} />
+
         {/* ---- Related (emergent nearest neighbors) ---- */}
         {related.length > 0 && (
           <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-800">
@@ -361,70 +371,7 @@ export default function RecordDetail({
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {related.map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/records/${r.id}`}
-                  className="group overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
-                >
-                  {r.type === "image" && r.imagePath ? (
-                    // Image record: the image IS the content — show it big, no text.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={r.imagePath}
-                      alt={r.title ?? ""}
-                      className="aspect-square w-full object-cover"
-                    />
-                  ) : r.type === "book" && r.imagePath ? (
-                    // Book: cover + title (+ author). Portrait cover, contained
-                    // on a neutral backer so it isn't cropped (matches the card).
-                    <div className="flex h-full flex-col">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={r.imagePath}
-                        alt={r.title ?? "Cover"}
-                        className="aspect-[3/4] w-full bg-gray-50 object-contain dark:bg-gray-800"
-                      />
-                      <div className="flex flex-1 flex-col p-2.5">
-                        {r.title && (
-                          <span className="line-clamp-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {r.title}
-                          </span>
-                        )}
-                        {r.sourceAuthor && (
-                          <span className="mt-0.5 truncate text-[11px] text-gray-400">
-                            — {r.sourceAuthor}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    // Everything else: a text card with the content truncated.
-                    <div className="flex h-full flex-col gap-1.5 p-3">
-                      <span
-                        className={`inline-block w-fit rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${TYPE_COLORS[r.type] || "bg-gray-100 text-gray-700"}`}
-                      >
-                        {r.type}
-                      </span>
-                      {r.title && (
-                        <span className="line-clamp-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {r.title}
-                        </span>
-                      )}
-                      {r.preview && (
-                        <span
-                          className={`line-clamp-3 text-xs text-gray-600 dark:text-gray-400 ${r.type === "quote" ? "italic" : ""}`}
-                        >
-                          {r.type === "quote" ? `“${r.preview}”` : r.preview}
-                        </span>
-                      )}
-                      {r.sourceAuthor && (
-                        <span className="mt-auto truncate pt-1 text-[11px] text-gray-400">
-                          — {r.sourceAuthor}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </Link>
+                <RecordMiniCard key={r.id} record={r} />
               ))}
             </div>
           </div>

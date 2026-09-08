@@ -16,6 +16,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { getRecord, getRelatedRecords } from "@/lib/actions/records";
+import { getRecordConnections } from "@/lib/actions/record-links";
 import RecordDetail from "@/components/record-detail";
 
 type Props = {
@@ -31,9 +32,13 @@ export default async function RecordDetailPage({ params }: Props) {
 
   if (!record) notFound();
 
-  // Emergent "Related" neighbors (Phase 4) — cheap HNSW query, computed here so
-  // RecordDetail stays presentational and both surfaces share the same data.
-  const related = await getRelatedRecords(id);
+  // Emergent "Related" neighbors (Phase 4) + manual "Connections" (Phase 5),
+  // computed here so RecordDetail stays presentational and both surfaces share
+  // the same data.
+  const [related, connections] = await Promise.all([
+    getRelatedRecords(id),
+    getRecordConnections(id),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 md:p-8">
@@ -47,7 +52,11 @@ export default async function RecordDetailPage({ params }: Props) {
         </Link>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <RecordDetail record={record} related={related} />
+          <RecordDetail
+            record={record}
+            related={related}
+            connections={connections}
+          />
         </div>
       </div>
     </div>

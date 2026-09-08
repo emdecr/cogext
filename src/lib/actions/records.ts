@@ -28,10 +28,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and, ne, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, ne, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { records, recordTags, collectionRecords } from "@/db/schema";
+import { records, recordTags, collectionRecords, recordLinks } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
@@ -539,6 +539,16 @@ export async function deleteRecord(id: string): Promise<ActionResult> {
     await db
       .delete(collectionRecords)
       .where(eq(collectionRecords.recordId, parsed.data.id));
+    // Manual connections (Phase 5) reference the record from EITHER column,
+    // so clear both directions before deleting.
+    await db
+      .delete(recordLinks)
+      .where(
+        or(
+          eq(recordLinks.recordId, parsed.data.id),
+          eq(recordLinks.relatedRecordId, parsed.data.id),
+        ),
+      );
 
     const result = await db
       .delete(records)

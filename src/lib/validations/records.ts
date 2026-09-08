@@ -76,6 +76,16 @@ export type RelatedRecord = {
   sourceAuthor: string | null;
 };
 
+// A manual, user-authored connection (Phase 5) as seen from one record: the
+// "other" record it links to, plus the link id and the optional "why" note.
+// Reuses RelatedRecord for the other record so the same card renders both the
+// emergent "Related" list and the manual "Connections" list.
+export type RecordConnection = {
+  linkId: string;
+  note: string | null;
+  record: RelatedRecord;
+};
+
 // ============================================================================
 // CREATE RECORD
 // ============================================================================
