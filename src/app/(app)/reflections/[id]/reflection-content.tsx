@@ -25,8 +25,27 @@
 
 "use client";
 
+import type { Components } from "react-markdown";
 import Markdown from "@/components/markdown";
+import RecordRefLink from "@/components/record-ref-link";
 import type { Recommendation } from "@/lib/ai/recommendations";
+
+// Render inline links the reflection emits. Record citations (Phase 2) are
+// `/records/<id>` links — upgrade those to a hover-card preview (Phase 3).
+// Everything else is an external link, opened in a new tab.
+const markdownComponents: Components = {
+  a(props) {
+    const { href, children } = props;
+    if (href && href.startsWith("/records/")) {
+      return <RecordRefLink href={href}>{children}</RecordRefLink>;
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  },
+};
 
 type Props = {
   content: string;
@@ -68,6 +87,7 @@ export default function ReflectionContent({
           prose-blockquote:text-gray-600 dark:prose-blockquote:text-gray-400
           [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
         "
+        components={markdownComponents}
       >
         {content}
       </Markdown>
