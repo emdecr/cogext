@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import RecordImagePreview from "@/components/record-image-preview";
 import { searchRecords } from "@/lib/actions/search";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import Skeleton from "@/components/skeleton";
@@ -211,8 +212,15 @@ export default function CommandPalette() {
           {/* Result list */}
           {!isSearching &&
             results.map((result) => (
-              <Link
+              // Hovering anywhere on an image record's row pops a larger
+              // preview, so image records are identifiable without opening
+              // them — the tiny 40px crop alone often isn't enough.
+              <RecordImagePreview
                 key={result.id}
+                src={result.imagePath}
+                alt={result.title ?? ""}
+              >
+              <Link
                 href={`/records/${result.id}`}
                 onClick={() => {
                   // Navigate to the record's canonical URL. Clicking is
@@ -223,7 +231,7 @@ export default function CommandPalette() {
                 }}
                 className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
               >
-                {/* Image thumbnail (if applicable) */}
+                {/* Inline thumbnail anchor (the larger preview is on row hover) */}
                 {result.imagePath && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -262,6 +270,7 @@ export default function CommandPalette() {
                   </p>
                 </div>
               </Link>
+              </RecordImagePreview>
             ))}
         </div>
       </div>

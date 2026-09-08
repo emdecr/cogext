@@ -20,6 +20,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import RecordMiniCard from "@/components/record-mini-card";
+import RecordImagePreview from "@/components/record-image-preview";
 import { searchRecords } from "@/lib/actions/search";
 import {
   addRecordLink,
@@ -314,19 +315,35 @@ function AddConnectionDialog({
                     </p>
                   )}
                   {results.map((r) => (
-                    <button
+                    // Hovering an image record's row pops a larger preview,
+                    // so image records are identifiable in the picker.
+                    <RecordImagePreview
                       key={r.id}
-                      type="button"
-                      onClick={() => setSelected(r)}
-                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                      src={r.imagePath}
+                      alt={r.title ?? ""}
                     >
-                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                        {r.type}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
-                        {r.title || r.content.slice(0, 80)}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(r)}
+                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        {/* Inline thumbnail anchor (larger preview on row hover) */}
+                        {r.imagePath && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.imagePath}
+                            alt=""
+                            className="h-10 w-10 flex-shrink-0 rounded object-cover"
+                          />
+                        )}
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                          {r.type}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
+                          {r.title || r.content.slice(0, 80)}
+                        </span>
+                      </button>
+                    </RecordImagePreview>
                   ))}
                 </div>
               </>
