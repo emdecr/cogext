@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { createRecord } from "@/lib/actions/records";
 import { addTagToRecord } from "@/lib/actions/tags";
+import { fetchUrlMetadata } from "@/lib/actions/url-metadata";
 import {
   CREATABLE_RECORD_TYPES,
   READING_STATUSES,
@@ -52,6 +53,34 @@ export default function CreateRecordForm() {
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-fill from a pasted source URL: fetch the page's <title>/og:title and
+  // (for links) its description, filling only fields the user left empty. We
+  // remember the last URL we looked up so blur-after-paste doesn't refetch.
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const lastFetchedUrlRef = useRef<string | null>(null);
+
+  async function maybeFetchMetadata(url: string) {
+    const trimmed = url.trim();
+    if (!/^https?:\/\//i.test(trimmed)) return;
+    if (lastFetchedUrlRef.current === trimmed) return;
+    lastFetchedUrlRef.current = trimmed;
+
+    setIsFetchingMeta(true);
+    try {
+      const meta = await fetchUrlMetadata(trimmed);
+      // Never clobber what the user already typed.
+      if (meta.title) {
+        setTitle((prev) => (prev.trim() ? prev : meta.title!));
+      }
+      // Content autofill is link-only — other types have their own content.
+      if (type === "link" && meta.description) {
+        setContent((prev) => (prev.trim() ? prev : meta.description!));
+      }
+    } finally {
+      setIsFetchingMeta(false);
+    }
+  }
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +185,7 @@ export default function CreateRecordForm() {
     clearImage();
     setError(null);
     setFieldErrors(undefined);
+    lastFetchedUrlRef.current = null;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -465,12 +495,26 @@ export default function CreateRecordForm() {
                             (optional)
                           </span>
                         )}
+                        {isFetchingMeta && (
+                          <span className="font-normal text-gray-400">
+                            {" "}
+                            · fetching title…
+                          </span>
+                        )}
                       </label>
                       <input
                         id="sourceUrl"
                         type="url"
                         value={sourceUrl}
                         onChange={(e) => setSourceUrl(e.target.value)}
+                        onBlur={(e) => maybeFetchMetadata(e.target.value)}
+                        onPaste={(e) => {
+                          // Read the pasted text directly — state hasn't updated
+                          // yet in the paste handler. Covers the common case of
+                          // pasting a full URL into an empty field.
+                          const text = e.clipboardData.getData("text");
+                          if (text) maybeFetchMetadata(text);
+                        }}
                         placeholder="https://..."
                         className={inputClass}
                       />

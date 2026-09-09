@@ -57,6 +57,13 @@ vi.mock("@/lib/actions/tags", () => ({
   addTagToRecord: mockAddTagToRecord,
 }));
 
+// The URL-metadata action pulls in server-only config (JWT_SECRET) at import
+// time, so mock it out — the form only calls it on paste/blur, which these
+// tests don't exercise.
+vi.mock("@/lib/actions/url-metadata", () => ({
+  fetchUrlMetadata: vi.fn(async () => ({ title: null, description: null })),
+}));
+
 // ---- Mock the TagInput component ----
 // We're testing CreateRecordForm, not TagInput. Mocking TagInput keeps
 // the tests focused and avoids importing TagInput's own dependencies.

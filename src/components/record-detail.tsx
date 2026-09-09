@@ -31,6 +31,7 @@ import ConfirmDialog from "@/components/confirm-dialog";
 import RecordMiniCard from "@/components/record-mini-card";
 import RecordConnections from "@/components/record-connections";
 import { StarRating } from "@/components/star-rating";
+import { getYouTubeVideoId, getYouTubeEmbedUrl } from "@/lib/youtube";
 import {
   READING_STATUS_LABELS,
   type RecordType,
@@ -97,6 +98,13 @@ export default function RecordDetail({
 
   // Flatten the tags from the join table structure into a simple array.
   const tags = record.recordTags.map((rt) => rt.tag);
+
+  // For link records pointing at a YouTube video, embed a player in the detail
+  // view (above the content). null for every other record / non-YouTube link.
+  const youTubeId =
+    record.type === "link" && record.sourceUrl
+      ? getYouTubeVideoId(record.sourceUrl)
+      : null;
 
   async function handleDelete() {
     setIsDeleting(true);
@@ -244,6 +252,19 @@ export default function RecordDetail({
           /* Non-image types: content on left, meta on right (mirrors create form) */
           <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div className="space-y-6">
+              {youTubeId && (
+                <div className="aspect-video w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                  <iframe
+                    src={getYouTubeEmbedUrl(youTubeId)}
+                    title={record.title || "YouTube video"}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+
               {record.type === "book" && record.imagePath && (
                 <div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
