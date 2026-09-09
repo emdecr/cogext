@@ -315,10 +315,24 @@ jobs:
           # GitHub's Ubuntu runners ship Google's Chrome apt repo pre-configured.
           # Its index periodically fails "Hash Sum mismatch", which breaks the
           # apt-get update that --with-deps runs — even though Playwright's
-          # chromium install doesn't need that repo at all. Drop the source so
-          # apt never touches it, then retry to ride out any other transient
-          # apt/network hiccup.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          # chromium install doesn't need that repo at all. Remove every apt
+          # source that points at Google's repo, matched by CONTENT so it works
+          # whatever the filename or format (classic .list or deb822 .sources),
+          # then retry to ride out any other transient apt/network hiccup.
+          echo "apt sources before cleanup:"; ls -la /etc/apt/sources.list.d/ || true
+          for f in /etc/apt/sources.list.d/*; do
+            [ -f "$f" ] || continue
+            if grep -q 'dl.google.com' "$f"; then
+              echo "removing google apt source: $f"
+              sudo rm -f "$f"
+            fi
+          done
+          sudo sed -i '\#dl.google.com#d' /etc/apt/sources.list 2>/dev/null || true
+          if grep -rq 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+            echo "::warning::Google Chrome apt source still present after cleanup"
+          else
+            echo "Google Chrome apt source removed"
+          fi
           for attempt in 1 2 3; do
             if npx playwright install --with-deps chromium; then
               exit 0
