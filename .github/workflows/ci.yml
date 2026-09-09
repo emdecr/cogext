@@ -311,7 +311,25 @@ jobs:
 
       # Only Chromium — matches the single enabled project in playwright.config.ts.
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          # GitHub's Ubuntu runners ship Google's Chrome apt repo pre-configured.
+          # Its index periodically fails "Hash Sum mismatch", which breaks the
+          # apt-get update that --with-deps runs — even though Playwright's
+          # chromium install doesn't need that repo at all. Drop the source so
+          # apt never touches it, then retry to ride out any other transient
+          # apt/network hiccup.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          for attempt in 1 2 3; do
+            if npx playwright install --with-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::Playwright install failed (attempt ${attempt}/3); clearing apt cache and retrying..."
+            sudo apt-get clean
+            sudo rm -rf /var/lib/apt/lists/*
+            sleep 15
+          done
+          echo "::error::Playwright install failed after 3 attempts"
+          exit 1
 
       # Dev mode doesn't run migrations on boot, so seed the schema first.
       # Use drizzle-kit (reads out:"./drizzle" from drizzle.config.ts) — NOT
