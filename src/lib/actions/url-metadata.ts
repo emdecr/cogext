@@ -135,8 +135,12 @@ async function fetchHtml(url: URL): Promise<string | null> {
       // 302 to http://169.254.169.254. "manual" lets us stop at the first hop.
       redirect: "manual",
       headers: {
-        // Some sites serve minimal or bot-blocked markup without a UA.
-        "user-agent": "Mozilla/5.0 (compatible; cogext-linkpreview/1.0)",
+        // Identify as a link-preview crawler. Many sites (NYT, etc.) 403 a
+        // generic or datacenter-Chrome UA but whitelist the crawlers that
+        // power social unfurls, serving them the og:* tags we're after — which
+        // is exactly what this feature is. Same UA Slack/iMessage/Discord use.
+        "user-agent":
+          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
         accept: "text/html,application/xhtml+xml",
       },
     });
