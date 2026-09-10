@@ -20,10 +20,13 @@
 import { vi } from "vitest";
 
 // ---- Deterministic embedding vector ----
-// Real embeddings are 768 floats representing semantic meaning.
+// Real embeddings are 1024 floats representing semantic meaning — this MUST
+// match the pgvector column dimension in src/db/schema.ts (currently 1024 for
+// voyage-4-lite). If the two drift, any test that inserts a mock embedding into
+// the real column fails on a dimension mismatch.
 // For tests, we just need consistent numbers — the actual values don't matter.
 // We use a vector that's all zeros with 1.0 at index 0 as a recognizable pattern.
-export function createMockEmbedding(dimensions = 768): number[] {
+export function createMockEmbedding(dimensions = 1024): number[] {
   const vec = new Array(dimensions).fill(0);
   vec[0] = 1.0;
   return vec;
