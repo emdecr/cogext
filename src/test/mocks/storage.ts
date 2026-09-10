@@ -42,8 +42,12 @@ export const saveFile = vi.fn(async (file: File): Promise<string> => {
 });
 
 // saveBuffer: same, for the post-compression path where we already have bytes.
+// The real signature is saveBuffer(buffer, ext, contentType); contentType is
+// unused by the mock, but callers pass it and vi.fn still records it in
+// .mock.calls for assertions — we just don't declare it here to keep lint
+// (--max-warnings 0, no underscore-arg exemption) happy.
 export const saveBuffer = vi.fn(
-  async (buffer: Buffer, ext: string, _contentType: string): Promise<string> => {
+  async (buffer: Buffer, ext: string): Promise<string> => {
     const path = `/uploads/mock-${counter++}.${ext}`;
     mockStorageFiles.set(path, buffer);
     return path;
