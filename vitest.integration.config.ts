@@ -53,6 +53,14 @@ export default defineConfig({
     // Generous timeout for database operations
     testTimeout: 30_000,
 
+    // Run integration test FILES sequentially, not in parallel workers.
+    // Every file's setup (setup.integration.ts) runs migrate() against the
+    // SAME shared database; two files migrating concurrently race on
+    // `CREATE EXTENSION IF NOT EXISTS vector` and fail with a duplicate-key
+    // error on pg_extension. Serializing files makes migrate() calls (and any
+    // shared-table writes) safe. Tests within a file still run in order.
+    fileParallelism: false,
+
     // Global test functions without imports (describe, it, expect)
     globals: true,
 
