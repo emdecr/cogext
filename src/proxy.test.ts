@@ -23,29 +23,21 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { SignJWT } from "jose";
 
 import { proxy } from "@/proxy";
+import { TEST_JWT_SECRET, signSession } from "@/test/auth-helpers";
 
-const TEST_SECRET = "test-jwt-secret-please-change-0123456789";
-const secretBytes = new TextEncoder().encode(TEST_SECRET);
 const COOKIE_NAME = "cogext-session";
 
 beforeAll(() => {
-  process.env.JWT_SECRET = TEST_SECRET;
+  // proxy reads JWT_SECRET at request time, so setting it here is enough.
+  process.env.JWT_SECRET = TEST_JWT_SECRET;
 });
 
 afterEach(() => {
   // ALLOW_REGISTRATION is opt-in per test; never leak it across tests.
   delete process.env.ALLOW_REGISTRATION;
 });
-
-async function signSession(userId = "user-1"): Promise<string> {
-  return new SignJWT({ userId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
-    .sign(secretBytes);
-}
 
 function request(pathname: string, cookie?: string): NextRequest {
   const headers = new Headers();

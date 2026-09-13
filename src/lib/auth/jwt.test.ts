@@ -23,18 +23,21 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.hoisted(() => {
-  // A deterministic, >=32-char secret for the whole file.
+  // jwt.ts reads JWT_SECRET at module load, so it must be set before the import
+  // below. Hoisted blocks can't see imported bindings, so the literal lives
+  // here and is asserted equal to the shared TEST_JWT_SECRET just below.
   process.env.JWT_SECRET = "test-jwt-secret-please-change-0123456789";
 });
 
-// Read back the exact value the modules under test will use.
-const TEST_SECRET = process.env.JWT_SECRET!;
-
 import { createToken, verifyToken } from "@/lib/auth/jwt";
 import jwt from "jsonwebtoken";
-import { SignJWT, jwtVerify } from "jose";
+import { jwtVerify } from "jose";
+import { TEST_JWT_SECRET, testSecretBytes, signSession } from "@/test/auth-helpers";
 
-const secretBytes = new TextEncoder().encode(TEST_SECRET);
+// Guard against the hoisted bootstrap drifting from the shared secret.
+if (process.env.JWT_SECRET !== TEST_JWT_SECRET) {
+  throw new Error("jwt.test bootstrap secret does not match TEST_JWT_SECRET");
+}
 
 describe("createToken / verifyToken", () => {
   it("round-trips a payload", () => {
@@ -57,7 +60,7 @@ describe("createToken / verifyToken", () => {
 
   it("rejects an expired token", () => {
     // Signed with the SAME secret, so rejection is due to expiry, not signature.
-    const expired = jwt.sign({ userId: "user-123" }, TEST_SECRET, { expiresIn: -10 });
+    const expired = jwt.sign({ userId: "user-123" }, TEST_JWT_SECRET, { expiresIn: -10 });
     expect(verifyToken(expired)).toBeNull();
   });
 
@@ -71,15 +74,12 @@ describe("createToken / verifyToken", () => {
 describe("jsonwebtoken <-> jose seam (login signs, proxy verifies)", () => {
   it("a jsonwebtoken-signed token verifies with jose (the production path)", async () => {
     const token = createToken({ userId: "user-abc" });
-    const { payload } = await jwtVerify(token, secretBytes);
+    const { payload } = await jwtVerify(token, testSecretBytes);
     expect(payload.userId).toBe("user-abc");
   });
 
   it("a jose-signed HS256 token verifies with jsonwebtoken (reverse direction)", async () => {
-    const token = await new SignJWT({ userId: "user-xyz" })
-      .setProtectedHeader({ alg: "HS256" })
-      .setExpirationTime("7d")
-      .sign(secretBytes);
+    const token = await signSession("user-xyz");
     expect(verifyToken(token)?.userId).toBe("user-xyz");
   });
 
@@ -87,6 +87,6 @@ describe("jsonwebtoken <-> jose seam (login signs, proxy verifies)", () => {
     const foreign = jwt.sign({ userId: "user-abc" }, "a-totally-different-secret-abcdefghij", {
       expiresIn: "7d",
     });
-    await expect(jwtVerify(foreign, secretBytes)).rejects.toThrow();
+    await expect(jwtVerify(foreign, testSecretBytes)).rejects.toThrow();
   });
 });
