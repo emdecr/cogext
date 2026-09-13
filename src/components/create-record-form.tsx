@@ -430,7 +430,7 @@ export default function CreateRecordForm() {
                                 ? "A short description or summary (leave blank to just log it)..."
                                 : "Write your note..."
                       }
-                      rows={12}
+                      rows={type === "book" ? 6 : 12}
                       error={fieldErrors?.content?.[0]}
                       dialogTitle={
                         type === "book" ? "Edit description" : "Edit content"

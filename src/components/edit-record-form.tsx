@@ -230,7 +230,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
               label={record.type === "book" ? "Description" : "Content"}
               value={content}
               onChange={setContent}
-              rows={12}
+              rows={record.type === "book" ? 6 : 12}
               error={fieldErrors?.content?.[0]}
               dialogTitle={
                 record.type === "book" ? "Edit description" : "Edit content"
