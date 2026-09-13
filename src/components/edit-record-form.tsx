@@ -158,6 +158,25 @@ export default function EditRecordForm({ record, onClose }: Props) {
     record.type === "link" ||
     record.type === "book";
 
+  // Shared note field, placed under the Description for books (left column) and
+  // in the metadata column for every other type. Mirrors create-record-form.
+  const noteField = (
+    <MarkdownField
+      id="edit-note"
+      label={
+        <>
+          Note{" "}
+          <span className="font-normal text-gray-400">(optional)</span>
+        </>
+      }
+      value={note}
+      onChange={setNote}
+      placeholder="Your personal annotation..."
+      rows={5}
+      dialogTitle="Edit note"
+    />
+  );
+
   return (
     <form onSubmit={handleSubmit} className="flex h-full flex-col">
       {/* ---- Header ---- */}
@@ -217,6 +236,9 @@ export default function EditRecordForm({ record, onClose }: Props) {
                 record.type === "book" ? "Edit description" : "Edit content"
               }
             />
+
+            {/* Books keep the note right under the description. */}
+            {record.type === "book" && noteField}
           </div>
 
           {/* Right column: metadata */}
@@ -358,20 +380,8 @@ export default function EditRecordForm({ record, onClose }: Props) {
               </div>
             )}
 
-            <MarkdownField
-              id="edit-note"
-              label={
-                <>
-                  Note{" "}
-                  <span className="font-normal text-gray-400">(optional)</span>
-                </>
-              }
-              value={note}
-              onChange={setNote}
-              placeholder="Your personal annotation..."
-              rows={5}
-              dialogTitle="Edit note"
-            />
+            {/* Non-book types keep the note here in the metadata column. */}
+            {record.type !== "book" && noteField}
           </div>
         </div>
       </div>

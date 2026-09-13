@@ -280,6 +280,26 @@ export default function CreateRecordForm() {
     type === "link" ||
     type === "book";
 
+  // The note field is shared across types but placed differently: for books it
+  // sits directly under the Description in the left column (the two read as one
+  // thought); for every other type it stays in the right-hand metadata column.
+  const noteField = (
+    <MarkdownField
+      id="note"
+      label={
+        <>
+          Note{" "}
+          <span className="font-normal text-gray-400">(optional)</span>
+        </>
+      }
+      value={note}
+      onChange={setNote}
+      placeholder="Your personal annotation..."
+      rows={5}
+      dialogTitle="Edit note"
+    />
+  );
+
   return (
     <Dialog.Root
       open={isOpen}
@@ -417,6 +437,9 @@ export default function CreateRecordForm() {
                       }
                     />
                   )}
+
+                  {/* Books keep the note right under the description. */}
+                  {type === "book" && noteField}
 
                   {type === "image" && (
                     <div
@@ -648,22 +671,8 @@ export default function CreateRecordForm() {
                     </div>
                   )}
 
-                  <MarkdownField
-                    id="note"
-                    label={
-                      <>
-                        Note{" "}
-                        <span className="font-normal text-gray-400">
-                          (optional)
-                        </span>
-                      </>
-                    }
-                    value={note}
-                    onChange={setNote}
-                    placeholder="Your personal annotation..."
-                    rows={5}
-                    dialogTitle="Edit note"
-                  />
+                  {/* Non-book types keep the note here in the metadata column. */}
+                  {type !== "book" && noteField}
 
                   <div>
                     <label className={labelClass}>
