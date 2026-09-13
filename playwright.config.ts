@@ -75,22 +75,46 @@ export default defineConfig({
     // },
   ],
 
-  // Automatically start your dev server before running tests.
-  // This means you don't need to manually run `npm run dev` first —
-  // Playwright handles it. It waits for the server to be ready,
-  // then runs tests, then shuts it down.
+  // Start the app before running tests, then shut it down after.
+  //
+  // We test the PRODUCTION build (`next build` + `next start`), not `next dev`,
+  // so E2E proves production behavior — RSC caching, minification, and
+  // production-only config validation all differ from dev and are exactly what
+  // a smoke test should catch.
+  //
+  // Note: next.config.ts sets `output: "standalone"` for the Docker image, so
+  // `next start` prints a warning and serves the full `.next` production build
+  // rather than the trimmed standalone bundle. That's fine here — it's still a
+  // production server in production mode. The exact standalone artifact
+  // (`node .next/standalone/server.js`) is what the Docker image runs, and its
+  // correctness is covered by the Docker build job + the deploy health check.
   webServer: {
-    // We use port 3100 to avoid collisions with other dev servers.
-    // The --port flag pins Next.js to this exact port instead of
-    // letting it pick a random one when 3000 is taken.
-    command: "npm run dev -- --port 3100",
+    // Port 3100 avoids collisions with a dev server on 3000.
+    command: "npm run build && npm run start -- --port 3100",
     // Readiness probe MUST hit a path that returns 200. We use the liveness
-    // endpoint (not "/") because the middleware now returns 404 for "/" when
-    // logged out — Playwright treats a 404 here as "server not ready" and would
-    // time out. /api/health is excluded from middleware and always 200s.
+    // endpoint (not "/") because the proxy redirects "/" when logged out —
+    // Playwright treats a non-200 here as "server not ready" and would time
+    // out. /api/health is excluded from the proxy and always 200s.
     url: "http://localhost:3100/api/health",
-    // Reuse an already-running dev server if you have one open.
-    // Saves time during development.
+    // A cold `next build` is far slower than starting a dev server.
+    timeout: 180_000,
+    // Reuse an already-running server on 3100 during local iteration.
     reuseExistingServer: !process.env.CI,
+    // `next build` + `next start` run in production mode, which enforces
+    // config validation (src/lib/config.ts): JWT_SECRET must be >=32 chars and
+    // not a known default, CRON_SECRET must be >=32, and the AI keys must be
+    // present. Provide throwaway values here so local `npm run test:e2e` works
+    // in prod mode without real secrets; CI passes its own via the job env
+    // (which wins over these fallbacks). STORAGE_PROVIDER=local avoids the
+    // MinIO-specific required vars — the smoke tests don't touch storage.
+    env: {
+      JWT_SECRET:
+        process.env.JWT_SECRET || "e2e-jwt-secret-at-least-32-characters-long",
+      CRON_SECRET:
+        process.env.CRON_SECRET || "e2e-cron-secret-at-least-32-characters-long",
+      STORAGE_PROVIDER: process.env.STORAGE_PROVIDER || "local",
+      VOYAGE_API_KEY: process.env.VOYAGE_API_KEY || "e2e-not-a-real-key",
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "e2e-not-a-real-key",
+    },
   },
 });

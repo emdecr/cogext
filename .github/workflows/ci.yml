@@ -291,10 +291,12 @@ jobs:
 
     env:
       DATABASE_URL: postgres://cogext:cogext@localhost:5432/cogext_e2e
-      # Dummy runtime secrets — dev mode doesn't enforce strength, and these
-      # flows don't call the real AI providers.
-      JWT_SECRET: e2e-not-a-real-secret
-      CRON_SECRET: e2e-not-a-real-cron-secret
+      # Throwaway runtime secrets. The E2E server now runs a PRODUCTION build
+      # (next build + next start), which enforces config validation, so
+      # JWT_SECRET and CRON_SECRET must be >=32 chars and not a known default.
+      # These flows don't call the real AI providers, so the keys are dummies.
+      JWT_SECRET: e2e-not-a-real-secret-padded-to-at-least-32
+      CRON_SECRET: e2e-not-a-real-cron-secret-padded-to-min-32
       VOYAGE_API_KEY: e2e-not-a-real-key
       ANTHROPIC_API_KEY: e2e-not-a-real-key
       STORAGE_PROVIDER: local
@@ -345,11 +347,11 @@ jobs:
           echo "::error::Playwright install failed after 3 attempts"
           exit 1
 
-      # Dev mode doesn't run migrations on boot, so seed the schema first.
-      # Use drizzle-kit (reads out:"./drizzle" from drizzle.config.ts) — NOT
-      # scripts/migrate.mjs, which is the prod-only runner that resolves its
-      # migrations folder relative to itself (scripts/drizzle) and only works
-      # inside the Docker standalone layout.
+      # next start doesn't run migrations on boot (only the Docker entrypoint
+      # does), so seed the schema first. Use drizzle-kit (reads out:"./drizzle"
+      # from drizzle.config.ts) — NOT scripts/migrate.mjs, which is the prod-only
+      # runner that resolves its migrations folder relative to itself
+      # (scripts/drizzle) and only works inside the Docker standalone layout.
       - name: Apply database migrations
         run: npm run db:migrate
 
