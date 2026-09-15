@@ -278,17 +278,24 @@ export default function CreateRecordForm() {
 
     // Attach connections now that the record exists. Best-effort, like tags —
     // a failed link shouldn't strand the saved record; addRecordLink handles
-    // ownership and duplicate checks server-side.
+    // ownership and duplicate checks server-side. The try/catch is what makes
+    // "best-effort" true: addRecordLink can reject (e.g. requireUserId redirects,
+    // or a pre-insert read throws) before returning a failure result, and we
+    // still want the form to reset and close.
     if (result.recordId && pendingConnections.length > 0) {
-      await Promise.all(
-        pendingConnections.map((c) =>
-          addRecordLink({
-            recordId: result.recordId!,
-            relatedRecordId: c.record.id,
-            note: c.note || undefined,
-          }),
-        ),
-      );
+      try {
+        await Promise.all(
+          pendingConnections.map((c) =>
+            addRecordLink({
+              recordId: result.recordId!,
+              relatedRecordId: c.record.id,
+              note: c.note || undefined,
+            }),
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to attach connections:", err);
+      }
     }
 
     resetForm();

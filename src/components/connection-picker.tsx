@@ -88,17 +88,26 @@ export default function ConnectionPicker({
       return;
     }
     setSearching(true);
+    // Track cancellation per effect run: if the query changes (or clears) while
+    // a search is in flight, ignore its late resolution so stale hits can't
+    // overwrite the current list or spinner state.
+    let cancelled = false;
     const handle = setTimeout(async () => {
       try {
         const found = await searchRecords(q);
+        if (cancelled) return;
         setResults(found.map(toCandidate));
       } catch {
+        if (cancelled) return;
         setResults([]);
       } finally {
-        setSearching(false);
+        if (!cancelled) setSearching(false);
       }
     }, 250);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   function pick(record: LinkCandidate) {
