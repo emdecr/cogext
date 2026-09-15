@@ -57,6 +57,11 @@ vi.mock("@/lib/actions/tags", () => ({
   addTagToRecord: mockAddTagToRecord,
 }));
 
+// addRecordLink is a Server Action (touches the DB); mock it like the others.
+vi.mock("@/lib/actions/record-links", () => ({
+  addRecordLink: vi.fn(async () => ({ success: true })),
+}));
+
 // The URL-metadata action pulls in server-only config (JWT_SECRET) at import
 // time, so mock it out — the form only calls it on paste/blur, which these
 // tests don't exercise.
@@ -69,6 +74,14 @@ vi.mock("@/lib/actions/url-metadata", () => ({
 // the tests focused and avoids importing TagInput's own dependencies.
 vi.mock("@/components/tag-input", () => ({
   default: () => <div data-testid="tag-input" />,
+}));
+
+// ---- Mock the ConnectionPicker component ----
+// Same reasoning as TagInput: we're testing CreateRecordForm, not the picker.
+// Mocking it also keeps its own deps (search + link-suggestion actions, which
+// import @/db) out of this component test.
+vi.mock("@/components/connection-picker", () => ({
+  default: () => <div data-testid="connection-picker" />,
 }));
 
 // ---- Import AFTER mocks ----
