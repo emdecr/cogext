@@ -227,6 +227,49 @@ describe("generateReflection", () => {
     expect(saved.content).not.toContain("](R9)");
   });
 
+  it("sends a note record's full content but truncates other types to a preview", async () => {
+    // "Where the meat lives depends on type": a note's body is its `content`
+    // (primary — must not be clipped), while an article's `content` is captured
+    // source material (secondary — a short preview is enough).
+    mockFindExistingReflection.mockResolvedValue(null);
+    const longNote = "N".repeat(210) + "NOTE_TAIL"; // 219 chars, past the 200 cap
+    const longArticle = "A".repeat(210) + "ARTICLE_TAIL";
+    mockFindPeriodRecords
+      .mockResolvedValueOnce([
+        {
+          id: "rec-note",
+          type: "note",
+          title: "A long note",
+          content: longNote,
+          note: null,
+          sourceAuthor: null,
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [],
+        },
+        {
+          id: "rec-article",
+          type: "article",
+          title: "A long article",
+          content: longArticle,
+          note: null,
+          sourceAuthor: null,
+          createdAt: new Date("2026-03-25T12:00:00Z"),
+          recordTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await generateReflection("user-123");
+
+    // The reflection prompt is the first message's content on the first chat call.
+    const prompt = mockChat.mock.calls[0][0][0].content as string;
+    // Note content is primary → included past the 200-char preview cap.
+    expect(prompt).toContain("NOTE_TAIL");
+    // Article content is secondary → truncated to a 200-char preview.
+    expect(prompt).not.toContain("ARTICLE_TAIL");
+    expect(prompt).toContain("A".repeat(200) + "...");
+  });
+
   it("still saves the reflection when recommendations come back empty", async () => {
     mockFindExistingReflection.mockResolvedValue(null);
     mockFindPeriodRecords

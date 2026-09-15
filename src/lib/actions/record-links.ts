@@ -182,6 +182,58 @@ export async function removeRecordLink(linkId: string): Promise<ActionResult> {
 }
 
 // ============================================================================
+// LINK SUGGESTIONS (for the create-record picker)
+// ============================================================================
+// Powers the "default" list shown when the connection picker opens with an
+// empty query — before the user has typed anything to search. Books surface
+// first (the aworkinglibrary pattern: notes and quotes orbiting a book), then
+// other recent records, so the most common connection target is one tap away.
+//
+// Returns the lightweight shape the picker renders (a subset of searchRecords'
+// result), so the picker can treat suggestions and search hits uniformly.
+
+export type LinkCandidate = {
+  id: string;
+  type: (typeof records.type.enumValues)[number];
+  title: string | null;
+  content: string;
+  imagePath: string | null;
+};
+
+export async function getLinkSuggestions(): Promise<LinkCandidate[]> {
+  const userId = await requireUserId();
+
+  // Pull a recent slice, then partition so books lead. We over-fetch a little
+  // (24) and trim to 12 after sorting, so a books-heavy or notes-heavy recent
+  // history still yields a useful mix.
+  const recent = await db
+    .select({
+      id: records.id,
+      type: records.type,
+      title: records.title,
+      content: records.content,
+      imagePath: records.imagePath,
+      createdAt: records.createdAt,
+    })
+    .from(records)
+    .where(eq(records.userId, userId))
+    .orderBy(desc(records.createdAt))
+    .limit(24);
+
+  // Stable partition: books first (each group already newest-first from the
+  // query), then everything else. Drop createdAt from the returned shape.
+  const books = recent.filter((r) => r.type === "book");
+  const others = recent.filter((r) => r.type !== "book");
+  return [...books, ...others].slice(0, 12).map((r) => ({
+    id: r.id,
+    type: r.type,
+    title: r.title,
+    content: r.content,
+    imagePath: r.imagePath,
+  }));
+}
+
+// ============================================================================
 // READ (undirected)
 // ============================================================================
 // Returns the connections for a record — resolving the "other" record on each

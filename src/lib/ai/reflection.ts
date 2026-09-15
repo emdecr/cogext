@@ -283,7 +283,14 @@ function buildReflectionRecordSummaries(
     markerToId.set(marker, record.id);
 
     const tagNames = record.recordTags.map((rt) => rt.tag.name);
-    const preview = record.content.slice(0, 200);
+    // Where the "cognition meat" lives depends on record type. For a note, the
+    // body IS the content field — it's the primary field and shouldn't be
+    // clipped to a preview, or the reflection reasons over a truncated thought.
+    // For every other type, content is captured source material (a quote, an
+    // article excerpt, a book description) and the user's own thinking lives in
+    // `note` (sent in full below), so a short content preview is enough.
+    const contentCap = record.type === "note" ? 1000 : 200;
+    const preview = record.content.slice(0, contentCap);
     const date = record.createdAt.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
@@ -293,7 +300,7 @@ function buildReflectionRecordSummaries(
     return [
       `- ${marker} [${record.type}] (${date})`,
       record.title ? `"${record.title}"` : "",
-      `${preview}${record.content.length > 200 ? "..." : ""}`,
+      `${preview}${record.content.length > contentCap ? "..." : ""}`,
       record.sourceAuthor ? `— ${record.sourceAuthor}` : "",
       record.note ? `[User note: ${record.note}]` : "",
       tagNames.length > 0 ? `(tags: ${tagNames.join(", ")})` : "",
