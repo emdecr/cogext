@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { createRecord } from "@/lib/actions/records";
 import { addTagToRecord } from "@/lib/actions/tags";
+import { addRecordLink } from "@/lib/actions/record-links";
 import { fetchUrlMetadata } from "@/lib/actions/url-metadata";
 import {
   CREATABLE_RECORD_TYPES,
@@ -24,6 +25,9 @@ import {
 import TagInput from "@/components/tag-input";
 import { CoverImageInput } from "@/components/cover-image-input";
 import MarkdownField from "@/components/markdown-field";
+import ConnectionPicker, {
+  type PendingConnection,
+} from "@/components/connection-picker";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400";
@@ -46,6 +50,13 @@ export default function CreateRecordForm() {
 
   const [pendingTags, setPendingTags] = useState<
     { id: string; name: string; isAi: boolean }[]
+  >([]);
+
+  // Connections to attach after the record is saved. Held here (not written
+  // yet) because addRecordLink needs the new record's id — same deferred
+  // pattern as pendingTags. See ConnectionPicker.
+  const [pendingConnections, setPendingConnections] = useState<
+    PendingConnection[]
   >([]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -182,6 +193,7 @@ export default function CreateRecordForm() {
     setDateRead("");
     setType("note");
     setPendingTags([]);
+    setPendingConnections([]);
     clearImage();
     setError(null);
     setFieldErrors(undefined);
@@ -261,6 +273,21 @@ export default function CreateRecordForm() {
     if (result.recordId && pendingTags.length > 0) {
       await Promise.all(
         pendingTags.map((tag) => addTagToRecord(result.recordId!, tag.name)),
+      );
+    }
+
+    // Attach connections now that the record exists. Best-effort, like tags —
+    // a failed link shouldn't strand the saved record; addRecordLink handles
+    // ownership and duplicate checks server-side.
+    if (result.recordId && pendingConnections.length > 0) {
+      await Promise.all(
+        pendingConnections.map((c) =>
+          addRecordLink({
+            recordId: result.recordId!,
+            relatedRecordId: c.record.id,
+            note: c.note || undefined,
+          }),
+        ),
       );
     }
 
@@ -698,6 +725,38 @@ export default function CreateRecordForm() {
                           prev.filter((t) => t.id !== id),
                         );
                       }}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Connections{" "}
+                      <span className="font-normal text-gray-400">
+                        (optional)
+                      </span>
+                    </label>
+                    <ConnectionPicker
+                      selected={pendingConnections}
+                      onAdd={(record) =>
+                        setPendingConnections((prev) =>
+                          prev.some((c) => c.record.id === record.id)
+                            ? prev
+                            : [...prev, { record, note: "" }],
+                        )
+                      }
+                      onRemove={(id) =>
+                        setPendingConnections((prev) =>
+                          prev.filter((c) => c.record.id !== id),
+                        )
+                      }
+                      onNoteChange={(id, note) =>
+                        setPendingConnections((prev) =>
+                          prev.map((c) =>
+                            c.record.id === id ? { ...c, note } : c,
+                          ),
+                        )
+                      }
                       disabled={isSubmitting}
                     />
                   </div>
