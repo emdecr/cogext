@@ -244,15 +244,26 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
 
   # List the remote, keeping the lsf exit status separate from grep's. grep
   # exits 1 on "no matches", which is a legitimately EMPTY remote — not a
-  # failure — so we run lsf on its own and only treat a nonzero lsf as fatal.
-  # Masking an lsf failure (as `2>/dev/null | ... || true` did) would look
-  # identical to an empty remote and silently skip pruning forever.
+  # failure — so we run lsf on its own and branch on the exit code:
+  #   3  = "directory not found" — the destination folder doesn't exist until
+  #        the first upload creates it (a dry-run, or the very first real run),
+  #        so treat it as "nothing there yet", not a fault.
+  #   !0 = a real problem (auth, network, misconfig) — abort, and surface
+  #        rclone's own error so the cron log says WHY. Masking it (as
+  #        `2>/dev/null | ... || true` did) would look identical to an empty
+  #        remote and silently skip pruning forever.
+  lsf_errfile=$(mktemp)
   lsf_status=0
-  RAW_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>/dev/null) || lsf_status=$?
-  if (( lsf_status != 0 )); then
+  RAW_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>"$lsf_errfile") || lsf_status=$?
+  if (( lsf_status == 3 )); then
+    RAW_REMOTE=""   # folder not created yet — nothing to prune
+  elif (( lsf_status != 0 )); then
     echo "❌ Could not list offsite remote ($OFFSITE_REMOTE) — skipping prune rather than masking the fault." >&2
+    [[ -s "$lsf_errfile" ]] && sed 's/^/   rclone: /' "$lsf_errfile" >&2
+    rm -f "$lsf_errfile"
     exit 1
   fi
+  rm -f "$lsf_errfile"
   ALL_REMOTE=$(printf '%s\n' "$RAW_REMOTE" | grep -E '^[0-9]{8}_[0-9]{6}$' | sort || true)
 
   OLD_REMOTE=""
