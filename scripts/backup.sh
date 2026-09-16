@@ -231,9 +231,29 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
   # rather than `head -n -N` (GNU-only), so this behaves the same everywhere.
   echo ""
   echo "🧹 Offsite retention — keeping newest $OFFSITE_RETAIN..."
-  ALL_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>/dev/null \
-    | grep -E '^[0-9]{8}_[0-9]{6}$' \
-    | sort || true)
+
+  # Validate OFFSITE_RETAIN FIRST — this is destructive input. It must be a
+  # positive integer: in bash arithmetic a non-numeric value collapses to 0, so
+  # `head -n $((count - 0))` would select EVERY folder for purge. Reject 0,
+  # negatives, empty, and malformed values (no leading zero → no octal surprise)
+  # before any listing or deletion happens.
+  if ! [[ "$OFFSITE_RETAIN" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ OFFSITE_RETAIN must be a positive integer (got: '$OFFSITE_RETAIN'). Aborting before any prune." >&2
+    exit 1
+  fi
+
+  # List the remote, keeping the lsf exit status separate from grep's. grep
+  # exits 1 on "no matches", which is a legitimately EMPTY remote — not a
+  # failure — so we run lsf on its own and only treat a nonzero lsf as fatal.
+  # Masking an lsf failure (as `2>/dev/null | ... || true` did) would look
+  # identical to an empty remote and silently skip pruning forever.
+  lsf_status=0
+  RAW_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>/dev/null) || lsf_status=$?
+  if (( lsf_status != 0 )); then
+    echo "❌ Could not list offsite remote ($OFFSITE_REMOTE) — skipping prune rather than masking the fault." >&2
+    exit 1
+  fi
+  ALL_REMOTE=$(printf '%s\n' "$RAW_REMOTE" | grep -E '^[0-9]{8}_[0-9]{6}$' | sort || true)
 
   OLD_REMOTE=""
   if [[ -n "$ALL_REMOTE" ]]; then
@@ -246,13 +266,26 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
   if [[ -z "$OLD_REMOTE" ]]; then
     echo "   Nothing to prune offsite (≤ $OFFSITE_RETAIN kept)."
   else
+    # Attempt every prune, but remember any failure and exit nonzero at the end
+    # so a swallowed purge error can't slip past as a "successful" backup run.
+    purge_failed=0
     while IFS= read -r old; do
       if [[ "$DRY_RUN" == "false" ]]; then
-        rclone purge "$OFFSITE_REMOTE/$old" && echo "   🗑️  pruned offsite $old"
+        if rclone purge "$OFFSITE_REMOTE/$old"; then
+          echo "   🗑️  pruned offsite $old"
+        else
+          echo "   ⚠️  failed to prune offsite $old" >&2
+          purge_failed=1
+        fi
       else
         echo "   [dry-run] Would purge offsite $old"
       fi
     done <<< "$OLD_REMOTE"
+
+    if (( purge_failed != 0 )); then
+      echo "❌ One or more offsite prunes failed — see warnings above." >&2
+      exit 1
+    fi
   fi
 else
   echo ""
