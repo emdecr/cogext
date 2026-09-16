@@ -64,6 +64,12 @@ ENV_FILE="/opt/cogext/.env"
 OFFSITE_ENABLED="${OFFSITE_ENABLED:-false}"
 OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
 
+# How many timestamped backup folders to KEEP offsite. Older ones are purged
+# after each successful upload, so the remote doesn't grow forever. Local
+# retention is separate (RETENTION_DAYS above); offsite is by count, not age,
+# because you typically want a fixed handful of recent restore points off-box.
+OFFSITE_RETAIN="${OFFSITE_RETAIN:-5}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
@@ -214,6 +220,72 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
     echo "   ✅ Offsite upload complete"
   else
     echo "   [dry-run] Would upload: $BACKUP_DIR → $OFFSITE_REMOTE/$TIMESTAMP"
+  fi
+
+  # ---- Offsite retention: keep only the newest OFFSITE_RETAIN folders ----
+  # The remote holds one folder per run, named by timestamp (YYYYMMDD_HHMMSS),
+  # which sorts chronologically. We list them, then purge everything except the
+  # newest N. The timestamp regex is a guard so we only ever purge our OWN
+  # backup folders, never another file that happens to live under the remote.
+  # We compute the count and use a positive `head -n <prune count>` (portable)
+  # rather than `head -n -N` (GNU-only), so this behaves the same everywhere.
+  echo ""
+  echo "🧹 Offsite retention — keeping newest $OFFSITE_RETAIN..."
+
+  # Validate OFFSITE_RETAIN FIRST — this is destructive input. It must be a
+  # positive integer: in bash arithmetic a non-numeric value collapses to 0, so
+  # `head -n $((count - 0))` would select EVERY folder for purge. Reject 0,
+  # negatives, empty, and malformed values (no leading zero → no octal surprise)
+  # before any listing or deletion happens.
+  if ! [[ "$OFFSITE_RETAIN" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ OFFSITE_RETAIN must be a positive integer (got: '$OFFSITE_RETAIN'). Aborting before any prune." >&2
+    exit 1
+  fi
+
+  # List the remote, keeping the lsf exit status separate from grep's. grep
+  # exits 1 on "no matches", which is a legitimately EMPTY remote — not a
+  # failure — so we run lsf on its own and only treat a nonzero lsf as fatal.
+  # Masking an lsf failure (as `2>/dev/null | ... || true` did) would look
+  # identical to an empty remote and silently skip pruning forever.
+  lsf_status=0
+  RAW_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>/dev/null) || lsf_status=$?
+  if (( lsf_status != 0 )); then
+    echo "❌ Could not list offsite remote ($OFFSITE_REMOTE) — skipping prune rather than masking the fault." >&2
+    exit 1
+  fi
+  ALL_REMOTE=$(printf '%s\n' "$RAW_REMOTE" | grep -E '^[0-9]{8}_[0-9]{6}$' | sort || true)
+
+  OLD_REMOTE=""
+  if [[ -n "$ALL_REMOTE" ]]; then
+    REMOTE_COUNT=$(printf '%s\n' "$ALL_REMOTE" | wc -l | tr -d ' ')
+    if (( REMOTE_COUNT > OFFSITE_RETAIN )); then
+      OLD_REMOTE=$(printf '%s\n' "$ALL_REMOTE" | head -n "$(( REMOTE_COUNT - OFFSITE_RETAIN ))")
+    fi
+  fi
+
+  if [[ -z "$OLD_REMOTE" ]]; then
+    echo "   Nothing to prune offsite (≤ $OFFSITE_RETAIN kept)."
+  else
+    # Attempt every prune, but remember any failure and exit nonzero at the end
+    # so a swallowed purge error can't slip past as a "successful" backup run.
+    purge_failed=0
+    while IFS= read -r old; do
+      if [[ "$DRY_RUN" == "false" ]]; then
+        if rclone purge "$OFFSITE_REMOTE/$old"; then
+          echo "   🗑️  pruned offsite $old"
+        else
+          echo "   ⚠️  failed to prune offsite $old" >&2
+          purge_failed=1
+        fi
+      else
+        echo "   [dry-run] Would purge offsite $old"
+      fi
+    done <<< "$OLD_REMOTE"
+
+    if (( purge_failed != 0 )); then
+      echo "❌ One or more offsite prunes failed — see warnings above." >&2
+      exit 1
+    fi
   fi
 else
   echo ""
