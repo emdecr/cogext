@@ -14,6 +14,8 @@
 
 import { useState } from "react";
 import { updateRecord } from "@/lib/actions/records";
+import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
+import TagInput from "@/components/tag-input";
 import {
   READING_STATUSES,
   READING_STATUS_LABELS,
@@ -74,6 +76,13 @@ export default function EditRecordForm({ record, onClose }: Props) {
   // `coverRemoved` marks the existing saved cover for deletion.
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverRemoved, setCoverRemoved] = useState(false);
+
+  // Tags are managed with their own server actions (add/remove take effect
+  // immediately), independent of the form's Save — same model as the read-only
+  // detail view. Local state gives instant pill feedback without a refetch.
+  const [tags, setTags] = useState<Tag[]>(
+    record.recordTags.map((rt) => rt.tag),
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +153,27 @@ export default function EditRecordForm({ record, onClose }: Props) {
     }
 
     onClose();
+  }
+
+  // ---- Tag add/remove (immediate, via server actions) ----
+  async function handleAddTag(name: string) {
+    // Guard against a duplicate the input didn't catch (e.g. case folding).
+    if (tags.some((t) => t.name === name.trim().toLowerCase())) return;
+    const result = await addTagToRecord(record.id, name);
+    if (result.success && result.tag) {
+      const added = result.tag;
+      setTags((prev) =>
+        prev.some((t) => t.id === added.id) ? prev : [...prev, added],
+      );
+    }
+  }
+
+  async function handleRemoveTag(tagId: string) {
+    // Optimistic: drop the pill now, then persist.
+    const previous = tags;
+    setTags((prev) => prev.filter((t) => t.id !== tagId));
+    const result = await removeTagFromRecord(record.id, tagId);
+    if (!result.success) setTags(previous);
   }
 
   const showSourceUrl =
@@ -382,6 +412,16 @@ export default function EditRecordForm({ record, onClose }: Props) {
 
             {/* Non-book types keep the note here in the metadata column. */}
             {record.type !== "book" && noteField}
+
+            <div>
+              <label className={labelClass}>Tags</label>
+              <TagInput
+                tags={tags}
+                onAdd={handleAddTag}
+                onRemove={handleRemoveTag}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
         </div>
       </div>

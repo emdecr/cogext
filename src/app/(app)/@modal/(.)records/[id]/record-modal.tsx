@@ -42,6 +42,7 @@ type RecordWithTags = {
   readingStatus: ReadingStatus | null;
   dateRead: string | null;
   createdAt: Date;
+  updatedAt: Date;
   recordTags: { tag: Tag }[];
 };
 

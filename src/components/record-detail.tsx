@@ -59,6 +59,7 @@ type RecordWithTags = {
   readingStatus: ReadingStatus | null;
   dateRead: string | null;
   createdAt: Date;
+  updatedAt: Date;
   recordTags: { tag: Tag }[];
 };
 
@@ -420,10 +421,23 @@ export default function RecordDetail({
 
       {/* ---- Sticky footer ---- */}
       <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-gray-700">
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Created {new Date(record.createdAt).toLocaleDateString()} at{" "}
-          {new Date(record.createdAt).toLocaleTimeString()}
-        </p>
+        <div className="flex flex-col gap-0.5 text-xs text-gray-400 dark:text-gray-500">
+          <p>
+            Created {new Date(record.createdAt).toLocaleDateString()} at{" "}
+            {new Date(record.createdAt).toLocaleTimeString()}
+          </p>
+          {/* Only show "Updated" once the record has actually been edited.
+              createdAt and updatedAt default to the same value on insert, so
+              we compare with a 1s tolerance to avoid a redundant second line. */}
+          {new Date(record.updatedAt).getTime() -
+            new Date(record.createdAt).getTime() >
+            1000 && (
+            <p>
+              Updated {new Date(record.updatedAt).toLocaleDateString()} at{" "}
+              {new Date(record.updatedAt).toLocaleTimeString()}
+            </p>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <AddToCollection recordId={record.id} />
