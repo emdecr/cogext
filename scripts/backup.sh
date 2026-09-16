@@ -64,6 +64,12 @@ ENV_FILE="/opt/cogext/.env"
 OFFSITE_ENABLED="${OFFSITE_ENABLED:-false}"
 OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
 
+# How many timestamped backup folders to KEEP offsite. Older ones are purged
+# after each successful upload, so the remote doesn't grow forever. Local
+# retention is separate (RETENTION_DAYS above); offsite is by count, not age,
+# because you typically want a fixed handful of recent restore points off-box.
+OFFSITE_RETAIN="${OFFSITE_RETAIN:-5}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
@@ -214,6 +220,39 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
     echo "   ✅ Offsite upload complete"
   else
     echo "   [dry-run] Would upload: $BACKUP_DIR → $OFFSITE_REMOTE/$TIMESTAMP"
+  fi
+
+  # ---- Offsite retention: keep only the newest OFFSITE_RETAIN folders ----
+  # The remote holds one folder per run, named by timestamp (YYYYMMDD_HHMMSS),
+  # which sorts chronologically. We list them, then purge everything except the
+  # newest N. The timestamp regex is a guard so we only ever purge our OWN
+  # backup folders, never another file that happens to live under the remote.
+  # We compute the count and use a positive `head -n <prune count>` (portable)
+  # rather than `head -n -N` (GNU-only), so this behaves the same everywhere.
+  echo ""
+  echo "🧹 Offsite retention — keeping newest $OFFSITE_RETAIN..."
+  ALL_REMOTE=$(rclone lsf --dirs-only --dir-slash=false "$OFFSITE_REMOTE" 2>/dev/null \
+    | grep -E '^[0-9]{8}_[0-9]{6}$' \
+    | sort || true)
+
+  OLD_REMOTE=""
+  if [[ -n "$ALL_REMOTE" ]]; then
+    REMOTE_COUNT=$(printf '%s\n' "$ALL_REMOTE" | wc -l | tr -d ' ')
+    if (( REMOTE_COUNT > OFFSITE_RETAIN )); then
+      OLD_REMOTE=$(printf '%s\n' "$ALL_REMOTE" | head -n "$(( REMOTE_COUNT - OFFSITE_RETAIN ))")
+    fi
+  fi
+
+  if [[ -z "$OLD_REMOTE" ]]; then
+    echo "   Nothing to prune offsite (≤ $OFFSITE_RETAIN kept)."
+  else
+    while IFS= read -r old; do
+      if [[ "$DRY_RUN" == "false" ]]; then
+        rclone purge "$OFFSITE_REMOTE/$old" && echo "   🗑️  pruned offsite $old"
+      else
+        echo "   [dry-run] Would purge offsite $old"
+      fi
+    done <<< "$OLD_REMOTE"
   fi
 else
   echo ""
