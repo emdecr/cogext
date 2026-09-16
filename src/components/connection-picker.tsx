@@ -112,8 +112,10 @@ export default function ConnectionPicker({
 
   function pick(record: LinkCandidate) {
     onAdd(record);
-    // Keep the panel open so several connections can be added in a row, but
-    // clear the query so the suggestion list (minus the just-added one) returns.
+    // Close the panel on pick — the just-added connection shows above and the
+    // user reopens via "+ Add connection" to add another. (Previously the panel
+    // stayed open and had to be dismissed with a separate "Done" click.)
+    setOpen(false);
     setQuery("");
     setResults([]);
   }
@@ -226,6 +228,8 @@ export default function ConnectionPicker({
               </RecordImagePreview>
             ))}
           </div>
+          {/* Escape hatch for opening the panel without picking anything.
+              Picking a record closes the panel on its own. */}
           <div className="mt-1 flex justify-end">
             <button
               type="button"
@@ -235,7 +239,7 @@ export default function ConnectionPicker({
               }}
               className="text-xs text-gray-400 hover:underline"
             >
-              Done
+              Close
             </button>
           </div>
         </div>
