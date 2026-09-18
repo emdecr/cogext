@@ -722,6 +722,7 @@ export default function CreateRecordForm() {
                     </label>
                     <TagInput
                       tags={pendingTags}
+                      suggest
                       onAdd={(name) => {
                         setPendingTags((prev) => [
                           ...prev,
