@@ -107,6 +107,9 @@ export default function TagInput({
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         placeholder={tags.length > 0 ? "Add another tag..." : "Type a tag and press Enter"}
         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
       />

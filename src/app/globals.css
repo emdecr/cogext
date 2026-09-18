@@ -47,6 +47,29 @@ body {
 }
 
 /* ============================================================================
+   MOBILE FORM ZOOM GUARD
+   ============================================================================
+   iOS WebKit (Safari AND every iOS browser, incl. Chrome) auto-zooms into any
+   form control whose font-size is under 16px on focus. That zoom is what caused
+   the "typing zoomed in and the page scrolled sideways" reports on the record
+   forms — our controls render at text-sm (14px). Floor them at 16px on small
+   screens so focus never triggers the zoom. Desktop keeps the compact 14px look
+   from the component classes. Don't use maximum-scale on the viewport to fix
+   this — that disables pinch-zoom for everyone (an accessibility regression).
+
+   !important is required: the controls carry Tailwind's `text-sm` utility, whose
+   class selector outranks a bare `input` type selector, so without it this rule
+   loses the cascade and the fields stay 14px. Scoped to the mobile breakpoint,
+   so desktop keeps the compact 14px from the component classes. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ============================================================================
    MICRO-INTERACTION ANIMATIONS
    ============================================================================
    Custom keyframes for modals, popovers, and page transitions.
