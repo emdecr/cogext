@@ -153,7 +153,7 @@ export default function ConnectionPicker({
                   onClick={() => onRemove(c.record.id)}
                   disabled={disabled}
                   aria-label="Remove connection"
-                  className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800"
                 >
                   ✕
                 </button>
@@ -240,7 +240,7 @@ export default function ConnectionPicker({
                 setOpen(false);
                 setQuery("");
               }}
-              className="text-xs text-gray-400 hover:underline"
+              className="rounded-md px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               Close
             </button>
