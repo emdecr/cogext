@@ -192,6 +192,11 @@ export default function TagInput({
           aria-expanded={showDropdown}
           aria-controls={listboxId}
           aria-autocomplete="list"
+          // Point screen readers at the highlighted option so it's announced as
+          // the one Enter will select; unset when nothing is highlighted.
+          aria-activedescendant={
+            activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+          }
           placeholder={tags.length > 0 ? "Add another tag..." : "Type a tag and press Enter"}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-gray-400 dark:focus:ring-gray-400"
         />
@@ -203,7 +208,12 @@ export default function TagInput({
             className="absolute left-0 right-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
           >
             {suggestions.map((name, i) => (
-              <li key={name} role="option" aria-selected={i === activeIndex}>
+              <li
+                key={name}
+                id={`${listboxId}-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+              >
                 <button
                   type="button"
                   // mousedown fires before the input's blur, so the option is
