@@ -284,6 +284,10 @@ export default function EditRecordForm({ record, onClose }: Props) {
                 <input
                   id="edit-sourceUrl"
                   type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={sourceUrl}
                   onChange={(e) => setSourceUrl(e.target.value)}
                   placeholder="https://..."
@@ -327,6 +331,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
                   <input
                     id="edit-rating"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     max={5}
                     step="any"

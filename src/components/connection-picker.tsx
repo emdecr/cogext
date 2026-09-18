@@ -186,6 +186,9 @@ export default function ConnectionPicker({
           <input
             autoFocus
             type="text"
+            inputMode="search"
+            autoCapitalize="none"
+            autoCorrect="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search your records…"

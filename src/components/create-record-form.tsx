@@ -562,6 +562,10 @@ export default function CreateRecordForm() {
                       <input
                         id="sourceUrl"
                         type="url"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         value={sourceUrl}
                         onChange={(e) => setSourceUrl(e.target.value)}
                         onBlur={(e) => maybeFetchMetadata(e.target.value)}
@@ -620,6 +624,7 @@ export default function CreateRecordForm() {
                         <input
                           id="rating"
                           type="number"
+                          inputMode="decimal"
                           min={0}
                           max={5}
                           step="any"
