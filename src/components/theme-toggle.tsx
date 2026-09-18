@@ -80,7 +80,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={handleToggle}
-      className="flex h-9 items-center rounded-md bg-gray-200 px-3 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+      className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
       aria-label={`Theme: ${label}. Click to change.`}
       title={label}
     >

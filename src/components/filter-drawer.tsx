@@ -20,6 +20,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCollection } from "@/lib/actions/collections";
+import { CREATABLE_RECORD_TYPES } from "@/lib/validations/records";
 
 type CollectionSummary = {
   id: string;
@@ -34,6 +35,11 @@ type FilterDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
 
+  // Type filtering — rendered here only on mobile; on ≥sm the type pills live
+  // inline in FilterBar, so this section is hidden there to avoid duplication.
+  activeType: string | null;
+  onTypeChange: (type: string | null) => void;
+
   // Tag filtering
   activeTag: string | null;
   onTagChange: (tag: string | null) => void;
@@ -46,6 +52,8 @@ type FilterDrawerProps = {
 export default function FilterDrawer({
   isOpen,
   onClose,
+  activeType,
+  onTypeChange,
   activeTag,
   onTagChange,
   availableTags,
@@ -121,6 +129,40 @@ export default function FilterDrawer({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
+          {/* ---- Type section (mobile only) ---- */}
+          {/* On ≥sm the type pills show inline in FilterBar, so this is hidden
+              there. On mobile that inline row is hidden, so the pills live here. */}
+          <div className="mb-6 sm:hidden">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Type
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => onTypeChange(null)}
+                className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+                  activeType === null
+                    ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+              >
+                All
+              </button>
+              {CREATABLE_RECORD_TYPES.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => onTypeChange(activeType === type ? null : type)}
+                  className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+                    activeType === type
+                      ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* ---- Tags section ---- */}
           <div className="mb-6">
             <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -244,11 +286,12 @@ export default function FilterDrawer({
         </div>
 
         {/* Footer — clear all filters */}
-        {activeTag && (
+        {(activeTag || activeType) && (
           <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-700">
             <button
               onClick={() => {
                 onTagChange(null);
+                onTypeChange(null);
               }}
               className="w-full rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             >

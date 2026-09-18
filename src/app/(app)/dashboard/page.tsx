@@ -66,15 +66,40 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 md:p-8">
       <div className="mx-auto max-w-6xl">
         {/* ---- Header ---- */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Logged in as {user.email}
-            </p>
+        <div className="mb-6 space-y-4">
+          {/* Title row — Log out pinned to the top-right corner. It scrolls
+              with the page (intentionally not sticky). */}
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Dashboard
+            </h1>
+
+            {/* Logout — using a server action inline */}
+            <form
+              action={async () => {
+                "use server";
+                await clearSession();
+                redirect("/login");
+              }}
+            >
+              <button
+                type="submit"
+                className="rounded-md bg-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Log out
+              </button>
+            </form>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Toolbar row — record count + keyboard hints on the left, icon
+              buttons right-aligned. Every icon button shares the same h-9/w-9
+              footprint so they read as one uniform set (labels expand on ≥sm). */}
+          <div className="flex items-center gap-3">
+            {/* Record count */}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {records.length} record{records.length !== 1 ? "s" : ""}
+            </span>
+
             {/* Keyboard shortcut hints */}
             <div className="hidden items-center gap-2 sm:flex">
               <kbd className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-400 dark:border-gray-700">
@@ -87,59 +112,40 @@ export default async function DashboardPage() {
               <span className="text-xs text-gray-400">new</span>
             </div>
 
-            {/* Record count */}
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {records.length} record{records.length !== 1 ? "s" : ""}
-            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
 
-            <ThemeToggle />
-
-            {/* Collections — quick link to the collections index page */}
-            <Link
-              href="/collections"
-              className="rounded-md bg-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              title="Collections"
-            >
-              <span className="flex items-center gap-1.5">
-                {/* Folder/stack icon */}
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Collections</span>
-              </span>
-            </Link>
-
-            {/* Reflections — sparkle icon with unread notification dot */}
-            <ReflectionIndicator unreadReflections={unreadReflections} />
-
-            {/* AI Chat — opens the conversation sidebar */}
-            <ChatToggle />
-
-            {/* Logout — using a server action inline */}
-            <form
-              action={async () => {
-                "use server";
-                await clearSession();
-                redirect("/login");
-              }}
-            >
-              <button
-                type="submit"
-                className="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              {/* Collections — quick link to the collections index page */}
+              <Link
+                href="/collections"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:w-auto sm:px-3"
+                title="Collections"
               >
-                Log out
-              </button>
-            </form>
+                <span className="flex items-center gap-1.5">
+                  {/* Folder/stack icon */}
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Collections</span>
+                </span>
+              </Link>
+
+              {/* Reflections — sparkle icon with unread notification dot */}
+              <ReflectionIndicator unreadReflections={unreadReflections} />
+
+              {/* AI Chat — opens the conversation sidebar */}
+              <ChatToggle />
+            </div>
           </div>
         </div>
 

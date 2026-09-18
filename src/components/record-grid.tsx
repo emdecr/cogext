@@ -82,8 +82,10 @@ export default function RecordGrid({
       .sort((a, b) => b.count - a.count);
   }, [records]);
 
-  // Count active filters (for the badge on the Filters button)
-  const activeFilterCount = (activeTag ? 1 : 0);
+  // Count active filters (for the badge on the Filters button). Type counts
+  // too now that it can be set from the drawer on mobile, where the inline
+  // type pills are hidden.
+  const activeFilterCount = (activeTag ? 1 : 0) + (activeType ? 1 : 0);
 
   // ---- Filter records ----
   const filteredRecords = useMemo(() => {
@@ -117,6 +119,8 @@ export default function RecordGrid({
       <FilterDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        activeType={activeType}
+        onTypeChange={setActiveType}
         activeTag={activeTag}
         onTagChange={(tag) => {
           setActiveTag(tag);

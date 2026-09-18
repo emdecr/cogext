@@ -27,7 +27,7 @@ export default function ChatToggle() {
       {/* Chat button — opens the AI sidebar */}
       <button
         onClick={() => setIsSidebarOpen(true)}
-        className="rounded-md bg-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:w-auto sm:px-3"
         title="Open AI chat"
       >
         {/* Chat bubble icon + label */}

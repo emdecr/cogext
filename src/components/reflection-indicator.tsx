@@ -54,7 +54,7 @@ export default function ReflectionIndicator({ unreadReflections }: Props) {
       {/* ---- Trigger: sparkle icon with optional notification dot ---- */}
       <Popover.Trigger asChild>
         <button
-          className="relative flex h-9 items-center rounded-md bg-gray-200 px-3 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          className="relative flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           title={
             hasUnread
               ? `${unreadReflections.length} new reflection${unreadReflections.length > 1 ? "s" : ""}`
