@@ -508,7 +508,7 @@ export default function CreateRecordForm() {
                           <button
                             type="button"
                             onClick={clearImage}
-                            className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-white hover:bg-black/70"
+                            className="absolute right-2 top-2 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white hover:bg-black/70"
                           >
                             Remove
                           </button>

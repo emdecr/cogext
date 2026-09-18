@@ -70,6 +70,19 @@ body {
 }
 
 /* ============================================================================
+   AUTO-GROWING TEXTAREA
+   ============================================================================
+   Lets a textarea grow with its content instead of scrolling inside a fixed
+   box — so on a phone you can see the whole line/paragraph you're typing.
+   Progressive enhancement: browsers without field-sizing keep the fixed `rows`
+   height. Where supported, the `rows` attribute becomes the MINIMUM height, so
+   callers still control the starting size; pair with a max-height utility to
+   cap runaway growth (content past the cap scrolls). */
+.autogrow {
+  field-sizing: content;
+}
+
+/* ============================================================================
    MICRO-INTERACTION ANIMATIONS
    ============================================================================
    Custom keyframes for modals, popovers, and page transitions.

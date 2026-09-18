@@ -77,7 +77,16 @@ export default function MarkdownField({
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        className={inputClass}
+        // autogrow: expand to fit content, then scroll past a 50vh cap. The
+        // "Open editor" dialog remains the roomier editing path.
+        //
+        // `field-sizing: content` ignores the `rows` attribute, so we translate
+        // rows into a min-height (1lh per row + the field's vertical padding and
+        // borders) to preserve each field's original starting height. Result:
+        // the box looks identical at rest and grows instead of scrolling once
+        // the text exceeds `rows` lines.
+        style={{ minHeight: `calc(${rows} * 1lh + 1.5rem)` }}
+        className={`${inputClass} autogrow max-h-[50vh]`}
       />
 
       {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
