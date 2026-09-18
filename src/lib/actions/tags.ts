@@ -19,7 +19,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
@@ -107,6 +107,33 @@ export async function addTagToRecord(
     console.error("Failed to add tag:", error);
     return { success: false, error: "Failed to add tag" };
   }
+}
+
+// ============================================================================
+// TAG SUGGESTIONS
+// ============================================================================
+// Returns the distinct tags applied to THIS user's records, most-used first.
+// Powers the autocomplete in TagInput so you can reuse an existing tag (e.g. a
+// book title) instead of retyping and risking a near-duplicate. Scoped to the
+// user's own records even though tags are global — no reason to surface tag
+// names the user has never used.
+
+export async function getTagSuggestions(): Promise<
+  { name: string; count: number }[]
+> {
+  const userId = await requireUserId();
+
+  return db
+    .select({
+      name: tags.name,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(recordTags)
+    .innerJoin(tags, eq(recordTags.tagId, tags.id))
+    .innerJoin(records, eq(recordTags.recordId, records.id))
+    .where(eq(records.userId, userId))
+    .groupBy(tags.name)
+    .orderBy(desc(sql`count(*)`));
 }
 
 // ============================================================================
