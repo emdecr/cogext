@@ -41,33 +41,37 @@ export default function FilterBar({
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       {/* ---- Type filters ---- */}
-      <button
-        onClick={() => onTypeChange(null)}
-        className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-          activeType === null
-            ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        }`}
-      >
-        All
-      </button>
-
-      {CREATABLE_RECORD_TYPES.map((type) => (
+      {/* Inline on ≥sm where there's room; on mobile these move into the filter
+          drawer (see FilterDrawer) so this row doesn't overflow. */}
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
         <button
-          key={type}
-          onClick={() => onTypeChange(activeType === type ? null : type)}
+          onClick={() => onTypeChange(null)}
           className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-            activeType === type
+            activeType === null
               ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           }`}
         >
-          {type}
+          All
         </button>
-      ))}
 
-      {/* ---- Separator ---- */}
-      <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+        {CREATABLE_RECORD_TYPES.map((type) => (
+          <button
+            key={type}
+            onClick={() => onTypeChange(activeType === type ? null : type)}
+            className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+              activeType === type
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            {type}
+          </button>
+        ))}
+
+        {/* ---- Separator ---- */}
+        <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      </div>
 
       {/* ---- Active tag pill ---- */}
       {/* When a tag filter is active (set via the drawer), show it here
