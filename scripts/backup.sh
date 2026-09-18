@@ -70,16 +70,34 @@ OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
 # because you typically want a fixed handful of recent restore points off-box.
 OFFSITE_RETAIN="${OFFSITE_RETAIN:-5}"
 
+# Skip the whole backup when no CONTENT has changed since the last successful
+# run — so days you don't save anything don't pile up identical backups (and
+# don't burn Google Drive space via the offsite upload). We fingerprint the
+# content tables (records, tags, collections, links, conversations, messages,
+# reflections, ai_profile); adds bump a row count or a max() timestamp, edits
+# bump records.updated_at / ai_profile.updated_at, and deletes drop a row
+# count — so any of the three is detected. High-churn operational tables
+# (auth_events, ai_usage, users) are deliberately EXCLUDED so a login or an AI
+# call never counts as "content changed" and forces a needless backup.
+#
+# Set SKIP_UNCHANGED=false (or pass --force) to always back up regardless.
+SKIP_UNCHANGED="${SKIP_UNCHANGED:-true}"
+
+# Where the last successful backup's fingerprint is stored (one small file).
+FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
 
 DRY_RUN=false
 DB_ONLY=false
+FORCE=false
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true; echo "🔍 DRY RUN — no files will be written" ;;
     --db-only) DB_ONLY=true; echo "📦 DB-ONLY mode — skipping MinIO backup" ;;
+    --force)   FORCE=true;   echo "💪 FORCE — backing up even if nothing changed" ;;
   esac
 done
 
@@ -100,6 +118,66 @@ echo "============================================================"
 echo "CogExt Backup — $(date)"
 echo "Destination: $BACKUP_DIR"
 echo "============================================================"
+
+# =============================================================================
+# CHANGE DETECTION — skip when no content has changed since the last backup
+# =============================================================================
+# compute_fingerprint hashes the row count + newest timestamp of each content
+# table into a single md5 (done inside Postgres so nothing large crosses the
+# wire). Two runs with identical content produce an identical hash; any add,
+# edit, or delete changes it. Keep this table list in sync with the schema's
+# content tables — see the SKIP_UNCHANGED note above for what's excluded.
+compute_fingerprint() {
+  docker compose \
+    -f "$COMPOSE_FILE" \
+    exec -T db \
+    psql \
+      --username="$POSTGRES_USER" \
+      --no-password \
+      --dbname="$POSTGRES_DB" \
+      --tuples-only --no-align --quiet \
+      --command="
+        SELECT md5(string_agg(line, E'\n' ORDER BY line)) FROM (
+          SELECT 'records:'            || count(*) || ':' || COALESCE(max(GREATEST(created_at, updated_at))::text, '-') AS line FROM records
+          UNION ALL SELECT 'record_tags:'        || count(*) || ':-'                                              FROM record_tags
+          UNION ALL SELECT 'record_links:'       || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM record_links
+          UNION ALL SELECT 'tags:'               || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM tags
+          UNION ALL SELECT 'collections:'        || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM collections
+          UNION ALL SELECT 'collection_records:' || count(*) || ':-'                                              FROM collection_records
+          UNION ALL SELECT 'ai_profile:'         || count(*) || ':' || COALESCE(max(updated_at)::text, '-')       FROM ai_profile
+          UNION ALL SELECT 'conversations:'      || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM conversations
+          UNION ALL SELECT 'messages:'           || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM messages
+          UNION ALL SELECT 'reflections:'        || count(*) || ':' || COALESCE(max(created_at)::text, '-')       FROM reflections
+        ) s;" \
+  | tr -d '[:space:]'
+}
+
+# Computed once here and reused when we record the new fingerprint at the end,
+# so the "did it change?" check and the value we store can't drift apart.
+CURRENT_FINGERPRINT=""
+
+if [[ "$SKIP_UNCHANGED" == "true" && "$FORCE" == "false" ]]; then
+  echo ""
+  echo "🔎 Checking for content changes since last backup..."
+
+  # Don't let a fingerprint failure (DB down, query error) silently turn into a
+  # skipped backup — if we can't tell, we back up. `set -e` would otherwise
+  # abort the whole script, so capture the status instead of trusting it.
+  fp_status=0
+  CURRENT_FINGERPRINT=$(compute_fingerprint) || fp_status=$?
+
+  if (( fp_status != 0 )) || [[ -z "$CURRENT_FINGERPRINT" ]]; then
+    echo "   ⚠️  Could not compute fingerprint — proceeding with backup to be safe."
+    CURRENT_FINGERPRINT=""
+  elif [[ -f "$FINGERPRINT_FILE" ]] && [[ "$CURRENT_FINGERPRINT" == "$(cat "$FINGERPRINT_FILE")" ]]; then
+    echo "   ✅ No content changes since last backup — skipping."
+    echo "   (override with --force, or set SKIP_UNCHANGED=false)"
+    echo "============================================================"
+    exit 0
+  else
+    echo "   📝 Content changed (or first run) — proceeding with backup."
+  fi
+fi
 
 if [[ "$DRY_RUN" == "false" ]]; then
   mkdir -p "$BACKUP_DIR"
@@ -337,6 +415,27 @@ else
     echo "   [dry-run] Would delete: $OLD_BACKUPS"
   else
     echo "   [dry-run] Nothing to rotate."
+  fi
+fi
+
+
+# =============================================================================
+# RECORD FINGERPRINT
+# =============================================================================
+# Only reached after every step above succeeded (set -e aborts on failure), so
+# a failed backup never updates the fingerprint — the next run will see the old
+# value, detect the "change", and retry. Written last for the same reason.
+if [[ "$DRY_RUN" == "false" && "$SKIP_UNCHANGED" == "true" ]]; then
+  # We may not have computed it (e.g. --force skips the check), so compute now
+  # if needed. A failure here shouldn't fail an otherwise-good backup — worst
+  # case the next run backs up once unnecessarily.
+  if [[ -z "$CURRENT_FINGERPRINT" ]]; then
+    CURRENT_FINGERPRINT=$(compute_fingerprint 2>/dev/null || true)
+  fi
+  if [[ -n "$CURRENT_FINGERPRINT" ]]; then
+    printf '%s\n' "$CURRENT_FINGERPRINT" > "$FINGERPRINT_FILE"
+    echo ""
+    echo "🔖 Recorded content fingerprint for next run's change check."
   fi
 fi
 
