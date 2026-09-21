@@ -102,6 +102,12 @@ FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
 #
 # Works with the hosted service (https://healthchecks.io) or a self-hosted one;
 # it's just a URL. Leave empty to disable.
+#
+# Use HTTPS for any endpoint reached over an untrusted network (the hosted
+# service, or a self-hosted box across the public internet). The ping URL is a
+# bearer secret — anyone who can read it can send pings on your behalf — so over
+# plain HTTP it's exposed in transit. HTTP is fine only for a self-hosted
+# instance on a trusted local network (e.g. same host/LAN).
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
 
 # =============================================================================
@@ -111,6 +117,42 @@ HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
 DRY_RUN=false
 DB_ONLY=false
 FORCE=false
+
+# --- Notifications: dead-man's-switch ping (see HEALTHCHECK_URL above) --------
+# Defined and armed HERE — before argument parsing and .env loading — so that
+# even an early failure (e.g. a missing .env, a bad flag) still reports its exit
+# code, PROVIDED HEALTHCHECK_URL came from the environment (it's resolved in the
+# config block above, before this point). If the URL lives only in .env (the
+# documented default), it's still empty here, so a failure before .env loads
+# sends no ping and is instead caught as a missed run — the dead-man's-switch
+# working as intended. ping_hc NEVER fails the backup: curl errors are swallowed
+# (|| true), and dry-runs are skipped (the DRY_RUN check runs at EXIT, by when
+# args are parsed) so a test can't reset the timer or fake a success. Short
+# timeout + retries so a network blip neither hangs the run nor drops the ping.
+ping_hc() {
+  local suffix="$1" body="${2:-}"
+  [[ -n "$HEALTHCHECK_URL" && "$DRY_RUN" == "false" ]] || return 0
+  curl -fsS -m 10 --retry 3 \
+    --user-agent "cogext-backup" \
+    --data-raw "$body" \
+    -o /dev/null \
+    "${HEALTHCHECK_URL}${suffix}" || true
+}
+
+# Report the final outcome on ANY exit path: normal completion, the early
+# "nothing changed" skip (exit 0 → success), and any set -e failure or explicit
+# `exit N` (→ /<rc>, which the service reports as a failure and emails about).
+# rc is captured first so the report can't clobber $?.
+report_hc() {
+  local rc=$?
+  if (( rc == 0 )); then
+    ping_hc "" "CogExt backup OK on $(hostname) at $(date)."
+  else
+    ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
+  fi
+}
+trap report_hc EXIT
+
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true; echo "🔍 DRY RUN — no files will be written" ;;
@@ -137,43 +179,10 @@ echo "CogExt Backup — $(date)"
 echo "Destination: $BACKUP_DIR"
 echo "============================================================"
 
-# =============================================================================
-# NOTIFICATIONS — dead-man's-switch ping (optional)
-# =============================================================================
-# ping_hc pings the healthcheck URL. It NEVER fails the backup: curl errors are
-# swallowed (|| true) and dry-runs are skipped so a test can't reset the timer
-# or send a false success. Short timeout + retries so a network blip neither
-# hangs the run nor drops the ping.
-ping_hc() {
-  local suffix="$1" body="${2:-}"
-  [[ -n "$HEALTHCHECK_URL" && "$DRY_RUN" == "false" ]] || return 0
-  curl -fsS -m 10 --retry 3 \
-    --user-agent "cogext-backup" \
-    --data-raw "$body" \
-    -o /dev/null \
-    "${HEALTHCHECK_URL}${suffix}" || true
-}
-
-# Report the final outcome on ANY exit path via a trap: normal completion, the
-# early "nothing changed" skip (exit 0 → success), and any set -e failure or
-# explicit `exit N` (→ /<rc>, which the service reports as a failure and emails
-# about). This is why the trap is installed HERE, before the work starts. Note:
-# a failure BEFORE this point (e.g. missing .env) sends NO ping at all — which
-# is the dead-man's-switch working as intended: no ping → the service alerts on
-# the missed run. (rc is captured first; the report must not change $?.)
-report_hc() {
-  local rc=$?
-  if (( rc == 0 )); then
-    ping_hc "" "CogExt backup OK on $(hostname) at $(date)."
-  else
-    ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
-  fi
-}
-trap report_hc EXIT
-
-# Tell the service we've started (lets it measure runtime and flag a hung/
-# overrunning backup via its grace window). Safe before a skip — that's a very
-# short, healthy run.
+# Tell the service we've started (the trap above is already armed). This runs
+# after config load so it reflects a fully-resolved HEALTHCHECK_URL, and it lets
+# the service measure runtime and flag a hung/overrunning backup via its grace
+# window. Safe before a skip — that's a very short, healthy run.
 ping_hc "/start"
 
 # =============================================================================
