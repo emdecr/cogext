@@ -86,6 +86,30 @@ SKIP_UNCHANGED="${SKIP_UNCHANGED:-true}"
 # Where the last successful backup's fingerprint is stored (one small file).
 FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
 
+# Backup notifications via a healthchecks.io-style dead-man's-switch (optional).
+# Set HEALTHCHECK_URL to your check's ping URL and the script will:
+#   - ping <url>/start when it begins,
+#   - ping <url>       on success (INCLUDING a "nothing changed" skip — the run
+#                      was healthy, there was just nothing to back up),
+#   - ping <url>/<rc>  on failure (rc = nonzero exit code; the service treats
+#                      any nonzero as a failure and emails you).
+# Why a dead-man's-switch instead of the script emailing directly: it also
+# catches the case a self-sent email never can — the backup NOT RUNNING AT ALL
+# (server down, cron broken, disk full before we start). If no ping arrives by
+# the scheduled time + grace, the service emails you. Configure the email (and
+# schedule/grace) in the healthchecks.io UI; nothing else to install — we only
+# need curl, which is already here.
+#
+# Works with the hosted service (https://healthchecks.io) or a self-hosted one;
+# it's just a URL. Leave empty to disable.
+#
+# Use HTTPS for any endpoint reached over an untrusted network (the hosted
+# service, or a self-hosted box across the public internet). The ping URL is a
+# bearer secret — anyone who can read it can send pings on your behalf — so over
+# plain HTTP it's exposed in transit. HTTP is fine only for a self-hosted
+# instance on a trusted local network (e.g. same host/LAN).
+HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
@@ -93,6 +117,42 @@ FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
 DRY_RUN=false
 DB_ONLY=false
 FORCE=false
+
+# --- Notifications: dead-man's-switch ping (see HEALTHCHECK_URL above) --------
+# Defined and armed HERE — before argument parsing and .env loading — so that
+# even an early failure (e.g. a missing .env, a bad flag) still reports its exit
+# code, PROVIDED HEALTHCHECK_URL came from the environment (it's resolved in the
+# config block above, before this point). If the URL lives only in .env (the
+# documented default), it's still empty here, so a failure before .env loads
+# sends no ping and is instead caught as a missed run — the dead-man's-switch
+# working as intended. ping_hc NEVER fails the backup: curl errors are swallowed
+# (|| true), and dry-runs are skipped (the DRY_RUN check runs at EXIT, by when
+# args are parsed) so a test can't reset the timer or fake a success. Short
+# timeout + retries so a network blip neither hangs the run nor drops the ping.
+ping_hc() {
+  local suffix="$1" body="${2:-}"
+  [[ -n "$HEALTHCHECK_URL" && "$DRY_RUN" == "false" ]] || return 0
+  curl -fsS -m 10 --retry 3 \
+    --user-agent "cogext-backup" \
+    --data-raw "$body" \
+    -o /dev/null \
+    "${HEALTHCHECK_URL}${suffix}" || true
+}
+
+# Report the final outcome on ANY exit path: normal completion, the early
+# "nothing changed" skip (exit 0 → success), and any set -e failure or explicit
+# `exit N` (→ /<rc>, which the service reports as a failure and emails about).
+# rc is captured first so the report can't clobber $?.
+report_hc() {
+  local rc=$?
+  if (( rc == 0 )); then
+    ping_hc "" "CogExt backup OK on $(hostname) at $(date)."
+  else
+    ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
+  fi
+}
+trap report_hc EXIT
+
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true; echo "🔍 DRY RUN — no files will be written" ;;
@@ -118,6 +178,12 @@ echo "============================================================"
 echo "CogExt Backup — $(date)"
 echo "Destination: $BACKUP_DIR"
 echo "============================================================"
+
+# Tell the service we've started (the trap above is already armed). This runs
+# after config load so it reflects a fully-resolved HEALTHCHECK_URL, and it lets
+# the service measure runtime and flag a hung/overrunning backup via its grace
+# window. Safe before a skip — that's a very short, healthy run.
+ping_hc "/start"
 
 # =============================================================================
 # CHANGE DETECTION — skip when no content has changed since the last backup
