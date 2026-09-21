@@ -86,6 +86,24 @@ SKIP_UNCHANGED="${SKIP_UNCHANGED:-true}"
 # Where the last successful backup's fingerprint is stored (one small file).
 FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
 
+# Backup notifications via a healthchecks.io-style dead-man's-switch (optional).
+# Set HEALTHCHECK_URL to your check's ping URL and the script will:
+#   - ping <url>/start when it begins,
+#   - ping <url>       on success (INCLUDING a "nothing changed" skip — the run
+#                      was healthy, there was just nothing to back up),
+#   - ping <url>/<rc>  on failure (rc = nonzero exit code; the service treats
+#                      any nonzero as a failure and emails you).
+# Why a dead-man's-switch instead of the script emailing directly: it also
+# catches the case a self-sent email never can — the backup NOT RUNNING AT ALL
+# (server down, cron broken, disk full before we start). If no ping arrives by
+# the scheduled time + grace, the service emails you. Configure the email (and
+# schedule/grace) in the healthchecks.io UI; nothing else to install — we only
+# need curl, which is already here.
+#
+# Works with the hosted service (https://healthchecks.io) or a self-hosted one;
+# it's just a URL. Leave empty to disable.
+HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
@@ -118,6 +136,45 @@ echo "============================================================"
 echo "CogExt Backup — $(date)"
 echo "Destination: $BACKUP_DIR"
 echo "============================================================"
+
+# =============================================================================
+# NOTIFICATIONS — dead-man's-switch ping (optional)
+# =============================================================================
+# ping_hc pings the healthcheck URL. It NEVER fails the backup: curl errors are
+# swallowed (|| true) and dry-runs are skipped so a test can't reset the timer
+# or send a false success. Short timeout + retries so a network blip neither
+# hangs the run nor drops the ping.
+ping_hc() {
+  local suffix="$1" body="${2:-}"
+  [[ -n "$HEALTHCHECK_URL" && "$DRY_RUN" == "false" ]] || return 0
+  curl -fsS -m 10 --retry 3 \
+    --user-agent "cogext-backup" \
+    --data-raw "$body" \
+    -o /dev/null \
+    "${HEALTHCHECK_URL}${suffix}" || true
+}
+
+# Report the final outcome on ANY exit path via a trap: normal completion, the
+# early "nothing changed" skip (exit 0 → success), and any set -e failure or
+# explicit `exit N` (→ /<rc>, which the service reports as a failure and emails
+# about). This is why the trap is installed HERE, before the work starts. Note:
+# a failure BEFORE this point (e.g. missing .env) sends NO ping at all — which
+# is the dead-man's-switch working as intended: no ping → the service alerts on
+# the missed run. (rc is captured first; the report must not change $?.)
+report_hc() {
+  local rc=$?
+  if (( rc == 0 )); then
+    ping_hc "" "CogExt backup OK on $(hostname) at $(date)."
+  else
+    ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
+  fi
+}
+trap report_hc EXIT
+
+# Tell the service we've started (lets it measure runtime and flag a hung/
+# overrunning backup via its grace window). Safe before a skip — that's a very
+# short, healthy run.
+ping_hc "/start"
 
 # =============================================================================
 # CHANGE DETECTION — skip when no content has changed since the last backup
