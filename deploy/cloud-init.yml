@@ -34,6 +34,7 @@ packages:
   - curl
   - git
   - unattended-upgrades
+  - rclone          # offsite backups to Google Drive (scripts/backup.sh)
 
 # --- Create deploy user ---
 users:
@@ -44,6 +45,18 @@ users:
     ssh_authorized_keys:
       # Replace with your actual public key:
       - ssh-ed25519 AAAA... your-key-here
+
+# --- Files written before runcmd ---
+write_files:
+  # Nightly backup cron — 2am America/Toronto (matches the healthchecks.io
+  # schedule). Runs as the deploy user so it picks up ~deploy/.config/rclone.
+  # NOTE: this fires even before backup.sh + .env exist, so the first run(s)
+  # will error harmlessly until you've deployed and configured .env + rclone.
+  - path: /etc/cron.d/cogext-backup
+    permissions: '0644'
+    content: |
+      # CogExt nightly backup — see DEPLOY.md → "Automated backups"
+      0 2 * * * deploy /opt/cogext/scripts/backup.sh >> /var/log/cogext-backup.log 2>&1
 
 # --- Run commands after package install ---
 runcmd:
@@ -87,8 +100,19 @@ runcmd:
   - systemctl enable unattended-upgrades
   - systemctl start unattended-upgrades
 
-  # -- Create app directory --
+  # -- Create app directories --
   - mkdir -p /opt/cogext
   - chown deploy:deploy /opt/cogext
+  # scripts/ is where CI's sync-scripts job scp's backup.sh + restore.sh; the
+  # target dir must exist before the first sync.
+  - mkdir -p /opt/cogext/scripts
+  - chown deploy:deploy /opt/cogext/scripts
   - mkdir -p /opt/backups/cogext
   - chown deploy:deploy /opt/backups/cogext
+
+  # -- Backup log file (deploy-owned) --
+  # The nightly cron redirects into this file. /var/log is root-owned, so without
+  # a pre-created deploy-owned file the redirect fails to open it BEFORE
+  # backup.sh runs — a silent no-backup. Create it once here.
+  - touch /var/log/cogext-backup.log
+  - chown deploy:deploy /var/log/cogext-backup.log
