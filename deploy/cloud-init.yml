@@ -34,6 +34,7 @@ packages:
   - curl
   - git
   - unattended-upgrades
+  - cron            # runs the nightly backup drop-in (/etc/cron.d/cogext-backup)
   - rclone          # offsite backups to Google Drive (scripts/backup.sh)
 
 # --- Create deploy user ---
@@ -63,6 +64,10 @@ runcmd:
   # -- Enable Docker --
   - systemctl enable docker
   - systemctl start docker
+
+  # -- Ensure cron is running (the nightly backup relies on /etc/cron.d) --
+  - systemctl enable cron
+  - systemctl start cron
 
   # -- SSH hardening --
   - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
