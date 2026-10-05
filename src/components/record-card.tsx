@@ -115,15 +115,17 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
         {/* Title — always shown for books (even with a cover) so the shelf
             reads as title + author + rating; hidden for other image records
             where the image is the content. */}
+        {/* An untitled quote shows the quote text here, so it stays italic;
+            a titled quote reads like any other heading. */}
         {(!record.imagePath || record.type === "book") && (
-          <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) ? "font-bold" : "font-medium"} ${record.type === "quote" ? "italic" : ""}`}>
+          <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) || (record.type === "quote" && record.title) ? "font-bold" : "font-medium"} ${record.type === "quote" && !record.title ? "italic" : ""}`}>
             {displayTitle}
           </h3>
         )}
 
         {/* Content preview */}
         {record.title && !record.imagePath && (
-          <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">{preview}</p>
+          <p className={`mb-2 text-sm ${record.type === "quote" ? "italic text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"}`}>{preview}</p>
         )}
 
         {/* Author attribution — styled as "— Author Name" for quotes */}
