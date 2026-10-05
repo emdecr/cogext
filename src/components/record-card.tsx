@@ -116,7 +116,7 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
             reads as title + author + rating; hidden for other image records
             where the image is the content. */}
         {(!record.imagePath || record.type === "book") && (
-          <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) ? "font-bold" : "font-medium"} ${record.type === "quote" ? "italic" : ""}`}>
+          <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note", "quote"].includes(record.type) ? "font-bold" : "font-medium"}`}>
             {displayTitle}
           </h3>
         )}
