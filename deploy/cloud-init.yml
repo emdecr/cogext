@@ -1,5 +1,10 @@
 #cloud-config
 timezone: America/Toronto
+# Give the box a real name instead of Linode's default "localhost" — it shows
+# up in the healthchecks.io backup pings (scripts/backup.sh uses $(hostname)).
+# manage_etc_hosts adds the name to /etc/hosts so sudo can resolve it.
+hostname: cogext
+manage_etc_hosts: true
 # =============================================================================
 # GENERIC LINODE CLOUD-INIT
 # =============================================================================

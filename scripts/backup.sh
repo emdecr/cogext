@@ -118,6 +118,14 @@ DRY_RUN=false
 DB_ONLY=false
 FORCE=false
 
+# What a successful run actually did, so the success ping's body tells a
+# "nothing changed" skip apart from a real backup (and an offsite upload apart
+# from a local-only one). Set at each exit-0 path below; report_hc reads it.
+#   skipped    — content unchanged, nothing written anywhere
+#   local      — backup written to $BACKUP_ROOT only (offsite disabled)
+#   offsite    — backup written locally AND uploaded to $OFFSITE_REMOTE
+BACKUP_OUTCOME=""
+
 # --- Notifications: dead-man's-switch ping (see HEALTHCHECK_URL above) --------
 # Defined and armed HERE — before argument parsing and .env loading — so that
 # even an early failure (e.g. a missing .env, a bad flag) still reports its exit
@@ -146,7 +154,14 @@ ping_hc() {
 report_hc() {
   local rc=$?
   if (( rc == 0 )); then
-    ping_hc "" "CogExt backup OK on $(hostname) at $(date)."
+    local msg
+    case "$BACKUP_OUTCOME" in
+      skipped) msg="CogExt backup SKIPPED — no content changes since last backup. Nothing written or uploaded." ;;
+      offsite) msg="CogExt backup OK — ${TIMESTAMP:-?} saved locally and uploaded to ${OFFSITE_REMOTE:-offsite}." ;;
+      local)   msg="CogExt backup OK (LOCAL ONLY) — ${TIMESTAMP:-?} saved to ${BACKUP_ROOT}; offsite upload disabled." ;;
+      *)       msg="CogExt backup OK." ;;
+    esac
+    ping_hc "" "$msg Host $(hostname), $(date)."
   else
     ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
   fi
@@ -239,6 +254,7 @@ if [[ "$SKIP_UNCHANGED" == "true" && "$FORCE" == "false" ]]; then
     echo "   ✅ No content changes since last backup — skipping."
     echo "   (override with --force, or set SKIP_UNCHANGED=false)"
     echo "============================================================"
+    BACKUP_OUTCOME="skipped"
     exit 0
   else
     echo "   📝 Content changed (or first run) — proceeding with backup."
@@ -362,6 +378,7 @@ if [[ "$OFFSITE_ENABLED" == "true" && -n "$OFFSITE_REMOTE" ]]; then
       --stats 60s
 
     echo "   ✅ Offsite upload complete"
+    BACKUP_OUTCOME="offsite"
   else
     echo "   [dry-run] Would upload: $BACKUP_DIR → $OFFSITE_REMOTE/$TIMESTAMP"
   fi
@@ -509,6 +526,10 @@ fi
 # =============================================================================
 # SUMMARY
 # =============================================================================
+
+# Offsite step sets "offsite" on a real upload; anything else that got here
+# wrote a local backup only.
+[[ -n "$BACKUP_OUTCOME" ]] || BACKUP_OUTCOME="local"
 
 echo ""
 echo "============================================================"
