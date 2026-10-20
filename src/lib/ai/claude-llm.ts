@@ -20,7 +20,9 @@
 // for thinking on top of the visible reply.
 //
 // This provider handles chat(), chatStream(), and generateTags().
-// The factory uses Claude for all LLM tasks (tagging + chat).
+// The factory builds two instances: one on TAGGING_MODEL (Haiku) for
+// generateTags(), one on CHAT_MODEL (Sonnet) for chat. Same class, so any
+// effort/max_tokens setting here must work on both models.
 //
 // SDK: @anthropic-ai/sdk — Anthropic's official Node.js SDK
 //   - Handles auth, retries, rate limiting, streaming
@@ -34,7 +36,9 @@ export class ClaudeLLMProvider implements LLMProvider {
   private client: Anthropic;
   private model: string;
 
-  constructor() {
+  // `model` lets the factory pick a model per use: getLLMProvider() passes
+  // TAGGING_MODEL (Haiku), getChatProvider() leaves it unset → CHAT_MODEL.
+  constructor(model?: string) {
     // The SDK reads ANTHROPIC_API_KEY from the environment automatically,
     // but we pass it explicitly for clarity. Throws if not set.
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -46,15 +50,17 @@ export class ClaudeLLMProvider implements LLMProvider {
 
     this.client = new Anthropic({ apiKey });
 
-    // CHAT_MODEL controls which Claude model to use.
-    this.model = process.env.CHAT_MODEL || "claude-sonnet-5-5";
+    // Defaults to CHAT_MODEL when the factory doesn't pass a model.
+    this.model = model || process.env.CHAT_MODEL || "claude-sonnet-5-5";
   }
 
   // ==========================================================================
   // GENERATE TAGS
   // ==========================================================================
   // Uses Claude to analyze content and suggest tags.
-  // Runs on CHAT_MODEL (see getLLMProvider() in ./index.ts) at low effort.
+  // Runs on TAGGING_MODEL (default claude-haiku-5-5, see getLLMProvider() in
+  // ./index.ts) at low effort. Haiku 5.5 also thinks by default, so the
+  // max_tokens headroom below applies to it too.
   async generateTags(content: string, type: string): Promise<string[]> {
     const truncated =
       content.length > 1000 ? content.slice(0, 1000) + "..." : content;
