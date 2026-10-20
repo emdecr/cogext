@@ -61,10 +61,19 @@ describe("admin gate", () => {
     await expect(requireAdmin()).rejects.toThrow("NOT_FOUND");
   });
 
-  it("is fail-closed with an empty allowlist, without touching session or DB", async () => {
+  it("is fail-closed with an empty allowlist, without a DB lookup", async () => {
     adminConfig.emails = [];
     await expect(getAdminUser()).resolves.toBeNull();
-    expect(getSession).not.toHaveBeenCalled();
     expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  // Regression: reading the session (cookies) is what makes /admin render
+  // per-request. When the empty-allowlist check ran first, `next build` (no
+  // ADMIN_EMAILS) prerendered every admin page as a static 404, which prod then
+  // served even with ADMIN_EMAILS set.
+  it("reads the session even when the allowlist is empty", async () => {
+    adminConfig.emails = [];
+    await getAdminUser();
+    expect(getSession).toHaveBeenCalled();
   });
 });
