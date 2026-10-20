@@ -36,6 +36,8 @@ import ReflectionIndicator from "@/components/reflection-indicator";
 import { getReflections } from "@/lib/actions/reflections";
 import { getCollections } from "@/lib/actions/collections";
 import KeyboardShortcuts from "@/components/keyboard-shortcuts";
+import { config } from "@/lib/config";
+import { isAdminEmail } from "@/lib/auth/admin-emails";
 
 export default async function DashboardPage() {
   // Auth check (defense in depth — middleware already verified this)
@@ -61,6 +63,11 @@ export default async function DashboardPage() {
   const unreadReflections = allReflections.filter((r) => !r.isRead);
 
   if (!user) redirect("/login");
+
+  // We already have the user row, so check the allowlist directly rather than
+  // calling getAdminUser() (which would repeat the lookup). /admin itself is
+  // gated separately — hiding the link is UI only.
+  const showAdminLink = isAdminEmail(user.email, config.admin.emails);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-950 md:p-8">
@@ -93,7 +100,8 @@ export default async function DashboardPage() {
 
           {/* Toolbar row — record count + keyboard hints on the left, icon
               buttons right-aligned. Every icon button shares the same h-9/w-9
-              footprint so they read as one uniform set (labels expand on ≥sm). */}
+              footprint so they read as one uniform set. Collections and Chat are
+              icon-only; only Admin expands a label on ≥sm. */}
           <div className="flex items-center gap-3">
             {/* Record count */}
             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -115,29 +123,29 @@ export default async function DashboardPage() {
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
 
-              {/* Collections — quick link to the collections index page */}
+              {/* Collections — quick link to the collections index page
+                  (icon-only; label via title/aria-label) */}
               <Link
                 href="/collections"
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:w-auto sm:px-3"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 title="Collections"
+                aria-label="Collections"
               >
-                <span className="flex items-center gap-1.5">
-                  {/* Folder/stack icon */}
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Collections</span>
-                </span>
+                {/* Folder/stack icon */}
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
               </Link>
 
               {/* Reflections — sparkle icon with unread notification dot */}
@@ -145,6 +153,33 @@ export default async function DashboardPage() {
 
               {/* AI Chat — opens the conversation sidebar */}
               <ChatToggle />
+
+              {/* Admin — only for ADMIN_EMAILS users */}
+              {showAdminLink && (
+                <Link
+                  href="/admin"
+                  className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:w-auto sm:px-3"
+                  title="Admin"
+                >
+                  <span className="flex items-center gap-1.5">
+                    {/* Shield icon */}
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">Admin</span>
+                  </span>
+                </Link>
+              )}
             </div>
           </div>
         </div>
