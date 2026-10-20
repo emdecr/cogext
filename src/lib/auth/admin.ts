@@ -36,11 +36,17 @@ export type AdminUser = { id: string; email: string };
  * Use for conditional UI (e.g. showing the Admin link). Never throws.
  */
 export const getAdminUser = cache(async (): Promise<AdminUser | null> => {
-  // Cheap short-circuit: no allowlist means no admins, skip the session/DB.
-  if (config.admin.emails.length === 0) return null;
-
+  // Read the session (cookies) FIRST, unconditionally. cookies() is what tells
+  // Next.js this render is per-request. If we returned early on an empty
+  // allowlist before touching it, `next build` (where ADMIN_EMAILS is unset)
+  // would see no dynamic API, prerender every /admin page as STATIC, and bake
+  // the notFound() into a 404 that prod then serves to everyone — regardless
+  // of the runtime ADMIN_EMAILS. (That shipped once; see admin.test.ts.)
   const session = await getSession();
   if (!session) return null;
+
+  // No allowlist means no admins — skip the DB lookup.
+  if (config.admin.emails.length === 0) return null;
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.userId),
