@@ -110,6 +110,19 @@ FINGERPRINT_FILE="${FINGERPRINT_FILE:-$BACKUP_ROOT/.last-backup-fingerprint}"
 # instance on a trusted local network (e.g. same host/LAN).
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
 
+# Run-status files for the app's admin → Backups tab (optional, best-effort).
+# Every non-dry run writes, from the EXIT trap:
+#   backup-last-run.json  — this run's outcome, sizes, exit code (atomic mv)
+#   backup-history.jsonl  — the last BACKUP_HISTORY_KEEP runs, one per line
+# This dir is mounted READ-ONLY into the app container (docker-compose.prod.yml)
+# so it must hold ONLY these status files — never point it at BACKUP_ROOT, or
+# the DB dumps become readable inside the app. The JSON shape is parsed by
+# src/lib/backups/parse.ts; keep the two in sync.
+# Deliberately NOT named BACKUP_STATUS_DIR: that's the APP's in-container path
+# (/status), and this script sources the same .env.
+BACKUP_STATUS_HOST_DIR="${BACKUP_STATUS_HOST_DIR:-/opt/cogext/status}"
+BACKUP_HISTORY_KEEP="${BACKUP_HISTORY_KEEP:-30}"
+
 # =============================================================================
 # SETUP
 # =============================================================================
@@ -125,6 +138,78 @@ FORCE=false
 #   local      — backup written to $BACKUP_ROOT only (offsite disabled)
 #   offsite    — backup written locally AND uploaded to $OFFSITE_REMOTE
 BACKUP_OUTCOME=""
+
+# For the status file (write_status below). Sizes stay empty (→ null) unless
+# that dump step actually ran.
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DB_SIZE_BYTES=""
+MINIO_SIZE_BYTES=""
+
+# --- Status file for the admin Backups tab (see BACKUP_STATUS_HOST_DIR above) -----
+# >>> status-writer
+# JSON string, or null when empty. Escapes backslash and double quote and
+# flattens control whitespace — enough for the values we write (timestamps,
+# hostnames, rclone remote names).
+json_str() {
+  local v="$1"
+  if [[ -z "$v" ]]; then printf 'null'; return; fi
+  v="${v//\\/\\\\}"
+  v="${v//\"/\\\"}"
+  v="${v//$'\n'/ }"; v="${v//$'\r'/ }"; v="${v//$'\t'/ }"
+  printf '"%s"' "$v"
+}
+
+# JSON integer, or null when not a non-negative integer.
+json_num() {
+  if [[ "$1" =~ ^[0-9]+$ ]]; then printf '%s' "$1"; else printf 'null'; fi
+}
+
+# write_status <exit code> <outcome: skipped|local|offsite|failed>
+# Best-effort: callers run it as `write_status ... || true`, and any failure
+# only prints a warning — it must never fail (or change the result of) the
+# backup. Skipped on --dry-run, same as the healthchecks ping.
+write_status() {
+  local rc="$1" outcome="$2"
+  [[ "$DRY_RUN" == "false" ]] || return 0
+  # A malformed KEEP would break the tail arithmetic below — fall back to 30.
+  [[ "$BACKUP_HISTORY_KEEP" =~ ^[1-9][0-9]*$ ]] || BACKUP_HISTORY_KEEP=30
+
+  local ts="" remote="" kept=""
+  if [[ "$outcome" == "local" || "$outcome" == "offsite" ]]; then
+    ts="${TIMESTAMP:-}"
+  fi
+  [[ "$outcome" == "offsite" ]] && remote="${OFFSITE_REMOTE:-}"
+  kept=$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*_[0-9]*' 2>/dev/null | wc -l | tr -d ' ') || kept=""
+
+  local json
+  json=$(printf '{"finishedAt":%s,"startedAt":%s,"exitCode":%s,"outcome":%s,"timestamp":%s,"dbSizeBytes":%s,"minioSizeBytes":%s,"offsiteRemote":%s,"localBackupsKept":%s,"host":%s}' \
+    "$(json_str "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" \
+    "$(json_str "${STARTED_AT:-}")" \
+    "$(json_num "$rc")" \
+    "$(json_str "$outcome")" \
+    "$(json_str "$ts")" \
+    "$(json_num "${DB_SIZE_BYTES:-}")" \
+    "$(json_num "${MINIO_SIZE_BYTES:-}")" \
+    "$(json_str "$remote")" \
+    "$(json_num "$kept")" \
+    "$(json_str "$(hostname 2>/dev/null || true)")")
+
+  local last="$BACKUP_STATUS_HOST_DIR/backup-last-run.json"
+  local hist="$BACKUP_STATUS_HOST_DIR/backup-history.jsonl"
+  # Write to a temp file in the same dir, then mv — the app never reads a
+  # half-written file. History: keep the newest (KEEP - 1) lines + this run.
+  if mkdir -p "$BACKUP_STATUS_HOST_DIR" \
+    && printf '%s\n' "$json" > "$last.tmp" \
+    && mv -f "$last.tmp" "$last" \
+    && { if [[ -f "$hist" ]]; then tail -n "$(( BACKUP_HISTORY_KEEP - 1 ))" "$hist"; fi; printf '%s\n' "$json"; } > "$hist.tmp" \
+    && mv -f "$hist.tmp" "$hist"
+  then
+    :
+  else
+    echo "⚠️  Could not write backup status to $BACKUP_STATUS_HOST_DIR (backup result unaffected)" >&2
+  fi
+}
+# <<< status-writer
 
 # --- Notifications: dead-man's-switch ping (see HEALTHCHECK_URL above) --------
 # Defined and armed HERE — before argument parsing and .env loading — so that
@@ -162,8 +247,10 @@ report_hc() {
       *)       msg="CogExt backup OK." ;;
     esac
     ping_hc "" "$msg Host $(hostname), $(date)."
+    write_status "$rc" "${BACKUP_OUTCOME:-local}" || true
   else
     ping_hc "/$rc" "CogExt backup FAILED (exit $rc) on $(hostname) at $(date). See /var/log/cogext-backup.log"
+    write_status "$rc" "failed" || true
   fi
 }
 trap report_hc EXIT
@@ -302,6 +389,7 @@ if [[ "$DRY_RUN" == "false" ]]; then
   | gzip -9 > "$POSTGRES_BACKUP"
 
   POSTGRES_SIZE=$(du -sh "$POSTGRES_BACKUP" | cut -f1)
+  DB_SIZE_BYTES=$(wc -c < "$POSTGRES_BACKUP" | tr -d ' ') || DB_SIZE_BYTES=""
   echo "   ✅ Postgres backup: $POSTGRES_BACKUP ($POSTGRES_SIZE)"
 else
   echo "   [dry-run] Would create: $POSTGRES_BACKUP"
@@ -343,6 +431,7 @@ if [[ "$DRY_RUN" == "false" ]]; then
     tar czf "/backup/minio_${TIMESTAMP}.tar.gz" -C /data .
 
   MINIO_SIZE=$(du -sh "$MINIO_BACKUP" | cut -f1)
+  MINIO_SIZE_BYTES=$(wc -c < "$MINIO_BACKUP" | tr -d ' ') || MINIO_SIZE_BYTES=""
   echo "   ✅ MinIO backup: $MINIO_BACKUP ($MINIO_SIZE)"
 else
   echo "   [dry-run] Would create: $MINIO_BACKUP (from volume: $MINIO_VOLUME)"

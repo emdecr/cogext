@@ -23,6 +23,8 @@
 // to the browser). Never import it in client components.
 // =============================================================================
 
+import { parseEmailList } from "@/lib/auth/admin-emails";
+
 // =============================================================================
 // HELPER: require an env var or throw a clear error
 // =============================================================================
@@ -83,6 +85,43 @@ export const config = {
     // (it runs on the Edge runtime and can't import this Node config) — keep
     // the "=== 'true'" semantics in sync if you change them here.
     allowRegistration: optionalEnv("ALLOW_REGISTRATION", "false") === "true",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Admin panel (/admin)
+  // ---------------------------------------------------------------------------
+  admin: {
+    // Comma-separated emails allowed into /admin. Normalized (trimmed,
+    // lowercased). Empty = nobody is an admin — the panel is fail-closed.
+    // See src/lib/auth/admin.ts.
+    emails: parseEmailList(process.env.ADMIN_EMAILS),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Backup status (admin → Backups tab). All optional: a missing value makes
+  // that card render "not configured", it never blocks startup.
+  // ---------------------------------------------------------------------------
+  backups: {
+    // healthchecks.io READ-ONLY API key (project settings → API keys). A
+    // read-only key can only read check status — it can't pause, edit, or
+    // delete checks — so leaking it exposes status, nothing more.
+    healthchecksApiKey: process.env.HEALTHCHECKS_API_KEY,
+
+    // The backup check's `unique_key` (read-only keys address checks by this,
+    // not by uuid). Find it with:
+    //   curl -H "X-Api-Key: $KEY" https://healthchecks.io/api/v3/checks/
+    healthchecksCheckId: process.env.HEALTHCHECKS_CHECK_ID,
+
+    // Base URL — override for a self-hosted healthchecks instance.
+    healthchecksApiBase: optionalEnv(
+      "HEALTHCHECKS_API_BASE",
+      "https://healthchecks.io"
+    ),
+
+    // Directory where scripts/backup.sh writes backup-last-run.json and
+    // backup-history.jsonl. In prod it's /opt/cogext/status on the host,
+    // mounted read-only at /status (docker-compose.prod.yml).
+    statusDir: optionalEnv("BACKUP_STATUS_DIR", "/status"),
   },
 
   // ---------------------------------------------------------------------------

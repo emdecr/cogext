@@ -44,8 +44,12 @@ services:
     restart: unless-stopped
 
     # Publish port 3000 on the host so Nginx can proxy to it.
+    # Bound to 127.0.0.1 so only nginx (on the same host) can reach it.
+    # A bare "3000:3000" listens on every interface, and Docker's own iptables
+    # rules run BEFORE ufw — so ufw's "deny incoming" would NOT block it, and
+    # the app would be reachable over plain HTTP at http://<ip>:3000.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
     # Runtime environment variables from .env (gitignored).
     env_file:
@@ -54,6 +58,14 @@ services:
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
+
+    # Backup run-status files written by scripts/backup.sh on the host, read by
+    # the admin Backups tab (BACKUP_STATUS_DIR defaults to /status). READ-ONLY,
+    # and the host dir holds ONLY status JSON — never the backups themselves.
+    # Create it before first deploy (mkdir -p /opt/cogext/status), or Docker
+    # creates it root-owned and backup.sh (as the deploy user) can't write it.
+    volumes:
+      - /opt/cogext/status:/status:ro
 
     depends_on:
       db:
