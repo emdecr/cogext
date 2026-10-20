@@ -106,8 +106,9 @@ The app will be available at `http://localhost:3000`. Register an account to get
 | `VOYAGE_API_KEY` | Yes | — | Voyage AI API key for embeddings |
 | `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key for chat, tagging, image analysis, reflections |
 | `EMBED_MODEL` | No | `voyage-4-lite` | Voyage AI embedding model |
-| `CHAT_MODEL` | No | `claude-sonnet-4-6` | Claude model for chat, tagging, and reflections |
-| `RECOMMENDATIONS_MODEL` | No | `claude-haiku-4-5-20251001` | Claude model for weekly media recommendations |
+| `CHAT_MODEL` | No | `claude-sonnet-5-5` | Claude model for chat, tagging, profile, and reflections |
+| `RECOMMENDATIONS_MODEL` | No | `claude-haiku-5-5` | Claude model for weekly media recommendations |
+| `IMAGE_ANALYSIS_MODEL` | No | `claude-haiku-5-5` | Claude model for describing uploaded images |
 | `STORAGE_PROVIDER` | No | `local` | `local` or `minio` |
 | `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Public-facing app URL |
 

@@ -93,18 +93,21 @@ export async function generateRecommendations(
     // plenty capable here and significantly cheaper than Sonnet — especially
     // since web search injects large result pages into the context window.
     // Override with RECOMMENDATIONS_MODEL if you want a different model.
-    const model = process.env.RECOMMENDATIONS_MODEL || "claude-haiku-4-5-20251001";
+    const model = process.env.RECOMMENDATIONS_MODEL || "claude-haiku-5-5";
 
     const response = await client.messages.create({
       model,
-      // 2000 gives comfortable headroom for web search tool turns + the final
-      // JSON array. With 1200, multiple search calls before the answer could
-      // squeeze the output and cause a truncated/unparseable response. We now
-      // only ask for 3 recommendations (down from 4-6), so 2000 is still
-      // conservative — a 3-item JSON array is roughly 300-400 tokens.
-      max_tokens: 2000,
+      // A 3-item JSON array is roughly 300-400 tokens, but web search tool
+      // turns and Haiku 5.5's adaptive thinking (on by default) both count
+      // toward max_tokens. 8000 keeps the final JSON from being truncated.
+      max_tokens: 8000,
+      // Haiku 5.5 defaults to "medium"; set it explicitly. Thinking stays on
+      // because this route combines a tool with a JSON-only answer, where
+      // thinking-off can make the model skip a needed search.
+      output_config: { effort: "medium" },
+      // Today's date grounds web search results in what's current.
       system:
-        "You are a thoughtful cultural guide. Recommend books, films, shows, essays, podcasts, and articles that connect specifically to the user's weekly reflection. Return only valid JSON.",
+        `You are a thoughtful cultural guide. Recommend books, films, shows, essays, podcasts, and articles that connect specifically to the user's weekly reflection. Return only valid JSON. The current date is ${new Date().toISOString().slice(0, 10)}.`,
       messages: [
         {
           role: "user",
@@ -138,6 +141,14 @@ export async function generateRecommendations(
           outputTokens: response.usage.output_tokens,
         },
       });
+    }
+
+    if (response.stop_reason === "refusal") {
+      console.warn(
+        "[generate-recommendations] Claude declined the request:",
+        response.stop_details
+      );
+      return [];
     }
 
     const text = extractTextFromAnthropicResponse(response);

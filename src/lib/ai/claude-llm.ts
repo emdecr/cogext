@@ -7,11 +7,17 @@
 // we need a high-quality model that can synthesize across multiple
 // retrieved records and have nuanced multi-turn conversations.
 //
-// Model: claude-sonnet-4-6 (default, configurable via CHAT_MODEL env var)
+// Model: claude-sonnet-5-5 (default, configurable via CHAT_MODEL env var)
 //   - Strong reasoning and synthesis
 //   - Good at following citation/formatting instructions
 //   - Fast enough for real-time chat
-//   - Cost-effective for a personal tool (~$3/1M input tokens)
+//   - Cost-effective for a personal tool ($2/1M input, $10/1M output)
+//
+// Thinking: Sonnet 5.5 runs adaptive thinking by default, and thinking
+// tokens count toward max_tokens. Every call here sets effort "low" (the
+// recommended level for chat, content generation, and classification) so
+// the model skips thinking on simple requests, and max_tokens leaves room
+// for thinking on top of the visible reply.
 //
 // This provider handles chat(), chatStream(), and generateTags().
 // The factory uses Claude for all LLM tasks (tagging + chat).
@@ -41,14 +47,14 @@ export class ClaudeLLMProvider implements LLMProvider {
     this.client = new Anthropic({ apiKey });
 
     // CHAT_MODEL controls which Claude model to use.
-    this.model = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+    this.model = process.env.CHAT_MODEL || "claude-sonnet-5-5";
   }
 
   // ==========================================================================
   // GENERATE TAGS
   // ==========================================================================
   // Uses Claude to analyze content and suggest tags.
-  // Haiku-class models are fast and cheap enough for this high-volume task.
+  // Runs on CHAT_MODEL (see getLLMProvider() in ./index.ts) at low effort.
   async generateTags(content: string, type: string): Promise<string[]> {
     const truncated =
       content.length > 1000 ? content.slice(0, 1000) + "..." : content;
@@ -56,7 +62,10 @@ export class ClaudeLLMProvider implements LLMProvider {
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 200,
+        // The tag JSON itself is ~50 tokens; the rest is headroom for
+        // adaptive thinking, which counts toward max_tokens.
+        max_tokens: 1024,
+        output_config: { effort: "low" },
         // System prompt goes in the top-level `system` field in the
         // Anthropic API — NOT as a message with role "system".
         system:
@@ -72,8 +81,14 @@ export class ClaudeLLMProvider implements LLMProvider {
         ],
       });
 
+      if (response.stop_reason === "refusal") {
+        console.warn("Claude declined tag generation:", response.stop_details);
+        return [];
+      }
+
       // The Anthropic SDK returns content as an array of "content blocks".
-      // For text responses, there's typically one block with type "text".
+      // A response can start with a (possibly empty) thinking block, so
+      // find the text block by type rather than by position.
       const textBlock = response.content.find((block) => block.type === "text");
       if (!textBlock || textBlock.type !== "text") return [];
 
@@ -117,7 +132,11 @@ export class ClaudeLLMProvider implements LLMProvider {
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 2048,
+        // Room for thinking plus a long reply (reflections run to a few
+        // thousand tokens). Non-streaming, so stay at ~16K to avoid SDK
+        // HTTP timeouts.
+        max_tokens: 16000,
+        output_config: { effort: "low" },
         // If no context is provided, use a sensible default.
         // The caller (RAG pipeline) will almost always provide context.
         system:
@@ -139,6 +158,10 @@ export class ClaudeLLMProvider implements LLMProvider {
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
         });
+      }
+
+      if (response.stop_reason === "refusal") {
+        console.warn("Claude declined chat request:", response.stop_details);
       }
 
       const textBlock = response.content.find((block) => block.type === "text");
@@ -185,7 +208,8 @@ export class ClaudeLLMProvider implements LLMProvider {
     // that handles SSE parsing and exposes a nice async iterator.
     const stream = this.client.messages.stream({
       model: this.model,
-      max_tokens: 2048,
+      max_tokens: 16000,
+      output_config: { effort: "low" },
       system:
         context ||
         "You are a helpful assistant for a personal knowledge base.",
