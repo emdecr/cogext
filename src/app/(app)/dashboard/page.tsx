@@ -160,6 +160,7 @@ export default async function DashboardPage() {
                   href="/admin"
                   className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:w-auto sm:px-3"
                   title="Admin"
+                  aria-label="Admin"
                 >
                   <span className="flex items-center gap-1.5">
                     {/* Shield icon */}
@@ -168,6 +169,7 @@ export default async function DashboardPage() {
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"
