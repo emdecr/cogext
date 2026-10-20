@@ -55,6 +55,14 @@ services:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
 
+    # Backup run-status files written by scripts/backup.sh on the host, read by
+    # the admin Backups tab (BACKUP_STATUS_DIR defaults to /status). READ-ONLY,
+    # and the host dir holds ONLY status JSON — never the backups themselves.
+    # Create it before first deploy (mkdir -p /opt/cogext/status), or Docker
+    # creates it root-owned and backup.sh (as the deploy user) can't write it.
+    volumes:
+      - /opt/cogext/status:/status:ro
+
     depends_on:
       db:
         condition: service_healthy
