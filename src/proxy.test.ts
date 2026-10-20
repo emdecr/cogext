@@ -81,7 +81,15 @@ describe("proxy — unauthenticated", () => {
 
   it("treats a tampered cookie as unauthenticated", async () => {
     const token = await signSession();
-    const tampered = token.slice(0, -1) + (token.at(-1) === "A" ? "B" : "A");
+    // Flip the FIRST signature character, not the last. An HS256 signature is
+    // 32 bytes = 43 base64url chars, and the last char only carries 4 data
+    // bits (the low 2 are padding): A/B/C/D decode to the same bytes, so
+    // swapping the last char left ~1 in 16 tokens still valid — a flaky test.
+    // Every other char carries 6 data bits, so changing it always breaks the
+    // signature.
+    const [header, payload, signature] = token.split(".");
+    const flipped = (signature[0] === "A" ? "B" : "A") + signature.slice(1);
+    const tampered = `${header}.${payload}.${flipped}`;
     const res = await proxy(request("/dashboard", tampered));
     expect(redirectLocation(res)).toMatch(/\/nothing-to-see-here$/);
   });
