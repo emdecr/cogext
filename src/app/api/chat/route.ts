@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     // Why the conversion? The provider returns an AsyncGenerator (simplest
     // streaming primitive), but HTTP responses need a ReadableStream
     // (browser API). This bridge is where the two meet.
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
 
     const stream = new ReadableStream({
       async start(controller) {

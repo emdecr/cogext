@@ -520,7 +520,7 @@ export const aiUsage = pgTable("ai_usage", {
   feature: aiFeatureEnum("feature").notNull(),
   provider: aiProviderEnum("provider").notNull(),
 
-  // The specific model used, e.g. "claude-sonnet-4-6", "llama3.2:1b".
+  // The specific model used, e.g. "claude-sonnet-5-5", "llama3.2:1b".
   // Stored as text (not an enum) because models change frequently — you
   // don't want a migration every time Anthropic ships a new model.
   model: text("model").notNull(),

@@ -156,7 +156,7 @@ Return ONLY the JSON object, no other text.`;
 
   try {
     const chatProvider = await getChatProvider();
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
 
     const response = await chatProvider.chat(
       [{ role: "user", content: prompt }],

@@ -144,8 +144,8 @@ export const config = {
     // Get your key at https://console.anthropic.com/settings/keys
     anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
 
-    // Claude model to use for chat and reflections.
-    model: optionalEnv("CHAT_MODEL", "claude-sonnet-4-6"),
+    // Claude model to use for chat, reflections, profile, and auto-tagging.
+    model: optionalEnv("CHAT_MODEL", "claude-sonnet-5-5"),
   },
 
   // ---------------------------------------------------------------------------

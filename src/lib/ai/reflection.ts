@@ -160,7 +160,7 @@ export async function generateReflection(
 
   try {
     const chatProvider = await getChatProvider();
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-4-6";
+    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
 
     // Capture token usage via the callback so we can log it after the
     // reflection row is saved (we need the reflectionId for context).

@@ -188,14 +188,19 @@ export async function analyzeImage(
     //
     // Claude reads them together: "here's an image, now answer this question."
     //
-    // Why claude-haiku-4-5-20251001 and not claude-sonnet-4-6?
+    // Why claude-haiku-5-5 and not claude-sonnet-5-5?
     //   Image description is a structured, well-defined task. Haiku is fast
     //   and cheap — no need for Sonnet's reasoning power here. This also
-    //   keeps image analysis costs low (Haiku is ~10x cheaper than Sonnet).
-    const model = process.env.IMAGE_ANALYSIS_MODEL || "claude-haiku-4-5-20251001";
+    //   keeps image analysis costs low (Haiku is ~20x cheaper than Sonnet).
+    //
+    // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+    // Effort "low" lets it skip thinking on a simple description; the
+    // max_tokens headroom covers the times it does think.
+    const model = process.env.IMAGE_ANALYSIS_MODEL || "claude-haiku-5-5";
     const response = await client.messages.create({
       model,
-      max_tokens: 500, // Description shouldn't need more than ~300 tokens
+      max_tokens: 2048, // Description itself is ~300 tokens; rest is thinking headroom
+      output_config: { effort: "low" },
 
       messages: [
         {
@@ -240,9 +245,14 @@ export async function analyzeImage(
       });
     }
 
+    if (response.stop_reason === "refusal") {
+      console.warn("[analyze-image] Claude declined to describe image:", response.stop_details);
+      return null;
+    }
+
     // ---- Extract the text description ----
-    // Claude's response content is an array of blocks. For a description
-    // task it will always be a single text block, but we find it explicitly
+    // Claude's response content is an array of blocks. It can start with a
+    // (possibly empty) thinking block, so find the text block by type
     // rather than assuming index 0.
     const textBlock = response.content.find((block) => block.type === "text");
     if (!textBlock || textBlock.type !== "text") {

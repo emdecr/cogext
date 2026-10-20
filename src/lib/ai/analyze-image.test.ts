@@ -184,8 +184,8 @@ describe("analyzeImage", () => {
     await analyzeImage("/uploads/photo.jpg");
 
     const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.model).toBe("claude-haiku-4-5-20251001");
-    expect(callArgs.max_tokens).toBe(500);
+    expect(callArgs.model).toBe("claude-haiku-5-5");
+    expect(callArgs.max_tokens).toBe(2048);
   });
 
   it("sends the image as a base64 content block", async () => {
