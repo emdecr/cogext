@@ -30,8 +30,8 @@ import type { EmbeddingProvider, LLMProvider } from "./types";
 // The same provider is reused across all requests.
 //
 // Note: we have TWO LLM singletons — one for tagging, one for chat.
-// Both use Claude now, but could use different models (e.g., Haiku for
-// tagging, Sonnet for chat).
+// Both use Claude, on different models: TAGGING_MODEL (Haiku) for tagging,
+// CHAT_MODEL (Sonnet) for chat.
 let embeddingProvider: EmbeddingProvider | null = null;
 let llmProvider: LLMProvider | null = null;
 let chatProvider: LLMProvider | null = null;
@@ -56,13 +56,19 @@ export async function getEmbeddingProvider(): Promise<EmbeddingProvider> {
 // ============================================================================
 // GET LLM PROVIDER (for tagging)
 // ============================================================================
-// Returns the provider used for AUTO-TAGGING. Uses Claude (same provider
-// as chat, but callers only use generateTags()).
+// Returns the provider used for AUTO-TAGGING. Same Claude provider class as
+// chat, but on its own model: TAGGING_MODEL, default Haiku 5.5. Tagging runs
+// on every save and is simple classification, so it doesn't need Sonnet.
+// (Read here rather than via config.ts to keep this module free of the
+// config import's required-env checks, matching RECOMMENDATIONS_MODEL and
+// IMAGE_ANALYSIS_MODEL; config.chat.taggingModel documents the same default.)
 
 export async function getLLMProvider(): Promise<LLMProvider> {
   if (!llmProvider) {
     const { ClaudeLLMProvider } = await import("./claude-llm");
-    llmProvider = new ClaudeLLMProvider();
+    llmProvider = new ClaudeLLMProvider(
+      process.env.TAGGING_MODEL || "claude-haiku-5-5"
+    );
   }
 
   return llmProvider;
