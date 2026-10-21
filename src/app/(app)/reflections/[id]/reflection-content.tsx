@@ -126,12 +126,15 @@ export default function ReflectionContent({
                   key={`${recommendation.type}-${recommendation.title}-${index}`}
                   className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-950/60"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="mt-0.5 min-w-0 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-900 dark:bg-violet-950/60 dark:text-violet-300">
+                  {/* Stacked: type label on its own line above the title, so
+                      the text uses the card's full width (a side-by-side
+                      label wasted a column on narrow screens). */}
+                  <div>
+                    <div className="inline-block rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-900 dark:bg-violet-950/60 dark:text-violet-300">
                       <span aria-hidden="true">{meta.icon}</span> {meta.label}
                     </div>
 
-                    <div className="min-w-0 flex-1">
+                    <div className="mt-3 min-w-0">
                       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                         {recommendation.url ? (
                           <a
