@@ -25,13 +25,8 @@
 // ============================================================================
 
 import type { EmbeddingProvider, LLMProvider } from "./types";
-import {
-  modelFor,
-  ollamaModelFor,
-  settingSource,
-  type ModelSetting,
-  type OllamaModelSetting,
-} from "./models";
+import { modelFor, ollamaModelFor, settingSource } from "./model-settings";
+import type { ModelSetting, OllamaModelSetting } from "./models";
 
 // ============================================================================
 // ACTIVE PROVIDERS
@@ -197,4 +192,4 @@ export function getModelAssignments(): ModelAssignment[] {
 
 // Re-export types so consumers can import everything from "@/lib/ai"
 export type { EmbeddingProvider, LLMProvider, ChatMessage } from "./types";
-export { modelFor } from "./models";
+export { modelFor } from "./model-settings";

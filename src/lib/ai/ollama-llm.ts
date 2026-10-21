@@ -22,7 +22,7 @@
 // ============================================================================
 
 import type { LLMProvider } from "./types";
-import { ollamaModelFor } from "./models";
+import { ollamaModelFor } from "./model-settings";
 
 export class OllamaLLMProvider implements LLMProvider {
   private baseUrl: string;

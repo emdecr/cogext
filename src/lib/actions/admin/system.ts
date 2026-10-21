@@ -74,7 +74,7 @@ export async function getSystemOverview(): Promise<SystemOverview> {
     readiness,
     runtime: {
       nodeVersion: process.version,
-      nodeEnv: process.env.NODE_ENV ?? "unknown",
+      nodeEnv: config.app.nodeEnv,
       uptimeSeconds: Math.floor(process.uptime()),
       gitSha: config.app.gitSha,
       gitRepository: config.app.gitRepository,

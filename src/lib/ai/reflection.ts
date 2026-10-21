@@ -35,7 +35,7 @@ import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { records, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import {
   generateRecommendations,

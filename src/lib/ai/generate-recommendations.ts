@@ -29,7 +29,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { logAiUsage } from "@/lib/ai/usage";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 import type { UserProfile } from "@/lib/ai/profile";
 import {
   ALLOWED_TYPES,

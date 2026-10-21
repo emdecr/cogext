@@ -31,7 +31,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { LLMProvider, ChatMessage, UsageCallback } from "./types";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 
 export class ClaudeLLMProvider implements LLMProvider {
   private client: Anthropic;

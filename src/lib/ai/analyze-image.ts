@@ -38,7 +38,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { logAiUsage } from "@/lib/ai/usage";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // SUPPORTED IMAGE TYPES

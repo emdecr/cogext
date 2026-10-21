@@ -21,7 +21,7 @@
 // ============================================================================
 
 import type { EmbeddingProvider } from "./types";
-import { ollamaModelFor } from "./models";
+import { ollamaModelFor } from "./model-settings";
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
   // The Ollama server URL. In dev, Ollama runs in Docker on port 11434.

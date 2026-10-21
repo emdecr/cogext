@@ -20,7 +20,7 @@
 // ============================================================================
 
 import type { EmbeddingProvider } from "./types";
-import { modelFor } from "./models";
+import { modelFor } from "./model-settings";
 
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 

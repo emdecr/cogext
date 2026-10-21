@@ -44,7 +44,7 @@ import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { logAiUsage } from "@/lib/ai/usage";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // INPUT VALIDATION

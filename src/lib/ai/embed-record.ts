@@ -22,7 +22,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getEmbeddingProvider } from "@/lib/ai";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // PREPARE TEXT FOR EMBEDDING

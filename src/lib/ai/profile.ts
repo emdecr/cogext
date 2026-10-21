@@ -37,7 +37,7 @@ import { db } from "@/db";
 import { records, aiProfile } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
 import { logAiUsage } from "@/lib/ai/usage";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // PROFILE SHAPE

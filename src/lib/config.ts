@@ -24,7 +24,12 @@
 // =============================================================================
 
 import { parseEmailList } from "@/lib/auth/admin-emails";
-import { modelFor } from "@/lib/ai/models";
+import {
+  MODEL_DEFAULTS,
+  OLLAMA_MODEL_DEFAULTS,
+  type ModelSetting,
+  type OllamaModelSetting,
+} from "@/lib/ai/models";
 
 // =============================================================================
 // HELPER: require an env var or throw a clear error
@@ -48,6 +53,47 @@ function requireEnv(name: string): string {
 function optionalEnv(name: string, defaultValue: string): string {
   return process.env[name] || defaultValue;
 }
+
+// =============================================================================
+// AI MODEL SETTINGS (optional)
+// =============================================================================
+// Resolved before the config object so `chat.model` and `voyage.embedModel`
+// can share the same values as `ai.models`. Empty string → default, like
+// optionalEnv() everywhere else. Listed one per line so every model env var
+// stays greppable in this file.
+const aiModels: Record<ModelSetting, string> = {
+  CHAT_MODEL: optionalEnv("CHAT_MODEL", MODEL_DEFAULTS.CHAT_MODEL),
+  TAGGING_MODEL: optionalEnv("TAGGING_MODEL", MODEL_DEFAULTS.TAGGING_MODEL),
+  RECOMMENDATIONS_MODEL: optionalEnv(
+    "RECOMMENDATIONS_MODEL",
+    MODEL_DEFAULTS.RECOMMENDATIONS_MODEL
+  ),
+  IMAGE_ANALYSIS_MODEL: optionalEnv(
+    "IMAGE_ANALYSIS_MODEL",
+    MODEL_DEFAULTS.IMAGE_ANALYSIS_MODEL
+  ),
+  WEB_SEARCH_TOOL_VERSION: optionalEnv(
+    "WEB_SEARCH_TOOL_VERSION",
+    MODEL_DEFAULTS.WEB_SEARCH_TOOL_VERSION
+  ),
+  EMBED_MODEL: optionalEnv("EMBED_MODEL", MODEL_DEFAULTS.EMBED_MODEL),
+};
+
+// Only used when src/lib/ai/index.ts is swapped to the Ollama providers.
+const ollamaModels: Record<OllamaModelSetting, string> = {
+  LLM_MODEL: optionalEnv("LLM_MODEL", OLLAMA_MODEL_DEFAULTS.LLM_MODEL),
+  EMBED_MODEL: optionalEnv("EMBED_MODEL", OLLAMA_MODEL_DEFAULTS.EMBED_MODEL),
+};
+
+const modelFromEnv: Record<ModelSetting | OllamaModelSetting, boolean> = {
+  CHAT_MODEL: Boolean(process.env.CHAT_MODEL),
+  TAGGING_MODEL: Boolean(process.env.TAGGING_MODEL),
+  RECOMMENDATIONS_MODEL: Boolean(process.env.RECOMMENDATIONS_MODEL),
+  IMAGE_ANALYSIS_MODEL: Boolean(process.env.IMAGE_ANALYSIS_MODEL),
+  WEB_SEARCH_TOOL_VERSION: Boolean(process.env.WEB_SEARCH_TOOL_VERSION),
+  EMBED_MODEL: Boolean(process.env.EMBED_MODEL),
+  LLM_MODEL: Boolean(process.env.LLM_MODEL),
+};
 
 // =============================================================================
 // CONFIG OBJECT
@@ -133,8 +179,8 @@ export const config = {
     // Get your key at https://dash.voyageai.com/
     apiKey: requireEnv("VOYAGE_API_KEY"),
 
-    // The embedding model name.
-    embedModel: modelFor("EMBED_MODEL"),
+    // The embedding model name (same value as ai.models.EMBED_MODEL).
+    embedModel: aiModels.EMBED_MODEL,
   },
 
   // ---------------------------------------------------------------------------
@@ -145,13 +191,23 @@ export const config = {
     // Get your key at https://console.anthropic.com/settings/keys
     anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
 
-    // Claude model to use for chat, reflections, and profile.
-    model: modelFor("CHAT_MODEL"),
+    // Claude model for chat, reflections, and profile (same value as
+    // ai.models.CHAT_MODEL). Every model setting is under `ai` below.
+    model: aiModels.CHAT_MODEL,
+  },
 
-    // Claude model for auto-tagging (every record save). Cheap and fast is
-    // enough for 3-5 tags. Defaults for all model settings live in
-    // src/lib/ai/models.ts.
-    taggingModel: modelFor("TAGGING_MODEL"),
+  // ---------------------------------------------------------------------------
+  // AI model names — all optional, all with defaults
+  // ---------------------------------------------------------------------------
+  // Read the effective values via src/lib/ai/model-settings.ts (modelFor() /
+  // ollamaModelFor() / settingSource()), not from here directly. Defaults
+  // live in src/lib/ai/models.ts.
+  ai: {
+    models: aiModels,
+    ollamaModels: ollamaModels,
+    // Whether each setting was set in the environment (vs the code default),
+    // for the admin System tab.
+    fromEnv: modelFromEnv,
   },
 
   // ---------------------------------------------------------------------------
@@ -212,6 +268,9 @@ export const config = {
     // "owner/repo" on GitHub, also from CI — used only to link gitSha to its
     // commit page. Empty → no link.
     gitRepository: process.env.GIT_REPOSITORY ?? "",
+
+    // "production" / "development" / "test". Shown on admin → System.
+    nodeEnv: optionalEnv("NODE_ENV", "unknown"),
   },
 };
 
