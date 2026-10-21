@@ -20,7 +20,9 @@
 // This is faster than making separate requests for each text.
 // ============================================================================
 
-import type { EmbeddingProvider } from "./types";
+import type { EmbeddingProvider, OutcomeCallback } from "./types";
+import { reportOutcome } from "./outcome";
+import { AiHttpError, AiInvalidResponseError } from "./errors";
 import { ollamaModelFor } from "./model-settings";
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
@@ -39,8 +41,8 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   // ---- Single text embedding ----
-  async embed(text: string): Promise<number[]> {
-    const results = await this.embedBatch([text]);
+  async embed(text: string, onOutcome?: OutcomeCallback): Promise<number[]> {
+    const results = await this.embedBatch([text], onOutcome);
     return results[0];
   }
 
@@ -49,24 +51,40 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   // Batching is more efficient because:
   //   1. One HTTP request instead of N
   //   2. The model can process texts in parallel internally
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    const response = await fetch(`${this.baseUrl}/api/embed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: this.model,
-        input: texts,
-      }),
-    });
+  // Reports one outcome per request and rethrows failures (callers decide
+  // whether an embedding failure is fatal).
+  async embedBatch(texts: string[], onOutcome?: OutcomeCallback): Promise<number[][]> {
+    const meta = { provider: "ollama" as const, model: this.model };
+    try {
+      const response = await fetch(`${this.baseUrl}/api/embed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: this.model,
+          input: texts,
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Ollama embedding failed: ${error}`);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new AiHttpError("ollama", response.status, `Ollama embedding failed: ${error}`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data.embeddings) || data.embeddings.length === 0) {
+        throw new AiInvalidResponseError("Ollama embedding returned no data");
+      }
+
+      reportOutcome(onOutcome, {
+        ...meta,
+        status: "ok",
+        usage: { inputTokens: data.prompt_eval_count ?? 0, outputTokens: 0 },
+      });
+      // Ollama returns { embeddings: [[...], [...], ...] }
+      return data.embeddings;
+    } catch (error) {
+      reportOutcome(onOutcome, { ...meta, status: "error", error });
+      throw error;
     }
-
-    const data = await response.json();
-
-    // Ollama returns { embeddings: [[...], [...], ...] }
-    return data.embeddings;
   }
 }

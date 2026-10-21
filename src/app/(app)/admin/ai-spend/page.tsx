@@ -36,6 +36,7 @@ const FEATURE_LABELS: Record<string, string> = {
   image_analysis: "Image analysis",
   profile: "AI profile",
   tagging: "Auto-tagging",
+  embedding: "Embeddings",
 };
 
 const pill =
@@ -99,7 +100,6 @@ export default async function AdminAiSpendPage({
   const window = parseSpendWindow((await searchParams).window);
   const s = await getAiSpend(window);
   const now = new Date(s.generatedAt);
-  const loggedFeatures = new Set(s.byFeature.map((l) => l.key));
 
   return (
     <section>
@@ -207,10 +207,11 @@ export default async function AdminAiSpendPage({
           (<code>src/lib/ai/pricing.ts</code>). Prompt-cache discounts and web
           search fees on recommendations aren&apos;t included.
         </li>
-        {!loggedFeatures.has("tagging") && (
-          <li>Auto-tagging calls aren&apos;t logged yet, so they&apos;re missing here.</li>
-        )}
-        <li>Embeddings (Voyage) aren&apos;t logged yet, so they&apos;re not included.</li>
+        <li>
+          Embeddings (Voyage) are logged with their token counts but not priced
+          yet, so they show as unpriced and aren&apos;t in the total.
+        </li>
+        <li>Call counts include failed calls; those have 0 tokens and add no cost.</li>
         <li>All users combined.</li>
       </ul>
     </section>

@@ -30,7 +30,10 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMProvider, ChatMessage, UsageCallback } from "./types";
+import type { LLMProvider, ChatMessage, OutcomeCallback } from "./types";
+import { reportOutcome } from "./outcome";
+import { AiInvalidResponseError } from "./errors";
+import { logger } from "@/lib/logger";
 import { modelFor } from "@/lib/ai/model-settings";
 
 export class ClaudeLLMProvider implements LLMProvider {
@@ -62,12 +65,19 @@ export class ClaudeLLMProvider implements LLMProvider {
   // Runs on TAGGING_MODEL (default claude-haiku-5-5, see getLLMProvider() in
   // ./index.ts) at low effort. Haiku 5.5 also thinks by default, so the
   // max_tokens headroom below applies to it too.
-  async generateTags(content: string, type: string): Promise<string[]> {
+  async generateTags(
+    content: string,
+    type: string,
+    onOutcome?: OutcomeCallback
+  ): Promise<string[]> {
     const truncated =
       content.length > 1000 ? content.slice(0, 1000) + "..." : content;
+    const meta = { provider: "claude" as const, model: this.model };
 
+    // 1. The API call. A throw here means nothing usable came back.
+    let response: Anthropic.Message;
     try {
-      const response = await this.client.messages.create({
+      response = await this.client.messages.create({
         model: this.model,
         // The tag JSON itself is ~50 tokens; the rest is headroom for
         // adaptive thinking, which counts toward max_tokens.
@@ -87,33 +97,58 @@ export class ClaudeLLMProvider implements LLMProvider {
           },
         ],
       });
+    } catch (error) {
+      logger.error("Claude tag generation failed", { feature: "tagging", error });
+      reportOutcome(onOutcome, { ...meta, status: "error", error });
+      return [];
+    }
 
-      if (response.stop_reason === "refusal") {
-        console.warn("Claude declined tag generation:", response.stop_details);
-        return [];
-      }
+    const usage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    };
 
+    if (response.stop_reason === "refusal") {
+      logger.warn("Claude declined tag generation", {
+        feature: "tagging",
+        stopDetails: response.stop_details,
+      });
+      reportOutcome(onOutcome, { ...meta, status: "refusal", usage });
+      return [];
+    }
+
+    // 2. Parse the reply. A failure here was still billed: report it as an
+    //    invalid_response error that keeps the usage.
+    try {
       // The Anthropic SDK returns content as an array of "content blocks".
       // A response can start with a (possibly empty) thinking block, so
       // find the text block by type rather than by position.
       const textBlock = response.content.find((block) => block.type === "text");
-      if (!textBlock || textBlock.type !== "text") return [];
+      if (!textBlock || textBlock.type !== "text") {
+        throw new AiInvalidResponseError("Tagging reply had no text block");
+      }
 
       // Strip markdown code fences if Claude wraps the JSON (e.g. ```json\n{...}\n```)
       let rawText = textBlock.text.trim();
       rawText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?\s*```$/, "");
 
       const parsed = JSON.parse(rawText);
-      if (!parsed.tags || !Array.isArray(parsed.tags)) return [];
+      if (!parsed.tags || !Array.isArray(parsed.tags)) {
+        throw new AiInvalidResponseError('Tagging reply had no "tags" array');
+      }
 
-      return parsed.tags
+      const tags = parsed.tags
         .map((tag: unknown) =>
           typeof tag === "string" ? tag.trim().toLowerCase() : ""
         )
         .filter((tag: string) => tag.length > 0)
         .slice(0, 5);
+
+      reportOutcome(onOutcome, { ...meta, status: "ok", usage });
+      return tags;
     } catch (error) {
-      console.error("Claude tag generation failed:", error);
+      logger.warn("Claude tag reply unusable", { feature: "tagging", error });
+      reportOutcome(onOutcome, { ...meta, status: "error", error, usage });
       return [];
     }
   }
@@ -134,8 +169,9 @@ export class ClaudeLLMProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     context?: string,
-    onUsage?: UsageCallback
+    onOutcome?: OutcomeCallback
   ): Promise<string> {
+    const meta = { provider: "claude" as const, model: this.model };
     try {
       const response = await this.client.messages.create({
         model: this.model,
@@ -158,23 +194,26 @@ export class ClaudeLLMProvider implements LLMProvider {
         })),
       });
 
-      // Report token usage if the caller wants it.
       // response.usage is always present on a successful Anthropic response.
-      if (onUsage) {
-        onUsage({
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        });
-      }
+      const usage = {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      };
 
       if (response.stop_reason === "refusal") {
-        console.warn("Claude declined chat request:", response.stop_details);
+        logger.warn("Claude declined chat request", {
+          stopDetails: response.stop_details,
+        });
+        reportOutcome(onOutcome, { ...meta, status: "refusal", usage });
+      } else {
+        reportOutcome(onOutcome, { ...meta, status: "ok", usage });
       }
 
       const textBlock = response.content.find((block) => block.type === "text");
       return textBlock && textBlock.type === "text" ? textBlock.text : "";
     } catch (error) {
-      console.error("Claude chat failed:", error);
+      logger.error("Claude chat failed", { error });
+      reportOutcome(onOutcome, { ...meta, status: "error", error });
       throw error; // Re-throw for chat — the caller needs to handle this
       // (unlike tags, where we silently return [] and move on)
     }
@@ -208,8 +247,9 @@ export class ClaudeLLMProvider implements LLMProvider {
   async *chatStream(
     messages: ChatMessage[],
     context?: string,
-    onUsage?: UsageCallback
+    onOutcome?: OutcomeCallback
   ): AsyncGenerator<string, void, unknown> {
+    const meta = { provider: "claude" as const, model: this.model };
     // client.messages.stream() returns a Stream object that emits events.
     // We use the .stream() method (not .create()) — it returns a helper
     // that handles SSE parsing and exposes a nice async iterator.
@@ -238,25 +278,37 @@ export class ClaudeLLMProvider implements LLMProvider {
     //
     // The `on("text")` helper simplifies this — it fires only for text deltas.
     // But we use the raw events for more control and to make the flow visible.
-    for await (const event of stream) {
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
-        yield event.delta.text;
+    try {
+      for await (const event of stream) {
+        if (
+          event.type === "content_block_delta" &&
+          event.delta.type === "text_delta"
+        ) {
+          yield event.delta.text;
+        }
       }
+    } catch (error) {
+      // The request failed or the stream broke mid-response. Report it, then
+      // rethrow so the route can end the HTTP stream with an error.
+      reportOutcome(onOutcome, { ...meta, status: "error", error });
+      throw error;
     }
 
     // After the stream completes, the SDK can reconstruct the full message
     // including token counts. finalMessage() is a lightweight call — no
     // extra API request, it just assembles the data from events we already
     // received during streaming.
-    if (onUsage) {
+    if (onOutcome) {
       try {
         const finalMessage = await stream.finalMessage();
-        onUsage({
+        const usage = {
           inputTokens: finalMessage.usage.input_tokens,
           outputTokens: finalMessage.usage.output_tokens,
+        };
+        reportOutcome(onOutcome, {
+          ...meta,
+          status: finalMessage.stop_reason === "refusal" ? "refusal" : "ok",
+          usage,
         });
       } catch {
         // If we can't get usage from the stream, don't break the response.

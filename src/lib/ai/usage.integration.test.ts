@@ -15,8 +15,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsage, users } from "@/db/schema";
-import { AiHttpError, MAX_ERROR_MESSAGE_LENGTH } from "@/lib/ai/errors";
-import { logAiFailure, logAiUsage } from "@/lib/ai/usage";
+import { AiHttpError, AiInvalidResponseError, MAX_ERROR_MESSAGE_LENGTH } from "@/lib/ai/errors";
+import { logAiFailure, logAiOutcome, logAiUsage } from "@/lib/ai/usage";
 
 let userId: string | undefined;
 
@@ -120,5 +120,28 @@ describe("ai_usage outcome logging", () => {
         error: new Error("boom"),
       })
     ).resolves.toBeUndefined();
+  });
+
+  it("logAiOutcome writes provider outcomes, keeping billed usage on invalid_response", async () => {
+    await logAiOutcome(
+      { userId: userId!, feature: "embedding" },
+      { status: "ok", provider: "voyage", model: "voyage-4-lite", usage: { inputTokens: 42, outputTokens: 0 } }
+    );
+    await logAiOutcome(
+      { userId: userId!, feature: "tagging" },
+      {
+        status: "error",
+        provider: "claude",
+        model: "claude-haiku-5-5",
+        error: new AiInvalidResponseError('no "tags" array'),
+        usage: { inputTokens: 300, outputTokens: 20 },
+      }
+    );
+
+    const rows = (await rowsFor()).slice(-2);
+    expect(rows.map((r) => [r.feature, r.provider, r.status, r.errorKind, r.inputTokens])).toEqual([
+      ["embedding", "voyage", "ok", null, 42],
+      ["tagging", "claude", "error", "invalid_response", 300],
+    ]);
   });
 });

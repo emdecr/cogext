@@ -37,7 +37,10 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
-import { logAiUsage } from "@/lib/ai/usage";
+import { logAiOutcome } from "@/lib/ai/usage";
+import type { AiCallOutcome } from "@/lib/ai/outcome";
+import { AiInvalidResponseError } from "@/lib/ai/errors";
+import { logger } from "@/lib/logger";
 import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
@@ -177,6 +180,13 @@ export async function analyzeImage(
   // 5MB upload cap gives us plenty of headroom.
   const base64Data = buffer.toString("base64");
 
+  // One ai_usage row per call (when there's a userId to attribute it to).
+  const model = modelFor("IMAGE_ANALYSIS_MODEL");
+  const log = (outcome: AiCallOutcome) => {
+    if (userId) logAiOutcome({ userId, feature: "image_analysis" }, outcome);
+  };
+  const meta = { provider: "claude" as const, model };
+
   try {
     const client = new Anthropic({ apiKey });
 
@@ -197,7 +207,6 @@ export async function analyzeImage(
     // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
     // Effort "low" lets it skip thinking on a simple description; the
     // max_tokens headroom covers the times it does think.
-    const model = modelFor("IMAGE_ANALYSIS_MODEL");
     const response = await client.messages.create({
       model,
       max_tokens: 2048, // Description itself is ~300 tokens; rest is thinking headroom
@@ -232,22 +241,17 @@ export async function analyzeImage(
       ],
     });
 
-    // Log token usage if we have a userId for attribution.
-    if (userId) {
-      logAiUsage({
-        userId,
-        feature: "image_analysis",
-        provider: "claude",
-        model,
-        usage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        },
-      });
-    }
+    const usage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    };
 
     if (response.stop_reason === "refusal") {
-      console.warn("[analyze-image] Claude declined to describe image:", response.stop_details);
+      logger.warn("Claude declined to describe image", {
+        feature: "image_analysis",
+        stopDetails: response.stop_details,
+      });
+      log({ ...meta, status: "refusal", usage });
       return null;
     }
 
@@ -256,21 +260,24 @@ export async function analyzeImage(
     // (possibly empty) thinking block, so find the text block by type
     // rather than assuming index 0.
     const textBlock = response.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      console.warn("[analyze-image] Claude returned no text block");
+    const description =
+      textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+    if (!description) {
+      // Billed, but unusable: an invalid_response that keeps the usage.
+      const error = new AiInvalidResponseError("Image analysis reply had no text");
+      logger.warn("Claude returned no image description", { feature: "image_analysis" });
+      log({ ...meta, status: "error", error, usage });
       return null;
     }
 
-    const description = textBlock.text.trim();
-    if (!description) return null;
-
+    log({ ...meta, status: "ok", usage });
     return description;
   } catch (error) {
     // Analysis failure is not fatal. The record still exists and saves
     // correctly — it just won't have AI-generated searchable content.
-    // We log the error for debugging but swallow it so the caller doesn't
-    // need to handle it.
-    console.error("[analyze-image] Claude Vision API call failed:", error);
+    // Logged, then swallowed so the caller doesn't need to handle it.
+    logger.error("Claude Vision API call failed", { feature: "image_analysis", error });
+    log({ ...meta, status: "error", error });
     return null;
   }
 }

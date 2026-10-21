@@ -70,6 +70,13 @@ function truncate(message: string): string {
     : message;
 }
 
+// `instanceof` that tolerates a missing class (e.g. a test that mocks the SDK
+// module with a bare stub) instead of throwing — classification must never
+// throw, since it runs inside "never throws" loggers.
+function isInstance(err: unknown, cls: unknown): boolean {
+  return typeof cls === "function" && err instanceof (cls as new (...args: never[]) => unknown);
+}
+
 export function classifyAiError(err: unknown): {
   kind: AiErrorKind;
   message: string;
@@ -80,11 +87,12 @@ export function classifyAiError(err: unknown): {
 
   const kind: AiErrorKind = (() => {
     // Order matters: the timeout class is a subclass of the connection class.
-    if (err instanceof Anthropic.APIConnectionTimeoutError) return "timeout";
-    if (err instanceof Anthropic.APIUserAbortError) return "timeout";
-    if (err instanceof Anthropic.APIConnectionError) return "network";
-    if (err instanceof Anthropic.APIError && typeof err.status === "number") {
-      return kindForStatus(err.status);
+    if (isInstance(err, Anthropic.APIConnectionTimeoutError)) return "timeout";
+    if (isInstance(err, Anthropic.APIUserAbortError)) return "timeout";
+    if (isInstance(err, Anthropic.APIConnectionError)) return "network";
+    if (isInstance(err, Anthropic.APIError)) {
+      const status = (err as { status?: unknown }).status;
+      if (typeof status === "number") return kindForStatus(status);
     }
     if (err instanceof AiHttpError) return kindForStatus(err.status);
     if (err instanceof AiInvalidResponseError) return "invalid_response";

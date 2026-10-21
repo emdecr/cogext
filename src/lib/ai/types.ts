@@ -29,11 +29,12 @@
 
 export interface EmbeddingProvider {
   // Convert a single text into a vector
-  embed(text: string): Promise<number[]>;
+  embed(text: string, onOutcome?: OutcomeCallback): Promise<number[]>;
 
   // Convert multiple texts at once (more efficient than calling embed()
   // in a loop — providers can batch the work internally)
-  embedBatch(texts: string[]): Promise<number[][]>;
+  // One API request → one outcome, however many texts.
+  embedBatch(texts: string[], onOutcome?: OutcomeCallback): Promise<number[][]>;
 
   // The size of vectors this provider produces. Must match the database
   // column size. nomic-embed-text = 768, OpenAI small = 1536.
@@ -60,19 +61,19 @@ export interface ChatMessage {
 }
 
 // ============================================================================
-// USAGE CALLBACK
+// OUTCOME CALLBACK
 // ============================================================================
-// Optional callback that providers call after an API response completes.
-// Callers pass this in to capture token counts without changing the return
-// type of chat/chatStream. If not provided, usage data is simply ignored.
+// Every method below that calls a model takes an optional `onOutcome`
+// callback, invoked once per API request with ok / refusal / error (plus the
+// provider's name, model, and token usage). Callers pass it to
+// logAiOutcome() so every call leaves one ai_usage row. Defined in
+// ./outcome.ts; re-exported here so provider consumers import from one place.
 //
-// For streaming: the callback fires after the stream finishes (when the
-// final message event arrives with the full usage tally).
+// For streaming: it fires after the stream finishes (when the final message
+// arrives with the full usage tally), or when the stream fails.
 
-export type UsageCallback = (usage: {
-  inputTokens: number;
-  outputTokens: number;
-}) => void;
+import type { OutcomeCallback } from "./outcome";
+export type { AiCallOutcome, OutcomeCallback } from "./outcome";
 
 // ============================================================================
 // LLM PROVIDER
@@ -90,7 +91,12 @@ export interface LLMProvider {
   // Returns an array of tag name strings (e.g., ["recipes", "italian", "pasta"]).
   // The `type` parameter helps the LLM understand context
   // (a "quote" gets different tags than a "link").
-  generateTags(content: string, type: string): Promise<string[]>;
+  // Never throws: failures return [] and are reported via onOutcome.
+  generateTags(
+    content: string,
+    type: string,
+    onOutcome?: OutcomeCallback
+  ): Promise<string[]>;
 
   // --------------------------------------------------------------------------
   // CHAT METHODS (Phase 3)
@@ -110,12 +116,11 @@ export interface LLMProvider {
   // Get a complete response (waits for the full answer).
   // Good for background tasks like profile generation where streaming
   // doesn't help.
-  // The optional onUsage callback fires once with the token counts after
-  // the response is received. Pass it to capture usage for logging.
+  // Throws on failure (after reporting it via onOutcome).
   chat(
     messages: ChatMessage[],
     context?: string,
-    onUsage?: UsageCallback
+    onOutcome?: OutcomeCallback
   ): Promise<string>;
 
   // Get a streaming response, yielding text chunks as they arrive.
@@ -124,10 +129,10 @@ export interface LLMProvider {
   //     process.stdout.write(chunk);  // each chunk is a few tokens
   //   }
   // No ReadableStream, no event emitters, no callbacks — just a for loop.
-  // The optional onUsage callback fires once after the stream completes.
+  // onOutcome fires once, after the stream completes or fails.
   chatStream(
     messages: ChatMessage[],
     context?: string,
-    onUsage?: UsageCallback
+    onOutcome?: OutcomeCallback
   ): AsyncGenerator<string, void, unknown>;
 }

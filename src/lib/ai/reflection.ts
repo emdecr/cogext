@@ -35,7 +35,6 @@ import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { records, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
-import { modelFor } from "@/lib/ai/model-settings";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import {
   generateRecommendations,
@@ -45,7 +44,9 @@ import {
   normalizeStoredRecommendations,
   type Recommendation,
 } from "@/lib/ai/recommendations";
-import { logAiUsage, type TokenUsage } from "@/lib/ai/usage";
+import { logAiOutcome } from "@/lib/ai/usage";
+import type { AiCallOutcome } from "@/lib/ai/outcome";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // RETURN TYPE
@@ -159,18 +160,25 @@ export async function generateReflection(
     userProfile
   );
 
+  // A successful call's outcome is held until the reflection row exists, so
+  // its ai_usage row can carry the reflectionId. A failed call is logged
+  // right away (there will be no reflection). If something after the call
+  // fails, the held outcome is still logged in the catch — without an id.
+  let pendingOutcome: AiCallOutcome | null = null;
+
   try {
     const chatProvider = await getChatProvider();
-    const chatModel = modelFor("CHAT_MODEL");
-
-    // Capture token usage via the callback so we can log it after the
-    // reflection row is saved (we need the reflectionId for context).
-    let reflectionUsage: TokenUsage | null = null;
 
     const content = await chatProvider.chat(
       [{ role: "user", content: reflectionPrompt }],
       "You are a thoughtful personal assistant helping someone reflect on what they saved to their knowledge base over a given period. Write in a warm, observant tone. Use markdown formatting. The period may be a single week or span several weeks — let the prompt's stated range and record count guide your framing.",
-      (usage) => { reflectionUsage = usage; }
+      (outcome) => {
+        if (outcome.status === "error") {
+          logAiOutcome({ userId, feature: "reflection" }, outcome);
+        } else {
+          pendingOutcome = outcome;
+        }
+      }
     );
 
     // Resolve inline record markers (e.g. "(R7)") into real /records/<uuid>
@@ -225,17 +233,14 @@ export async function generateReflection(
       })
       .returning({ id: reflections.id });
 
-    // Log token usage now that we have the reflectionId.
+    // Log the call now that we have the reflectionId.
     // Fire-and-forget — don't block the return on logging.
-    if (reflectionUsage) {
-      logAiUsage({
-        userId,
-        feature: "reflection",
-        provider: "claude",
-        model: chatModel,
-        usage: reflectionUsage,
-        reflectionId: saved.id,
-      });
+    if (pendingOutcome) {
+      logAiOutcome(
+        { userId, feature: "reflection", reflectionId: saved.id },
+        pendingOutcome
+      );
+      pendingOutcome = null;
     }
 
     return {
@@ -244,7 +249,12 @@ export async function generateReflection(
       recommendations,
     };
   } catch (error) {
-    console.error("Reflection generation failed:", error);
+    // The model call succeeded but a later step (recommendations, save)
+    // failed: the call was still billed, so log it, just without an id.
+    if (pendingOutcome) {
+      logAiOutcome({ userId, feature: "reflection" }, pendingOutcome);
+    }
+    logger.error("Reflection generation failed", { feature: "reflection", error });
     throw error;
   }
 }

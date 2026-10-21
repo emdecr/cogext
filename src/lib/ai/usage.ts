@@ -24,6 +24,7 @@ import { db } from "@/db";
 import { aiUsage } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { classifyAiError } from "./errors";
+import type { AiCallOutcome } from "./outcome";
 
 // ============================================================================
 // TYPES
@@ -103,8 +104,8 @@ export function logAiUsage(params: LogAiUsageParams): Promise<void> {
 // ============================================================================
 // LOG AI FAILURE
 // ============================================================================
-// Records a call that threw: 0 tokens (nothing billed, or nothing we can
-// see), status "error", and the classified kind + truncated message. Same
+// Records a failed call: status "error", 0 tokens unless the request was
+// billed but its reply unusable (pass `usage`), and the classified kind + truncated message. Same
 // fire-and-forget contract as logAiUsage — it never throws, so a catch block
 // can call it without its own try/catch.
 //
@@ -117,12 +118,21 @@ export type LogAiFailureParams = {
   provider: AiProvider;
   model: string;
   error: unknown;
+  // Billed tokens, when the request succeeded but the reply was unusable
+  // (invalid_response). Omit when the request itself failed.
+  usage?: TokenUsage;
   conversationId?: string;
   reflectionId?: string;
 };
 
 export function logAiFailure(params: LogAiFailureParams): Promise<void> {
-  const { kind, message } = classifyAiError(params.error);
+  let kind: string = "unknown";
+  let message = "unclassifiable error";
+  try {
+    ({ kind, message } = classifyAiError(params.error));
+  } catch {
+    // Keep the defaults — logging the failure matters more than its label.
+  }
   return db
     .insert(aiUsage)
     .values({
@@ -130,8 +140,8 @@ export function logAiFailure(params: LogAiFailureParams): Promise<void> {
       feature: params.feature,
       provider: params.provider,
       model: params.model,
-      inputTokens: 0,
-      outputTokens: 0,
+      inputTokens: params.usage?.inputTokens ?? 0,
+      outputTokens: params.usage?.outputTokens ?? 0,
       conversationId: params.conversationId,
       reflectionId: params.reflectionId,
       status: "error",
@@ -147,4 +157,43 @@ export function logAiFailure(params: LogAiFailureParams): Promise<void> {
         error,
       });
     });
+}
+
+// ============================================================================
+// LOG AI OUTCOME
+// ============================================================================
+// The one-liner callers use with a provider's onOutcome callback:
+//
+//   llm.generateTags(text, type, (o) => logAiOutcome({ userId, feature: "tagging" }, o));
+//
+// The provider supplies status, provider name, model, and usage; the caller
+// supplies who and what. Fire-and-forget, never throws.
+
+export type AiOutcomeContext = {
+  userId: string;
+  feature: AiFeature;
+  conversationId?: string;
+  reflectionId?: string;
+};
+
+export function logAiOutcome(
+  context: AiOutcomeContext,
+  outcome: AiCallOutcome
+): Promise<void> {
+  if (outcome.status === "error") {
+    return logAiFailure({
+      ...context,
+      provider: outcome.provider,
+      model: outcome.model,
+      error: outcome.error,
+      usage: outcome.usage,
+    });
+  }
+  return logAiUsage({
+    ...context,
+    provider: outcome.provider,
+    model: outcome.model,
+    usage: outcome.usage,
+    status: outcome.status,
+  });
 }

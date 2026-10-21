@@ -36,6 +36,7 @@ import { getSession } from "@/lib/auth/session";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
+import { logAiOutcome } from "@/lib/ai/usage";
 import { addTagToRecord } from "@/lib/actions/tags";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import {
@@ -205,6 +206,7 @@ export async function createRecord(
           const aiTags = await llm.generateTags(
             description,
             parsed.data.type,
+            (outcome) => logAiOutcome({ userId, feature: "tagging" }, outcome),
           );
 
           await Promise.all(
@@ -232,6 +234,7 @@ export async function createRecord(
           const aiTags = await llm.generateTags(
             parsed.data.content,
             parsed.data.type,
+            (outcome) => logAiOutcome({ userId, feature: "tagging" }, outcome),
           );
 
           await Promise.all(
