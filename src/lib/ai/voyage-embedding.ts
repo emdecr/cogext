@@ -21,6 +21,7 @@
 
 import type { EmbeddingProvider } from "./types";
 import { modelFor } from "./model-settings";
+import { AiHttpError, AiInvalidResponseError } from "./errors";
 
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 
@@ -78,7 +79,11 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(
+      // Typed so classifyAiError() reads the status directly (message
+      // format unchanged).
+      throw new AiHttpError(
+        "voyage",
+        response.status,
         `Voyage AI API error (${response.status}): ${body}`
       );
     }
@@ -86,7 +91,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
     const result: VoyageAPIResponse = await response.json();
 
     if (!result.data || result.data.length === 0) {
-      throw new Error("Voyage embedding returned no data");
+      throw new AiInvalidResponseError("Voyage embedding returned no data");
     }
 
     // Sort by index to ensure order matches input, then extract embeddings.
@@ -94,7 +99,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
 
     return sorted.map((item) => {
       if (!item.embedding) {
-        throw new Error("Voyage embedding returned null embedding for an item");
+        throw new AiInvalidResponseError("Voyage embedding returned null embedding for an item");
       }
       return item.embedding;
     });

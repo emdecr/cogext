@@ -86,10 +86,18 @@ export const aiFeatureEnum = pgEnum("ai_feature", [
   "recommendation",
   "image_analysis",
   "tagging",
+  // Voyage/Ollama embedding calls (record saves, search queries, chat RAG).
+  // Added with the AI failure-alerts plan (2026-10-21).
+  "embedding",
 ]);
 
 // Which AI provider handled the request.
-export const aiProviderEnum = pgEnum("ai_provider", ["claude", "ollama"]);
+export const aiProviderEnum = pgEnum("ai_provider", ["claude", "ollama", "voyage"]);
+
+// Outcome of an AI call. "error" rows carry 0 tokens plus error_kind /
+// error_message; "refusal" rows keep their (billed) tokens. See
+// src/lib/ai/usage.ts and plans/2026-10-21-ai-failure-alerts.md.
+export const aiCallStatusEnum = pgEnum("ai_call_status", ["ok", "error", "refusal"]);
 
 // Auth/audit events — what happened on the authentication surface. Kept as an
 // enum for validation; adding a new event type is a one-line change here plus a
@@ -510,7 +518,9 @@ export const reflections = pgTable("reflections", {
 // "my reflections used 45k tokens this month" or "conversation X is my
 // most expensive conversation."
 
-export const aiUsage = pgTable("ai_usage", {
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
 
   userId: uuid("user_id")
@@ -528,6 +538,17 @@ export const aiUsage = pgTable("ai_usage", {
   inputTokens: integer("input_tokens").notNull(),
   outputTokens: integer("output_tokens").notNull(),
 
+  // Success or failure of the call. Existing rows backfill as "ok".
+  status: aiCallStatusEnum("status").notNull().default("ok"),
+
+  // For status "error": a normalized category from classifyAiError()
+  // (auth, rate_limit, timeout, ...) — never raw provider text.
+  errorKind: text("error_kind"),
+
+  // For status "error": the provider's error text, truncated to 300 chars.
+  // Never prompt or record content.
+  errorMessage: text("error_message"),
+
   // Optional links to the domain object that triggered this call.
   // Only chat and reflections have a natural parent; for other features
   // (profile, image_analysis, tagging) these stay null and the feature
@@ -538,7 +559,13 @@ export const aiUsage = pgTable("ai_usage", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+  },
+  (table) => [
+    // Every read is time-windowed: AI spend (7d/30d), the alert check
+    // (last N hours), the System tab's last-used lookup.
+    index("ai_usage_created_at_idx").on(table.createdAt),
+  ]
+);
 
 // ============================================================================
 // AUTH EVENTS (audit log)

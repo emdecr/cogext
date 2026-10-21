@@ -12,11 +12,18 @@
 //
 // Usage is fire-and-forget: logging failures are swallowed and logged to
 // the console. An AI call should never fail because the usage logger broke.
+//
+// Every call gets ONE row, success or not (plans/2026-10-21-ai-failure-alerts.md):
+//   - logAiUsage()   — success (status "ok", the default) or a refusal
+//                      (status "refusal", with the tokens it was billed for)
+//   - logAiFailure() — the call threw; 0 tokens, status "error", plus a
+//                      classified error_kind and a truncated error_message
 // ============================================================================
 
 import { db } from "@/db";
 import { aiUsage } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { classifyAiError } from "./errors";
 
 // ============================================================================
 // TYPES
@@ -37,10 +44,14 @@ export type AiFeature =
   | "profile"
   | "recommendation"
   | "image_analysis"
-  | "tagging";
+  | "tagging"
+  | "embedding";
 
 // Which provider handled the call. Must match the ai_provider enum.
-export type AiProvider = "claude" | "ollama";
+export type AiProvider = "claude" | "ollama" | "voyage";
+
+// Outcome of the call. Must match the ai_call_status enum.
+export type AiCallStatus = "ok" | "error" | "refusal";
 
 // Everything needed to log a single AI usage row.
 export type LogAiUsageParams = {
@@ -51,6 +62,8 @@ export type LogAiUsageParams = {
   usage: TokenUsage;
   conversationId?: string;
   reflectionId?: string;
+  // "ok" (default) or "refusal". Errors go through logAiFailure() instead.
+  status?: Exclude<AiCallStatus, "error">;
 };
 
 // ============================================================================
@@ -74,6 +87,7 @@ export function logAiUsage(params: LogAiUsageParams): Promise<void> {
       outputTokens: params.usage.outputTokens,
       conversationId: params.conversationId,
       reflectionId: params.reflectionId,
+      status: params.status ?? "ok",
     })
     .then(() => {})
     .catch((error) => {
@@ -81,6 +95,55 @@ export function logAiUsage(params: LogAiUsageParams): Promise<void> {
       logger.error("Failed to log AI usage", {
         feature: params.feature,
         provider: params.provider,
+        error,
+      });
+    });
+}
+
+// ============================================================================
+// LOG AI FAILURE
+// ============================================================================
+// Records a call that threw: 0 tokens (nothing billed, or nothing we can
+// see), status "error", and the classified kind + truncated message. Same
+// fire-and-forget contract as logAiUsage — it never throws, so a catch block
+// can call it without its own try/catch.
+//
+// Only for real AI-call failures. Skip-paths that aren't failures (no API
+// key in dev, image file missing, record deleted) are NOT logged here.
+
+export type LogAiFailureParams = {
+  userId: string;
+  feature: AiFeature;
+  provider: AiProvider;
+  model: string;
+  error: unknown;
+  conversationId?: string;
+  reflectionId?: string;
+};
+
+export function logAiFailure(params: LogAiFailureParams): Promise<void> {
+  const { kind, message } = classifyAiError(params.error);
+  return db
+    .insert(aiUsage)
+    .values({
+      userId: params.userId,
+      feature: params.feature,
+      provider: params.provider,
+      model: params.model,
+      inputTokens: 0,
+      outputTokens: 0,
+      conversationId: params.conversationId,
+      reflectionId: params.reflectionId,
+      status: "error",
+      errorKind: kind,
+      errorMessage: message,
+    })
+    .then(() => {})
+    .catch((error) => {
+      logger.error("Failed to log AI failure", {
+        feature: params.feature,
+        provider: params.provider,
+        errorKind: kind,
         error,
       });
     });
