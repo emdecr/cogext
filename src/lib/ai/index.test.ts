@@ -44,6 +44,32 @@ describe("AI provider factory", () => {
     expect(ClaudeLLMProvider).toHaveBeenCalledWith("claude-sonnet-5-5");
   });
 
+  it("model assignments match what the factories and features resolve", async () => {
+    process.env.TAGGING_MODEL = "claude-sonnet-5-5";
+    delete process.env.CHAT_MODEL;
+    const { getModelAssignments } = await import("@/lib/ai");
+    const byFeature = Object.fromEntries(
+      getModelAssignments().map((m) => [m.feature, m])
+    );
+
+    expect(byFeature.tagging).toMatchObject({
+      model: "claude-sonnet-5-5",
+      setting: "TAGGING_MODEL",
+      source: "env",
+      provider: "claude",
+    });
+    expect(byFeature.chat).toMatchObject({
+      model: "claude-sonnet-5-5",
+      setting: "CHAT_MODEL",
+      source: "default",
+    });
+    expect(byFeature.recommendation.note).toMatch(/web_search_/);
+    expect(byFeature.embedding).toMatchObject({ provider: "voyage", setting: "EMBED_MODEL" });
+    expect(Object.keys(byFeature).sort()).toEqual(
+      ["chat", "embedding", "image_analysis", "profile", "recommendation", "reflection", "tagging"]
+    );
+  });
+
   it("chat passes no model, so the provider falls back to CHAT_MODEL", async () => {
     const { getChatProvider } = await import("@/lib/ai");
     await getChatProvider();

@@ -20,6 +20,7 @@
 // ============================================================================
 
 import type { EmbeddingProvider } from "./types";
+import { modelFor } from "./models";
 
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 
@@ -51,7 +52,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
     }
 
     this.apiKey = apiKey;
-    this.model = process.env.EMBED_MODEL || "voyage-4-lite";
+    this.model = modelFor("EMBED_MODEL");
   }
 
   // ---- Single text embedding ----

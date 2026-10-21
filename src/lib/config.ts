@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { parseEmailList } from "@/lib/auth/admin-emails";
+import { modelFor } from "@/lib/ai/models";
 
 // =============================================================================
 // HELPER: require an env var or throw a clear error
@@ -133,7 +134,7 @@ export const config = {
     apiKey: requireEnv("VOYAGE_API_KEY"),
 
     // The embedding model name.
-    embedModel: optionalEnv("EMBED_MODEL", "voyage-4-lite"),
+    embedModel: modelFor("EMBED_MODEL"),
   },
 
   // ---------------------------------------------------------------------------
@@ -145,12 +146,12 @@ export const config = {
     anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
 
     // Claude model to use for chat, reflections, and profile.
-    model: optionalEnv("CHAT_MODEL", "claude-sonnet-5-5"),
+    model: modelFor("CHAT_MODEL"),
 
     // Claude model for auto-tagging (every record save). Cheap and fast is
-    // enough for 3-5 tags. Read by getLLMProvider() in src/lib/ai/index.ts,
-    // which keeps its own copy of this default — keep the two in sync.
-    taggingModel: optionalEnv("TAGGING_MODEL", "claude-haiku-5-5"),
+    // enough for 3-5 tags. Defaults for all model settings live in
+    // src/lib/ai/models.ts.
+    taggingModel: modelFor("TAGGING_MODEL"),
   },
 
   // ---------------------------------------------------------------------------
@@ -203,6 +204,14 @@ export const config = {
     // Cron callers must include this in the Authorization header.
     // Generate with: openssl rand -hex 32
     cronSecret: process.env.CRON_SECRET,
+
+    // Commit this build came from. Baked into the image by CI (Dockerfile
+    // ARG GIT_SHA); "dev" for local/unstamped builds. Shown on admin → System.
+    gitSha: optionalEnv("GIT_SHA", "dev"),
+
+    // "owner/repo" on GitHub, also from CI — used only to link gitSha to its
+    // commit page. Empty → no link.
+    gitRepository: process.env.GIT_REPOSITORY ?? "",
   },
 };
 

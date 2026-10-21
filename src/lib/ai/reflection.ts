@@ -35,6 +35,7 @@ import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { records, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
+import { modelFor } from "@/lib/ai/models";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import {
   generateRecommendations,
@@ -160,7 +161,7 @@ export async function generateReflection(
 
   try {
     const chatProvider = await getChatProvider();
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
+    const chatModel = modelFor("CHAT_MODEL");
 
     // Capture token usage via the callback so we can log it after the
     // reflection row is saved (we need the reflectionId for context).

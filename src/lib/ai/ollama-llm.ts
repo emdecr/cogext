@@ -22,6 +22,7 @@
 // ============================================================================
 
 import type { LLMProvider } from "./types";
+import { ollamaModelFor } from "./models";
 
 export class OllamaLLMProvider implements LLMProvider {
   private baseUrl: string;
@@ -29,7 +30,7 @@ export class OllamaLLMProvider implements LLMProvider {
 
   constructor() {
     this.baseUrl = process.env.AI_BASE_URL || "http://localhost:11434";
-    this.model = process.env.LLM_MODEL || "llama3.2:1b";
+    this.model = ollamaModelFor("LLM_MODEL");
   }
 
   // ---- Generate tags for a record ----

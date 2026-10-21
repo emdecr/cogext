@@ -15,50 +15,17 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { getBackupOverview } from "@/lib/actions/admin/backups";
 import {
   formatBytes,
-  formatRelative,
-  formatUtc,
   type BackupOutcome,
   type BackupRun,
   type HcResult,
 } from "@/lib/backups/parse";
-import { getAdminTab } from "../tabs";
-
-const card =
-  "rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900";
-const cardTitle =
-  "text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400";
-const muted = "text-sm text-gray-500 dark:text-gray-400";
+import { Badge, When, TabHeading, card, cardTitle, muted, tone, type Tone } from "../ui";
 
 // ---------------------------------------------------------------------------
-// Badges
+// Status labels
 // ---------------------------------------------------------------------------
 
-const tone = {
-  green:
-    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  amber:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  red: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  gray: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-} as const;
-
-function Badge({
-  color,
-  children,
-}: {
-  color: keyof typeof tone;
-  children: React.ReactNode;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tone[color]}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-const HC_STATUS: Record<string, { label: string; color: keyof typeof tone }> = {
+const HC_STATUS: Record<string, { label: string; color: Tone }> = {
   up: { label: "Up", color: "green" },
   grace: { label: "Late (grace)", color: "amber" },
   down: { label: "Down", color: "red" },
@@ -66,7 +33,7 @@ const HC_STATUS: Record<string, { label: string; color: keyof typeof tone }> = {
   new: { label: "New (no pings yet)", color: "gray" },
 };
 
-const OUTCOME: Record<BackupOutcome, { label: string; color: keyof typeof tone }> = {
+const OUTCOME: Record<BackupOutcome, { label: string; color: Tone }> = {
   offsite: { label: "Backed up offsite", color: "green" },
   local: { label: "Local only", color: "amber" },
   skipped: { label: "Skipped (no changes)", color: "gray" },
@@ -80,15 +47,6 @@ function OutcomeBadge({ run }: { run: BackupRun }) {
       {o.label}
       {run.outcome === "failed" ? ` (exit ${run.exitCode})` : ""}
     </Badge>
-  );
-}
-
-// "3 hours ago" with the exact UTC time on hover.
-function When({ iso, now }: { iso: string; now: Date }) {
-  return (
-    <time dateTime={iso} title={formatUtc(iso)}>
-      {formatRelative(iso, now)}
-    </time>
   );
 }
 
@@ -266,7 +224,6 @@ function HistoryTable({ history, now }: { history: BackupRun[]; now: Date }) {
 
 export default async function AdminBackupsPage() {
   await requireAdmin();
-  const tab = getAdminTab("backups");
   const overview = await getBackupOverview();
   const now = new Date(overview.generatedAt);
   const { hc, file, warnings, lastWritten } = overview;
@@ -274,10 +231,7 @@ export default async function AdminBackupsPage() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {tab.label}
-      </h2>
-      <p className={`mt-1 ${muted}`}>{tab.description}</p>
+      <TabHeading slug="backups" />
 
       {warnings.length > 0 && (
         <ul className="mt-4 space-y-2">

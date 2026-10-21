@@ -31,6 +31,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { LLMProvider, ChatMessage, UsageCallback } from "./types";
+import { modelFor } from "@/lib/ai/models";
 
 export class ClaudeLLMProvider implements LLMProvider {
   private client: Anthropic;
@@ -51,7 +52,7 @@ export class ClaudeLLMProvider implements LLMProvider {
     this.client = new Anthropic({ apiKey });
 
     // Defaults to CHAT_MODEL when the factory doesn't pass a model.
-    this.model = model || process.env.CHAT_MODEL || "claude-sonnet-5-5";
+    this.model = model || modelFor("CHAT_MODEL");
   }
 
   // ==========================================================================

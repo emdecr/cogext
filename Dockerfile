@@ -140,6 +140,16 @@ ENV NODE_ENV=production
 # Disable telemetry in the runner too (build env vars don't carry over).
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Which commit this image was built from, shown on the admin System tab.
+# CI passes --build-arg GIT_SHA=<sha> GIT_REPOSITORY=<owner/repo>; local builds
+# leave them empty (the app shows "dev"). Declared LAST in the runner stage on
+# purpose: the value changes every commit, and every layer after an ARG is
+# rebuilt when it changes — here that's only these two ENV lines.
+ARG GIT_SHA=""
+ARG GIT_REPOSITORY=""
+ENV GIT_SHA=$GIT_SHA
+ENV GIT_REPOSITORY=$GIT_REPOSITORY
+
 # dumb-init is PID 1. It forwards signals (SIGTERM, SIGINT) to its child
 # process. docker-entrypoint.sh runs migrations then `exec`s into server.js.
 # The exec means server.js inherits the process slot — dumb-init → server.js.
