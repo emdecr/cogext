@@ -20,6 +20,7 @@ import {
   SPEND_WINDOWS,
   WINDOW_LABELS,
   barPercent,
+  displayUsd,
   formatTokens,
   parseSpendWindow,
   type SpendLine,
@@ -50,6 +51,13 @@ function lineDetail(l: SpendLine): string {
   return parts.join(" · ");
 }
 
+// One rule everywhere: a line whose calls are ALL unpriced shows "unpriced",
+// never "$0.00" (see displayUsd).
+function Cost({ line }: { line: SpendLine }) {
+  const usd = displayUsd(line);
+  return usd === null ? <Badge color="amber">unpriced</Badge> : <>{formatUsd(usd)}</>;
+}
+
 function FeatureBars({ lines, total }: { lines: SpendLine[]; total: number }) {
   const max = Math.max(...lines.map((l) => l.usd), 0);
   return (
@@ -57,12 +65,14 @@ function FeatureBars({ lines, total }: { lines: SpendLine[]; total: number }) {
       {lines.map((l) => {
         const label = FEATURE_LABELS[l.key] ?? l.key;
         return (
-          <li key={l.key} title={`${label}: ${formatUsd(l.usd)} · ${lineDetail(l)}`}>
+          <li key={l.key} title={`${label}: ${formatUsd(displayUsd(l))} · ${lineDetail(l)}`}>
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="text-gray-900 dark:text-gray-100">{label}</span>
               <span className="whitespace-nowrap tabular-nums text-gray-900 dark:text-gray-100">
-                {formatUsd(l.usd)}
-                <span className={`ml-2 text-xs ${muted}`}>{percentOf(l.usd, total)}</span>
+                <Cost line={l} />
+                {displayUsd(l) !== null && (
+                  <span className={`ml-2 text-xs ${muted}`}>{percentOf(l.usd, total)}</span>
+                )}
               </span>
             </div>
             {/* Bar: anchored at the left baseline, 4px rounded data end only. */}
@@ -137,7 +147,7 @@ export default async function AdminAiSpendPage({
           <div className={`${card} mt-4`}>
             <h3 className={cardTitle}>Estimated LLM spend · {WINDOW_LABELS[s.window]}</h3>
             <div className="mt-1 text-3xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-              {formatUsd(s.total.usd)}
+              <Cost line={s.total} />
             </div>
             <p className={`mt-1 text-xs ${muted}`}>
               {lineDetail(s.total)}
@@ -180,11 +190,7 @@ export default async function AdminAiSpendPage({
                     <td className="px-4 py-2 text-right">{formatTokens(m.inputTokens)}</td>
                     <td className="px-4 py-2 text-right">{formatTokens(m.outputTokens)}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right">
-                      {m.unpricedCalls === m.calls ? (
-                        <Badge color="amber">unpriced</Badge>
-                      ) : (
-                        formatUsd(m.usd)
-                      )}
+                      <Cost line={m} />
                     </td>
                   </tr>
                 ))}

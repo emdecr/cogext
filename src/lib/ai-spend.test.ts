@@ -8,6 +8,7 @@
 
 import {
   barPercent,
+  displayUsd,
   formatTokens,
   parseSpendWindow,
   summarizeSpend,
@@ -66,6 +67,25 @@ describe("summarizeSpend", () => {
     expect(s.total.usd).toBeCloseTo(2);
     expect(s.total.unpricedCalls).toBe(3);
     expect(s.total.calls).toBe(4);
+  });
+
+  it("displayUsd: all-unpriced lines read 'unpriced', not $0 (feature, model, and total)", () => {
+    const allLocal = summarizeSpend([
+      bucket({ feature: "tagging", model: "llama3.2:1b", calls: 5, inputTokens: 500, outputTokens: 50 }),
+    ]);
+    expect(displayUsd(allLocal.byFeature[0])).toBeNull();
+    expect(displayUsd(allLocal.byModel[0])).toBeNull();
+    expect(displayUsd(allLocal.total)).toBeNull();
+
+    // Partly priced → the priced portion; the detail text carries the count.
+    const mixed = summarizeSpend([
+      bucket({ model: "llama3.2:1b", calls: 3 }),
+      bucket({ model: "claude-sonnet-5-5", calls: 1, inputTokens: 1_000_000 }),
+    ]);
+    expect(displayUsd(mixed.total)).toBeCloseTo(2);
+
+    // No calls at all is $0, not "unpriced".
+    expect(displayUsd(summarizeSpend([]).total)).toBe(0);
   });
 
   it("handles no rows", () => {

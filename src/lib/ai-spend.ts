@@ -53,6 +53,16 @@ function add(line: SpendLine, b: UsageBucket, usd: number | null) {
 
 const byCost = (a: SpendLine, b: SpendLine) => b.usd - a.usd || b.calls - a.calls;
 
+/**
+ * The cost to DISPLAY for a line: null ("unpriced") when it has calls but
+ * every one of them is on an unpriced model — showing `usd` (0) there would
+ * read as "free". Partly-priced lines show the priced portion; the detail
+ * text carries the unpriced count.
+ */
+export function displayUsd(line: SpendLine): number | null {
+  return line.calls > 0 && line.unpricedCalls === line.calls ? null : line.usd;
+}
+
 export function summarizeSpend(buckets: UsageBucket[]): SpendSummary {
   const features = new Map<string, SpendLine>();
   const models = new Map<string, SpendLine>();
