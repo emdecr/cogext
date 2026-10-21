@@ -196,8 +196,7 @@ export default async function AdminSystemPage() {
         Rate limits are kept in memory, so they reset whenever the app
         restarts (uptime above). Model defaults live in{" "}
         <code>src/lib/ai/models.ts</code>; their env vars are read in{" "}
-        <code>src/lib/config.ts</code>. Per-record embedding models will be on
-        the{" "}
+        <code>src/lib/config.ts</code>. Per-record embedding models are on the{" "}
         <Link href="/admin/data" className="underline underline-offset-2">
           Data tab
         </Link>
