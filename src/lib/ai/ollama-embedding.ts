@@ -21,6 +21,7 @@
 // ============================================================================
 
 import type { EmbeddingProvider } from "./types";
+import { ollamaModelFor } from "./model-settings";
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
   // The Ollama server URL. In dev, Ollama runs in Docker on port 11434.
@@ -34,7 +35,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   constructor() {
     this.baseUrl = process.env.AI_BASE_URL || "http://localhost:11434";
-    this.model = process.env.EMBED_MODEL || "nomic-embed-text";
+    this.model = ollamaModelFor("EMBED_MODEL");
   }
 
   // ---- Single text embedding ----

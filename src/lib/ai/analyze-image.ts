@@ -38,6 +38,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { logAiUsage } from "@/lib/ai/usage";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // SUPPORTED IMAGE TYPES
@@ -196,7 +197,7 @@ export async function analyzeImage(
     // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
     // Effort "low" lets it skip thinking on a simple description; the
     // max_tokens headroom covers the times it does think.
-    const model = process.env.IMAGE_ANALYSIS_MODEL || "claude-haiku-5-5";
+    const model = modelFor("IMAGE_ANALYSIS_MODEL");
     const response = await client.messages.create({
       model,
       max_tokens: 2048, // Description itself is ~300 tokens; rest is thinking headroom

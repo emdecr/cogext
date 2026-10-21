@@ -44,6 +44,7 @@ import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { logAiUsage } from "@/lib/ai/usage";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // INPUT VALIDATION
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
     // Why the conversion? The provider returns an AsyncGenerator (simplest
     // streaming primitive), but HTTP responses need a ReadableStream
     // (browser API). This bridge is where the two meet.
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
+    const chatModel = modelFor("CHAT_MODEL");
 
     const stream = new ReadableStream({
       async start(controller) {

@@ -34,158 +34,23 @@
 // =============================================================================
 
 import { NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
-import { config } from "@/lib/config";
-import { logger } from "@/lib/logger";
+import { runReadinessChecks } from "@/lib/health";
 
-// =============================================================================
-// CHECK RESULT TYPE
-// =============================================================================
-
-type CheckStatus = "ok" | "degraded" | "error";
-
-type CheckResult = {
-  status: CheckStatus;
-  latencyMs?: number; // how long the check took (useful for DB latency monitoring)
-  note?: string;      // human-readable detail on degraded/error
-};
-
-// =============================================================================
-// INDIVIDUAL CHECKS
-// =============================================================================
-
-// ---------------------------------------------------------------------------
-// Database check
-// ---------------------------------------------------------------------------
-// Runs `SELECT 1` — the lightest possible query that still exercises the full
-// connection path (TCP connect, auth handshake, query, response).
-// We measure round-trip latency — if it's >200ms for a SELECT 1, something
-// is wrong with the connection (network issues, connection pool exhausted).
-
-async function checkDatabase(): Promise<CheckResult> {
-  const start = Date.now();
-  try {
-    // sql`SELECT 1` is Drizzle's tagged template for raw SQL.
-    // It goes through the same connection pool as all other queries,
-    // so if this works, normal queries will too.
-    await db.execute(sql`SELECT 1`);
-
-    return {
-      status: "ok",
-      latencyMs: Date.now() - start,
-    };
-  } catch (error) {
-    logger.error("Health check: database unreachable", { error });
-    return {
-      status: "error",
-      latencyMs: Date.now() - start,
-      note: "Cannot connect to PostgreSQL",
-    };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Storage check (MinIO)
-// ---------------------------------------------------------------------------
-// Only runs when STORAGE_PROVIDER=minio. In dev (local storage), we skip
-// this check since there's no MinIO container to ping.
-//
-// MinIO provides a dedicated health endpoint: /minio/health/live
-// It returns 200 if MinIO is up and ready, non-200 otherwise.
-// This is the same endpoint our docker-compose.prod.yml healthcheck uses.
-
-async function checkStorage(): Promise<CheckResult> {
-  // Skip check in local storage mode — no MinIO to ping
-  if (config.storage.provider !== "minio") {
-    return {
-      status: "ok",
-      note: "Local storage (no MinIO check needed)",
-    };
-  }
-
-  const start = Date.now();
-  try {
-    // Ping MinIO's built-in liveness endpoint.
-    // Uses the internal endpoint (http://minio:9000) — same as the app uses
-    // for uploads. If this is reachable, uploads will work.
-    const response = await fetch(
-      `${config.storage.endpoint}/minio/health/live`,
-      {
-        // Short timeout — health checks should fail fast, not hang.
-        // If MinIO doesn't respond in 5s, it's down.
-        signal: AbortSignal.timeout(5000),
-      }
-    );
-
-    if (response.ok) {
-      return { status: "ok", latencyMs: Date.now() - start };
-    }
-
-    return {
-      status: "degraded",
-      latencyMs: Date.now() - start,
-      note: `MinIO responded with HTTP ${response.status}`,
-    };
-  } catch (error) {
-    logger.warn("Health check: MinIO unreachable", { error });
-    return {
-      status: "degraded",
-      latencyMs: Date.now() - start,
-      // Degraded, not error — existing image URLs still load (they're cached
-      // in the browser or served from the stored URLs). Only NEW uploads fail.
-      note: "MinIO unreachable — uploads unavailable",
-    };
-  }
-}
-
-
-// =============================================================================
-// READINESS HANDLER
-// =============================================================================
+// The checks themselves live in src/lib/health.ts (shared with the admin
+// System tab).
 
 export async function GET() {
-  // Run all checks in parallel — faster than sequential.
-  const [database, storage] = await Promise.all([
-    checkDatabase(),
-    checkStorage(),
-  ]);
-
-  const checks = { database, storage };
-
-  // Determine overall status.
-  // Rules:
-  //   "error"    — DB is down (critical, app can't serve data)
-  //   "degraded" — non-critical service is down (app still partially works)
-  //   "ok"       — everything healthy
-  let overallStatus: CheckStatus = "ok";
-
-  if (database.status === "error") {
-    overallStatus = "error";
-  } else if (
-    storage.status === "degraded" ||
-    storage.status === "error"
-  ) {
-    overallStatus = "degraded";
-  }
+  const report = await runReadinessChecks();
 
   // HTTP 503 only for critical failures (DB down).
   // Degraded → 200 so monitoring tools don't page you for non-critical
   // issues at 3am. Set up a separate alert for "degraded" if you want.
-  const httpStatus = overallStatus === "error" ? 503 : 200;
+  const httpStatus = report.status === "error" ? 503 : 200;
 
-  return NextResponse.json(
-    {
-      status: overallStatus,
-      timestamp: new Date().toISOString(),
-      uptime: Math.floor(process.uptime()),
-      checks,
+  return NextResponse.json(report, {
+    status: httpStatus,
+    headers: {
+      "Cache-Control": "no-store",
     },
-    {
-      status: httpStatus,
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    }
-  );
+  });
 }

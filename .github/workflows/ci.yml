@@ -454,6 +454,11 @@ jobs:
           context: .
           # Only push on main branch (not on PRs)
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Stamps the image with its commit for the admin System tab
+          # (Dockerfile runner stage → GIT_SHA / GIT_REPOSITORY env).
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            GIT_REPOSITORY=${{ github.repository }}
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:sha-${{ github.sha }}

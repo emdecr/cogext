@@ -37,6 +37,7 @@ import { db } from "@/db";
 import { records, aiProfile } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
 import { logAiUsage } from "@/lib/ai/usage";
+import { modelFor } from "@/lib/ai/model-settings";
 
 // ============================================================================
 // PROFILE SHAPE
@@ -156,7 +157,7 @@ Return ONLY the JSON object, no other text.`;
 
   try {
     const chatProvider = await getChatProvider();
-    const chatModel = process.env.CHAT_MODEL || "claude-sonnet-5-5";
+    const chatModel = modelFor("CHAT_MODEL");
 
     const response = await chatProvider.chat(
       [{ role: "user", content: prompt }],

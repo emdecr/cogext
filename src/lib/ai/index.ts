@@ -25,6 +25,20 @@
 // ============================================================================
 
 import type { EmbeddingProvider, LLMProvider } from "./types";
+import { modelFor, ollamaModelFor, settingSource } from "./model-settings";
+import type { ModelSetting, OllamaModelSetting } from "./models";
+
+// ============================================================================
+// ACTIVE PROVIDERS
+// ============================================================================
+// Which concrete providers the factories below construct. Not read by the
+// factories (they name their classes directly); it labels the admin System
+// tab's model table. KEEP IN SYNC when swapping providers in this file (the
+// swap-ai-provider skill updates both).
+export const ACTIVE_PROVIDERS: {
+  llm: "claude" | "ollama";
+  embedding: "voyage" | "ollama";
+} = { llm: "claude", embedding: "voyage" };
 
 // We cache provider instances so they're only created once (singleton pattern).
 // The same provider is reused across all requests.
@@ -59,16 +73,12 @@ export async function getEmbeddingProvider(): Promise<EmbeddingProvider> {
 // Returns the provider used for AUTO-TAGGING. Same Claude provider class as
 // chat, but on its own model: TAGGING_MODEL, default Haiku 5.5. Tagging runs
 // on every save and is simple classification, so it doesn't need Sonnet.
-// (Read here rather than via config.ts to keep this module free of the
-// config import's required-env checks, matching RECOMMENDATIONS_MODEL and
-// IMAGE_ANALYSIS_MODEL; config.chat.taggingModel documents the same default.)
+// The model name and its default come from ./models.ts.
 
 export async function getLLMProvider(): Promise<LLMProvider> {
   if (!llmProvider) {
     const { ClaudeLLMProvider } = await import("./claude-llm");
-    llmProvider = new ClaudeLLMProvider(
-      process.env.TAGGING_MODEL || "claude-haiku-5-5"
-    );
+    llmProvider = new ClaudeLLMProvider(modelFor("TAGGING_MODEL"));
   }
 
   return llmProvider;
@@ -90,5 +100,96 @@ export async function getChatProvider(): Promise<LLMProvider> {
   return chatProvider;
 }
 
+// ============================================================================
+// MODEL ASSIGNMENTS (admin System tab)
+// ============================================================================
+// Which model runs which feature, resolved the same way the code above and
+// the feature modules resolve it (./models.ts). `feature` matches the
+// ai_usage.feature enum where a feature logs usage, so the tab can show the
+// last-used model next to the configured one.
+
+export type ModelAssignment = {
+  feature:
+    | "chat"
+    | "reflection"
+    | "profile"
+    | "tagging"
+    | "recommendation"
+    | "image_analysis"
+    | "embedding";
+  label: string;
+  setting: string; // env var name
+  model: string; // effective value
+  source: "env" | "default";
+  provider: "claude" | "ollama" | "voyage";
+  note?: string;
+};
+
+export function getModelAssignments(): ModelAssignment[] {
+  const onOllama = ACTIVE_PROVIDERS.llm === "ollama";
+
+  // Features served by the swappable LLM provider (chat + tagging factories).
+  const llmRow = (
+    feature: ModelAssignment["feature"],
+    label: string,
+    cloudSetting: ModelSetting
+  ): ModelAssignment => {
+    const setting: ModelSetting | OllamaModelSetting = onOllama
+      ? "LLM_MODEL"
+      : cloudSetting;
+    return {
+      feature,
+      label,
+      setting,
+      model: onOllama ? ollamaModelFor("LLM_MODEL") : modelFor(cloudSetting),
+      source: settingSource(setting),
+      provider: ACTIVE_PROVIDERS.llm,
+    };
+  };
+
+  // Features that call the Anthropic SDK directly — always Claude.
+  const claudeRow = (
+    feature: ModelAssignment["feature"],
+    label: string,
+    setting: ModelSetting,
+    note?: string
+  ): ModelAssignment => ({
+    feature,
+    label,
+    setting,
+    model: modelFor(setting),
+    source: settingSource(setting),
+    provider: "claude",
+    ...(note ? { note } : {}),
+  });
+
+  const embeddingOnOllama = ACTIVE_PROVIDERS.embedding === "ollama";
+
+  return [
+    llmRow("chat", "Chat (RAG)", "CHAT_MODEL"),
+    llmRow("reflection", "Weekly reflections", "CHAT_MODEL"),
+    llmRow("profile", "AI profile", "CHAT_MODEL"),
+    llmRow("tagging", "Auto-tagging", "TAGGING_MODEL"),
+    claudeRow(
+      "recommendation",
+      "Recommendations",
+      "RECOMMENDATIONS_MODEL",
+      `web search: ${modelFor("WEB_SEARCH_TOOL_VERSION")}`
+    ),
+    claudeRow("image_analysis", "Image analysis", "IMAGE_ANALYSIS_MODEL"),
+    {
+      feature: "embedding",
+      label: "Embeddings",
+      setting: "EMBED_MODEL",
+      model: embeddingOnOllama
+        ? ollamaModelFor("EMBED_MODEL")
+        : modelFor("EMBED_MODEL"),
+      source: settingSource("EMBED_MODEL"),
+      provider: ACTIVE_PROVIDERS.embedding,
+    },
+  ];
+}
+
 // Re-export types so consumers can import everything from "@/lib/ai"
 export type { EmbeddingProvider, LLMProvider, ChatMessage } from "./types";
+export { modelFor } from "./model-settings";
