@@ -30,9 +30,9 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMProvider, ChatMessage, OutcomeCallback } from "./types";
+import type { AiCallOutcome, LLMProvider, ChatMessage, OutcomeCallback } from "./types";
 import { reportOutcome } from "./outcome";
-import { AiInvalidResponseError } from "./errors";
+import { AiAbortedError, AiInvalidResponseError } from "./errors";
 import { logger } from "@/lib/logger";
 import { modelFor } from "@/lib/ai/model-settings";
 
@@ -278,41 +278,76 @@ export class ClaudeLLMProvider implements LLMProvider {
     //
     // The `on("text")` helper simplifies this — it fires only for text deltas.
     // But we use the raw events for more control and to make the flow visible.
+    // Exactly one outcome per request, however the stream ends:
+    //   - finished      → ok / refusal (from finalMessage)
+    //   - provider/stream error → error, rethrown to the route
+    //   - consumer stopped early (browser disconnected, so the route's
+    //     enqueue throws and for-await calls return() on this generator
+    //     while it's paused at `yield`) → neither catch nor the code after
+    //     the loop runs; `finally` reports an "aborted" outcome instead.
+    // Partial usage comes from the SDK's currentMessage snapshot — tokens
+    // streamed before a break were still billed.
+    let reported = false;
+    const report = (outcome: AiCallOutcome) => {
+      reported = true;
+      reportOutcome(onOutcome, outcome);
+    };
+    const partialUsage = () => {
+      const message = stream.currentMessage;
+      return message
+        ? {
+            inputTokens: message.usage.input_tokens,
+            outputTokens: message.usage.output_tokens,
+          }
+        : undefined;
+    };
+
     try {
-      for await (const event of stream) {
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
-        ) {
-          yield event.delta.text;
+      try {
+        for await (const event of stream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            yield event.delta.text;
+          }
+        }
+      } catch (error) {
+        // The request failed or the stream broke mid-response. Report it,
+        // then rethrow so the route can end the HTTP stream with an error.
+        report({ ...meta, status: "error", error, usage: partialUsage() });
+        throw error;
+      }
+
+      // After the stream completes, the SDK can reconstruct the full message
+      // including token counts. finalMessage() is a lightweight call — no
+      // extra API request, it just assembles the data from events we already
+      // received during streaming.
+      if (onOutcome) {
+        try {
+          const finalMessage = await stream.finalMessage();
+          report({
+            ...meta,
+            status: finalMessage.stop_reason === "refusal" ? "refusal" : "ok",
+            usage: {
+              inputTokens: finalMessage.usage.input_tokens,
+              outputTokens: finalMessage.usage.output_tokens,
+            },
+          });
+        } catch (error) {
+          // The reply was already delivered — don't break it. But record
+          // the failure rather than silently dropping the call's row.
+          report({ ...meta, status: "error", error, usage: partialUsage() });
         }
       }
-    } catch (error) {
-      // The request failed or the stream broke mid-response. Report it, then
-      // rethrow so the route can end the HTTP stream with an error.
-      reportOutcome(onOutcome, { ...meta, status: "error", error });
-      throw error;
-    }
-
-    // After the stream completes, the SDK can reconstruct the full message
-    // including token counts. finalMessage() is a lightweight call — no
-    // extra API request, it just assembles the data from events we already
-    // received during streaming.
-    if (onOutcome) {
-      try {
-        const finalMessage = await stream.finalMessage();
-        const usage = {
-          inputTokens: finalMessage.usage.input_tokens,
-          outputTokens: finalMessage.usage.output_tokens,
-        };
-        reportOutcome(onOutcome, {
+    } finally {
+      if (onOutcome && !reported) {
+        report({
           ...meta,
-          status: finalMessage.stop_reason === "refusal" ? "refusal" : "ok",
-          usage,
+          status: "error",
+          error: new AiAbortedError("Chat stream closed before completion"),
+          usage: partialUsage(),
         });
-      } catch {
-        // If we can't get usage from the stream, don't break the response.
-        // The chat already completed successfully — usage is a bonus.
       }
     }
   }

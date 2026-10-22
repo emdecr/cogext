@@ -9,6 +9,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  AiAbortedError,
   AiHttpError,
   AiInvalidResponseError,
   MAX_ERROR_MESSAGE_LENGTH,
@@ -35,6 +36,11 @@ describe("classifyAiError — Anthropic SDK", () => {
     [500, "api_error", "api_error"],
   ])("status %i (%s) → %s", (status, type, kind) => {
     expect(classifyAiError(sdkError(status, type)).kind).toBe(kind);
+  });
+
+  it("our own cancellations are 'aborted', not provider failures", () => {
+    expect(classifyAiError(new Anthropic.APIUserAbortError()).kind).toBe("aborted");
+    expect(classifyAiError(new AiAbortedError("closed early")).kind).toBe("aborted");
   });
 
   it("timeout is checked before its parent connection error", () => {

@@ -28,6 +28,7 @@ export type AiErrorKind =
   | "bad_request" // usually a model/parameter mismatch on our side
   | "invalid_response" // got a reply we couldn't use
   | "api_error" // other provider-side 5xx
+  | "aborted" // WE stopped it (client disconnected mid-stream) — not a provider fault
   | "unknown";
 
 /** HTTP failure from a provider we call with plain fetch (e.g. Voyage). */
@@ -39,6 +40,18 @@ export class AiHttpError extends Error {
   ) {
     super(message);
     this.name = "AiHttpError";
+  }
+}
+
+/**
+ * The call was stopped on our side before it finished — e.g. the browser
+ * disconnected mid-stream. Recorded (partial tokens were billed) but it's
+ * not a provider failure, so alerting should ignore this kind.
+ */
+export class AiAbortedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiAbortedError";
   }
 }
 
@@ -88,12 +101,13 @@ export function classifyAiError(err: unknown): {
   const kind: AiErrorKind = (() => {
     // Order matters: the timeout class is a subclass of the connection class.
     if (isInstance(err, Anthropic.APIConnectionTimeoutError)) return "timeout";
-    if (isInstance(err, Anthropic.APIUserAbortError)) return "timeout";
+    if (isInstance(err, Anthropic.APIUserAbortError)) return "aborted";
     if (isInstance(err, Anthropic.APIConnectionError)) return "network";
     if (isInstance(err, Anthropic.APIError)) {
       const status = (err as { status?: unknown }).status;
       if (typeof status === "number") return kindForStatus(status);
     }
+    if (err instanceof AiAbortedError) return "aborted";
     if (err instanceof AiHttpError) return kindForStatus(err.status);
     if (err instanceof AiInvalidResponseError) return "invalid_response";
     if (err instanceof SyntaxError) return "invalid_response"; // JSON.parse

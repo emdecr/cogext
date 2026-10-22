@@ -211,7 +211,12 @@ export default async function AdminAiSpendPage({
           Embeddings (Voyage) are logged with their token counts but not priced
           yet, so they show as unpriced and aren&apos;t in the total.
         </li>
-        <li>Call counts include failed calls; those have 0 tokens and add no cost.</li>
+        <li>
+          Call counts include failed calls. Calls that never got a reply have
+          0 tokens and add no cost; replies that were billed but unusable (or
+          streams cut off partway) keep their tokens and are counted in the
+          cost.
+        </li>
         <li>All users combined.</li>
       </ul>
     </section>

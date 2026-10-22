@@ -23,7 +23,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
 
 import { ClaudeLLMProvider } from "@/lib/ai/claude-llm";
 import { VoyageEmbeddingProvider } from "@/lib/ai/voyage-embedding";
-import { AiHttpError, AiInvalidResponseError } from "@/lib/ai/errors";
+import { AiAbortedError, AiHttpError, AiInvalidResponseError, classifyAiError } from "@/lib/ai/errors";
 import type { AiCallOutcome } from "@/lib/ai/outcome";
 
 const reply = (text: string, stop_reason = "end_turn") => ({
@@ -137,7 +137,12 @@ describe("ClaudeLLMProvider.chat", () => {
 describe("ClaudeLLMProvider.chatStream", () => {
   const llm = () => new ClaudeLLMProvider("claude-sonnet-5-5");
 
-  function fakeStream(events: unknown[], final: unknown, failAt?: number) {
+  function fakeStream(
+    events: unknown[],
+    final: unknown,
+    failAt?: number,
+    finalRejects = false
+  ) {
     return {
       async *[Symbol.asyncIterator]() {
         for (let i = 0; i < events.length; i++) {
@@ -145,7 +150,11 @@ describe("ClaudeLLMProvider.chatStream", () => {
           yield events[i];
         }
       },
-      finalMessage: vi.fn().mockResolvedValue(final),
+      finalMessage: finalRejects
+        ? vi.fn().mockRejectedValue(new Error("no final message"))
+        : vi.fn().mockResolvedValue(final),
+      // The SDK's partial snapshot: tokens counted so far.
+      currentMessage: { usage: { input_tokens: 120, output_tokens: 7 } },
     };
   }
 
@@ -176,7 +185,36 @@ describe("ClaudeLLMProvider.chatStream", () => {
       }
     };
     await expect(consume()).rejects.toThrow("stream broke");
-    expect(outcomes).toMatchObject([{ status: "error" }]);
+    // Exactly one outcome, carrying the partial (billed) usage.
+    expect(outcomes).toMatchObject([{ status: "error", usage: { outputTokens: 7 } }]);
+  });
+
+  it("consumer stops early (client disconnect): one 'aborted' outcome with partial usage", async () => {
+    mockStream.mockReturnValue(
+      fakeStream([delta("a"), delta("b"), delta("c")], reply("abc"))
+    );
+    const { outcomes, cb } = collect();
+    for await (const chunk of llm().chatStream([{ role: "user", content: "hi" }], undefined, cb)) {
+      void chunk;
+      break; // like the route's enqueue throwing after the browser left
+    }
+    expect(outcomes).toHaveLength(1);
+    const outcome = outcomes[0] as { status: string; error: unknown; usage: unknown };
+    expect(outcome.status).toBe("error");
+    expect(outcome.error).toBeInstanceOf(AiAbortedError);
+    expect(classifyAiError(outcome.error).kind).toBe("aborted");
+    expect(outcome.usage).toEqual({ inputTokens: 120, outputTokens: 7 });
+  });
+
+  it("finalMessage failure after a delivered reply: reported, not thrown", async () => {
+    mockStream.mockReturnValue(fakeStream([delta("ok")], null, undefined, true));
+    const { outcomes, cb } = collect();
+    let text = "";
+    for await (const chunk of llm().chatStream([{ role: "user", content: "hi" }], undefined, cb)) {
+      text += chunk;
+    }
+    expect(text).toBe("ok");
+    expect(outcomes).toMatchObject([{ status: "error", usage: { outputTokens: 7 } }]);
   });
 });
 
