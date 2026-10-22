@@ -21,6 +21,7 @@ const mockChat = vi.hoisted(() => vi.fn());
 const mockGetChatProvider = vi.hoisted(() => vi.fn());
 const mockGetProfile = vi.hoisted(() => vi.fn());
 const mockGenerateRecommendations = vi.hoisted(() => vi.fn());
+const mockLogAiOutcome = vi.hoisted(() => vi.fn());
 
 vi.mock("@/db", () => ({
   db: {
@@ -49,6 +50,10 @@ vi.mock("@/lib/ai/profile", () => ({
 
 vi.mock("@/lib/ai/generate-recommendations", () => ({
   generateRecommendations: mockGenerateRecommendations,
+}));
+
+vi.mock("@/lib/ai/usage", () => ({
+  logAiOutcome: mockLogAiOutcome,
 }));
 
 import { generateReflection } from "@/lib/ai/reflection";
@@ -292,6 +297,85 @@ describe("generateReflection", () => {
       expect.objectContaining({
         recommendations: [],
       })
+    );
+  });
+
+  // ---- ai_usage logging (AI failure-alerts plan) ----
+  // The chat call's outcome is held until the reflection row exists, so the
+  // ai_usage row carries the reflectionId.
+
+  const okOutcome = {
+    status: "ok" as const,
+    provider: "claude" as const,
+    model: "claude-sonnet-5-5",
+    usage: { inputTokens: 1000, outputTokens: 400 },
+  };
+
+  function oneRecordPeriod() {
+    mockFindExistingReflection.mockResolvedValue(null);
+    // mockReset, not just clear: a test that throws mid-run can leave a
+    // queued mockResolvedValueOnce behind for the next test.
+    mockFindPeriodRecords.mockReset();
+    mockFindPeriodRecords
+      .mockResolvedValueOnce([
+        {
+          id: "rec-1",
+          type: "note",
+          title: "A note",
+          content: "Thinking about attention.",
+          sourceAuthor: null,
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+  }
+
+  it("logs a successful call with the new reflection's id", async () => {
+    oneRecordPeriod();
+    mockChat.mockImplementation(async (_m: unknown, _c: unknown, onOutcome: (o: unknown) => void) => {
+      onOutcome(okOutcome);
+      return "A week of attention.";
+    });
+
+    await generateReflection("user-1");
+
+    expect(mockLogAiOutcome).toHaveBeenCalledTimes(1);
+    expect(mockLogAiOutcome).toHaveBeenCalledWith(
+      { userId: "user-1", feature: "reflection", reflectionId: "reflection-new" },
+      okOutcome
+    );
+  });
+
+  it("logs a failed call immediately, without a reflection id", async () => {
+    oneRecordPeriod();
+    const errorOutcome = { ...okOutcome, status: "error" as const, error: new Error("down") };
+    mockChat.mockImplementation(async (_m: unknown, _c: unknown, onOutcome: (o: unknown) => void) => {
+      onOutcome(errorOutcome);
+      throw new Error("down");
+    });
+
+    await expect(generateReflection("user-1")).rejects.toThrow("down");
+    expect(mockLogAiOutcome).toHaveBeenCalledTimes(1);
+    expect(mockLogAiOutcome).toHaveBeenCalledWith(
+      { userId: "user-1", feature: "reflection" },
+      errorOutcome
+    );
+  });
+
+  it("still logs the billed call when a later step fails", async () => {
+    oneRecordPeriod();
+    mockChat.mockImplementation(async (_m: unknown, _c: unknown, onOutcome: (o: unknown) => void) => {
+      onOutcome(okOutcome);
+      return "A week of attention.";
+    });
+    mockReturning.mockRejectedValue(new Error("insert failed"));
+
+    await expect(generateReflection("user-1")).rejects.toThrow("insert failed");
+    expect(mockLogAiOutcome).toHaveBeenCalledTimes(1);
+    expect(mockLogAiOutcome).toHaveBeenCalledWith(
+      { userId: "user-1", feature: "reflection" },
+      okOutcome
     );
   });
 });

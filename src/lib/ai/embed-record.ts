@@ -23,6 +23,7 @@ import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getEmbeddingProvider } from "@/lib/ai";
 import { modelFor } from "@/lib/ai/model-settings";
+import { logAiOutcome } from "@/lib/ai/usage";
 
 // ============================================================================
 // PREPARE TEXT FOR EMBEDDING
@@ -93,7 +94,9 @@ export async function embedRecord(recordId: string): Promise<void> {
     // Prepare the text and generate the embedding
     const text = prepareTextForEmbedding(record);
     const provider = await getEmbeddingProvider();
-    const embedding = await provider.embed(text);
+    const embedding = await provider.embed(text, (outcome) =>
+      logAiOutcome({ userId: record.userId, feature: "embedding" }, outcome)
+    );
 
     // Store the embedding AND the model name in the database.
     // The model name lets us identify which records need re-embedding
@@ -140,7 +143,11 @@ export async function embedRecordsBatch(recordIds: string[]): Promise<void> {
 
     // Batch embed
     const provider = await getEmbeddingProvider();
-    const embeddings = await provider.embedBatch(texts);
+    // One request, one ai_usage row. Attributed to the first record's user —
+    // batches come from a single user's backfill in practice.
+    const embeddings = await provider.embedBatch(texts, (outcome) =>
+      logAiOutcome({ userId: validRecords[0].userId, feature: "embedding" }, outcome)
+    );
 
     // Update each record with its embedding and model name
     const modelName = modelFor("EMBED_MODEL");

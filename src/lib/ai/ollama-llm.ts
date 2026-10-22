@@ -21,7 +21,10 @@
 // single-turn generation, not multi-turn conversation.
 // ============================================================================
 
-import type { LLMProvider } from "./types";
+import type { LLMProvider, OutcomeCallback } from "./types";
+import { reportOutcome } from "./outcome";
+import { AiHttpError, AiInvalidResponseError } from "./errors";
+import { logger } from "@/lib/logger";
 import { ollamaModelFor } from "./model-settings";
 
 export class OllamaLLMProvider implements LLMProvider {
@@ -41,7 +44,12 @@ export class OllamaLLMProvider implements LLMProvider {
   // We limit to 5 tags to avoid noise. The model sometimes suggests
   // overly specific or generic tags — the prompt tries to guide it
   // toward useful, mid-level categories.
-  async generateTags(content: string, type: string): Promise<string[]> {
+  async generateTags(
+    content: string,
+    type: string,
+    onOutcome?: OutcomeCallback
+  ): Promise<string[]> {
+    const meta = { provider: "ollama" as const, model: this.model };
     // Truncate very long content to avoid slow generation.
     // Tags should be based on the overall topic, not every detail.
     const truncated = content.length > 1000
@@ -58,6 +66,8 @@ ${truncated}
 
 Return ONLY a JSON object with a "tags" key containing an array of tag strings. Example: {"tags": ["recipes", "italian cuisine", "pasta"]}`;
 
+    // Ollama reports token counts on the response; 0 when absent.
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: "POST",
@@ -80,29 +90,36 @@ Return ONLY a JSON object with a "tags" key containing an array of tag strings. 
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Ollama LLM failed: ${error}`);
+        throw new AiHttpError("ollama", response.status, `Ollama LLM failed: ${error}`);
       }
 
       const data = await response.json();
+      usage = {
+        inputTokens: data.prompt_eval_count ?? 0,
+        outputTokens: data.eval_count ?? 0,
+      };
 
-      // data.response is the generated text (a JSON string)
+      // data.response is the generated text (a JSON string). A parse
+      // failure below still keeps `usage`, so it logs as invalid_response.
       const parsed = JSON.parse(data.response);
 
       // Validate the response shape and sanitize tags
       if (!parsed.tags || !Array.isArray(parsed.tags)) {
-        console.warn("Ollama returned unexpected format:", data.response);
-        return [];
+        throw new AiInvalidResponseError('Ollama tagging reply had no "tags" array');
       }
 
       // Normalize: lowercase, trim, remove empty strings, limit to 5
-      return parsed.tags
+      const tags = parsed.tags
         .map((tag: unknown) => (typeof tag === "string" ? tag.trim().toLowerCase() : ""))
         .filter((tag: string) => tag.length > 0)
         .slice(0, 5);
+      reportOutcome(onOutcome, { ...meta, status: "ok", usage });
+      return tags;
     } catch (error) {
       // Don't let AI failures break record creation.
       // Log the error and return empty tags — the record still saves.
-      console.error("AI tag generation failed:", error);
+      logger.error("Ollama tag generation failed", { feature: "tagging", error });
+      reportOutcome(onOutcome, { ...meta, status: "error", error, usage });
       return [];
     }
   }

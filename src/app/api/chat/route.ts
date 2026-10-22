@@ -43,8 +43,7 @@ import type { ChatMessage } from "@/lib/ai/types";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import { logAiUsage } from "@/lib/ai/usage";
-import { modelFor } from "@/lib/ai/model-settings";
+import { logAiOutcome } from "@/lib/ai/usage";
 
 // ============================================================================
 // INPUT VALIDATION
@@ -214,8 +213,6 @@ export async function POST(request: NextRequest) {
     // Why the conversion? The provider returns an AsyncGenerator (simplest
     // streaming primitive), but HTTP responses need a ReadableStream
     // (browser API). This bridge is where the two meet.
-    const chatModel = modelFor("CHAT_MODEL");
-
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -227,19 +224,11 @@ export async function POST(request: NextRequest) {
           for await (const chunk of chatProvider.chatStream(
             history,
             systemPrompt,
-            // Token usage callback — fires once after the stream completes.
-            // We don't await the log because the HTTP response is already
-            // sent; this is fire-and-forget cleanup.
-            (usage) => {
-              logAiUsage({
-                userId,
-                feature: "chat",
-                provider: "claude",
-                model: chatModel,
-                usage,
-                conversationId,
-              });
-            }
+            // Outcome callback — fires once, when the stream completes or
+            // fails. We don't await the log because the HTTP response is
+            // already sent; this is fire-and-forget bookkeeping.
+            (outcome) =>
+              logAiOutcome({ userId, feature: "chat", conversationId }, outcome)
           )) {
             controller.enqueue(encoder.encode(chunk));
           }
@@ -295,7 +284,9 @@ async function retrieveRelevantRecords(
   try {
     // Step 1: Embed the user's question
     const embeddingProvider = await getEmbeddingProvider();
-    const queryEmbedding = await embeddingProvider.embed(query);
+    const queryEmbedding = await embeddingProvider.embed(query, (outcome) =>
+      logAiOutcome({ userId, feature: "embedding" }, outcome)
+    );
     const embeddingStr = `[${queryEmbedding.join(",")}]`;
 
     // Step 2: Build the WHERE clause based on scope

@@ -163,13 +163,11 @@ export default async function AdminSystemPage() {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-2 text-xs">
-                    {m.feature === "embedding" ? (
-                      <span className={muted}>stored per record</span>
-                    ) : !o.lastUsedAvailable ? (
+                    {!o.lastUsedAvailable ? (
                       <span className={muted}>unknown</span>
                     ) : cmp === "none" ? (
                       <span className={muted}>
-                        {m.feature === "tagging" ? "not logged yet" : "never"}
+                        never
                       </span>
                     ) : (
                       <>

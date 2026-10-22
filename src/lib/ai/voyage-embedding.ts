@@ -19,8 +19,10 @@
 //   Response: { data: [{ embedding: [0.12, -0.34, ...], index: 0 }] }
 // ============================================================================
 
-import type { EmbeddingProvider } from "./types";
+import type { EmbeddingProvider, OutcomeCallback } from "./types";
+import { reportOutcome } from "./outcome";
 import { modelFor } from "./model-settings";
+import { AiHttpError, AiInvalidResponseError } from "./errors";
 
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 
@@ -32,6 +34,8 @@ interface VoyageEmbeddingItem {
 
 interface VoyageAPIResponse {
   data: VoyageEmbeddingItem[];
+  // Voyage bills embeddings per input token.
+  usage?: { total_tokens: number };
 }
 
 export class VoyageEmbeddingProvider implements EmbeddingProvider {
@@ -56,14 +60,34 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
   }
 
   // ---- Single text embedding ----
-  async embed(text: string): Promise<number[]> {
-    const results = await this.embedBatch([text]);
+  async embed(text: string, onOutcome?: OutcomeCallback): Promise<number[]> {
+    const results = await this.embedBatch([text], onOutcome);
     return results[0];
   }
 
   // ---- Batch embedding ----
   // Voyage supports batching up to 128 texts per request.
-  async embedBatch(texts: string[]): Promise<number[][]> {
+  // Reports one outcome per request and rethrows failures (callers decide
+  // whether an embedding failure is fatal).
+  async embedBatch(texts: string[], onOutcome?: OutcomeCallback): Promise<number[][]> {
+    const meta = { provider: "voyage" as const, model: this.model };
+    try {
+      const embeddings = await this.requestEmbeddings(texts);
+      reportOutcome(onOutcome, {
+        ...meta,
+        status: "ok",
+        usage: { inputTokens: embeddings.totalTokens, outputTokens: 0 },
+      });
+      return embeddings.vectors;
+    } catch (error) {
+      reportOutcome(onOutcome, { ...meta, status: "error", error });
+      throw error;
+    }
+  }
+
+  private async requestEmbeddings(
+    texts: string[]
+  ): Promise<{ vectors: number[][]; totalTokens: number }> {
     const response = await fetch(VOYAGE_API_URL, {
       method: "POST",
       headers: {
@@ -78,7 +102,11 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(
+      // Typed so classifyAiError() reads the status directly (message
+      // format unchanged).
+      throw new AiHttpError(
+        "voyage",
+        response.status,
         `Voyage AI API error (${response.status}): ${body}`
       );
     }
@@ -86,17 +114,18 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
     const result: VoyageAPIResponse = await response.json();
 
     if (!result.data || result.data.length === 0) {
-      throw new Error("Voyage embedding returned no data");
+      throw new AiInvalidResponseError("Voyage embedding returned no data");
     }
 
     // Sort by index to ensure order matches input, then extract embeddings.
     const sorted = [...result.data].sort((a, b) => a.index - b.index);
 
-    return sorted.map((item) => {
+    const vectors = sorted.map((item) => {
       if (!item.embedding) {
-        throw new Error("Voyage embedding returned null embedding for an item");
+        throw new AiInvalidResponseError("Voyage embedding returned null embedding for an item");
       }
       return item.embedding;
     });
+    return { vectors, totalTokens: result.usage?.total_tokens ?? 0 };
   }
 }

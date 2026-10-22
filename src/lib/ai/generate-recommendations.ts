@@ -28,7 +28,10 @@
 // ============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
-import { logAiUsage } from "@/lib/ai/usage";
+import { logAiOutcome } from "@/lib/ai/usage";
+import type { AiCallOutcome } from "@/lib/ai/outcome";
+import { AiInvalidResponseError } from "@/lib/ai/errors";
+import { logger } from "@/lib/logger";
 import { modelFor } from "@/lib/ai/model-settings";
 import type { UserProfile } from "@/lib/ai/profile";
 import {
@@ -87,6 +90,13 @@ export async function generateRecommendations(
     return [];
   }
 
+  const model = modelFor("RECOMMENDATIONS_MODEL");
+  const meta = { provider: "claude" as const, model };
+  // One ai_usage row per call (when there's a userId to attribute it to).
+  const log = (outcome: AiCallOutcome) => {
+    if (input.userId) logAiOutcome({ userId: input.userId, feature: "recommendation" }, outcome);
+  };
+
   try {
     const client = new Anthropic({ apiKey });
 
@@ -94,7 +104,6 @@ export async function generateRecommendations(
     // plenty capable here and significantly cheaper than Sonnet — especially
     // since web search injects large result pages into the context window.
     // Override with RECOMMENDATIONS_MODEL if you want a different model.
-    const model = modelFor("RECOMMENDATIONS_MODEL");
 
     const response = await client.messages.create({
       model,
@@ -127,40 +136,39 @@ export async function generateRecommendations(
       ],
     });
 
-    // Log token usage. Recommendation calls with web search tend to have
-    // higher input token counts because search results get injected as
-    // context — this is visible in the usage data without needing a
-    // separate web search counter.
-    if (input.userId) {
-      logAiUsage({
-        userId: input.userId,
-        feature: "recommendation",
-        provider: "claude",
-        model,
-        usage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        },
-      });
-    }
+    // Recommendation calls with web search tend to have higher input token
+    // counts because search results get injected as context — this is
+    // visible in the usage data without needing a separate search counter.
+    const usage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    };
 
     if (response.stop_reason === "refusal") {
-      console.warn(
-        "[generate-recommendations] Claude declined the request:",
-        response.stop_details
-      );
+      logger.warn("Claude declined the recommendations request", {
+        feature: "recommendation",
+        stopDetails: response.stop_details,
+      });
+      log({ ...meta, status: "refusal", usage });
       return [];
     }
 
     const text = extractTextFromAnthropicResponse(response);
-    if (!text) return [];
+    const recommendations = text ? parseRecommendationsStrict(text) : null;
+    if (recommendations === null) {
+      // Billed, but unusable: an invalid_response that keeps the usage.
+      const error = new AiInvalidResponseError(
+        text ? "Recommendations reply was not a JSON array" : "Recommendations reply had no text"
+      );
+      log({ ...meta, status: "error", error, usage });
+      return [];
+    }
 
-    return parseRecommendationsResponse(text);
+    log({ ...meta, status: "ok", usage });
+    return recommendations;
   } catch (error) {
-    console.warn(
-      "[generate-recommendations] Recommendation generation failed:",
-      error
-    );
+    logger.warn("Recommendation generation failed", { feature: "recommendation", error });
+    log({ ...meta, status: "error", error });
     return [];
   }
 }
@@ -283,22 +291,33 @@ function extractTextFromAnthropicResponse(response: {
 export function parseRecommendationsResponse(
   response: string
 ): Recommendation[] {
+  return parseRecommendationsStrict(response) ?? [];
+}
+
+/**
+ * Like parseRecommendationsResponse, but returns null when the reply isn't a
+ * JSON array at all, so the caller can log that as an invalid_response. An
+ * array whose items are all malformed is still a (valid, empty) answer.
+ */
+export function parseRecommendationsStrict(
+  response: string
+): Recommendation[] | null {
   const jsonStr = extractJsonString(response);
 
   try {
     const parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) return null;
 
     return parsed
       .map((item) => normalizeRecommendation(item))
       .filter((item): item is Recommendation => item !== null)
       .slice(0, 3);
   } catch {
-    console.warn(
-      "[generate-recommendations] Failed to parse recommendation JSON:",
-      jsonStr.slice(0, 200)
-    );
-    return [];
+    logger.warn("Failed to parse recommendation JSON", {
+      feature: "recommendation",
+      preview: jsonStr.slice(0, 200),
+    });
+    return null;
   }
 }
 

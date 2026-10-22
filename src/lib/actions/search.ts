@@ -32,6 +32,7 @@ import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider } from "@/lib/ai";
+import { logAiOutcome } from "@/lib/ai/usage";
 import type { RecordType } from "@/lib/validations/records";
 import { redirect } from "next/navigation";
 
@@ -93,7 +94,9 @@ async function semanticSearch(
 ): Promise<{ id: string; score: number }[]> {
   try {
     const provider = await getEmbeddingProvider();
-    const queryEmbedding = await provider.embed(query);
+    const queryEmbedding = await provider.embed(query, (outcome) =>
+      logAiOutcome({ userId, feature: "embedding" }, outcome)
+    );
 
     // Convert the embedding array to a pgvector-compatible string
     // format: '[0.12, -0.34, 0.56, ...]'
