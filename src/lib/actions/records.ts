@@ -37,6 +37,7 @@ import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
 import { logAiOutcome } from "@/lib/ai/usage";
+import { logger } from "@/lib/logger";
 import { addTagToRecord } from "@/lib/actions/tags";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import {
@@ -215,7 +216,7 @@ export async function createRecord(
             ),
           );
         } catch (err) {
-          console.error("Background image AI processing failed:", err);
+          logger.error("Background image AI processing failed", { feature: "image_analysis", recordId: created.id, error: err });
         }
       })();
     } else {
@@ -224,7 +225,7 @@ export async function createRecord(
 
       // Generate embedding for semantic search
       embedRecord(created.id).catch((err) =>
-        console.error("Background embed failed:", err),
+        logger.error("Background embed failed", { feature: "embedding", recordId: created.id, error: err }),
       );
 
       // Generate AI tags
@@ -243,7 +244,7 @@ export async function createRecord(
             ),
           );
         } catch (err) {
-          console.error("Background AI tagging failed:", err);
+          logger.error("Background AI tagging failed", { feature: "tagging", recordId: created.id, error: err });
         }
       })();
     }
@@ -256,7 +257,7 @@ export async function createRecord(
 
     return { success: true, recordId: created.id };
   } catch (error) {
-    console.error("Failed to create record:", error);
+    logger.error("Failed to create record", { error });
     return {
       success: false,
       error: "Failed to create record. Please try again.",
@@ -505,7 +506,7 @@ export async function updateRecord(
       };
     }
   } catch (error) {
-    console.error("Failed to update record:", error);
+    logger.error("Failed to update record", { error });
     return {
       success: false,
       error: "Failed to update record. Please try again.",
@@ -562,7 +563,7 @@ export async function deleteRecord(id: string): Promise<ActionResult> {
       return { success: false, error: "Record not found" };
     }
   } catch (error) {
-    console.error("Failed to delete record:", error);
+    logger.error("Failed to delete record", { error });
     return {
       success: false,
       error: "Failed to delete record. Please try again.",

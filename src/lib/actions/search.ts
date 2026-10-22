@@ -33,6 +33,7 @@ import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { getEmbeddingProvider } from "@/lib/ai";
 import { logAiOutcome } from "@/lib/ai/usage";
+import { logger } from "@/lib/logger";
 import type { RecordType } from "@/lib/validations/records";
 import { redirect } from "next/navigation";
 
@@ -128,7 +129,7 @@ async function semanticSearch(
     return results;
   } catch (error) {
     // If embedding fails (Ollama down, etc.), fall back to keyword-only
-    console.error("Semantic search failed:", error);
+    logger.error("Semantic search failed", { feature: "embedding", error });
     return [];
   }
 }
@@ -204,7 +205,7 @@ async function keywordSearch(
 
     return results;
   } catch (error) {
-    console.error("Keyword search failed:", error);
+    logger.error("Keyword search failed", { error });
     return [];
   }
 }

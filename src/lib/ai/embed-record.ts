@@ -24,6 +24,7 @@ import { records } from "@/db/schema";
 import { getEmbeddingProvider } from "@/lib/ai";
 import { modelFor } from "@/lib/ai/model-settings";
 import { logAiOutcome } from "@/lib/ai/usage";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // PREPARE TEXT FOR EMBEDDING
@@ -87,7 +88,7 @@ export async function embedRecord(recordId: string): Promise<void> {
     });
 
     if (!record) {
-      console.warn(`embedRecord: record ${recordId} not found`);
+      logger.warn("Record to embed not found", { feature: "embedding", recordId });
       return;
     }
 
@@ -112,7 +113,7 @@ export async function embedRecord(recordId: string): Promise<void> {
     // Log but don't throw — embedding failure shouldn't break the app.
     // The record exists and is usable; it just won't appear in
     // semantic search results until it's embedded.
-    console.error(`Failed to embed record ${recordId}:`, error);
+    logger.error("Failed to embed record", { feature: "embedding", recordId, error });
   }
 }
 
@@ -160,6 +161,6 @@ export async function embedRecordsBatch(recordIds: string[]): Promise<void> {
       ),
     );
   } catch (error) {
-    console.error("Batch embedding failed:", error);
+    logger.error("Batch embedding failed", { feature: "embedding", count: recordIds.length, error });
   }
 }
