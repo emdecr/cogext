@@ -22,9 +22,29 @@ const mockGetChatProvider = vi.hoisted(() => vi.fn());
 const mockGetProfile = vi.hoisted(() => vi.fn());
 const mockGenerateRecommendations = vi.hoisted(() => vi.fn());
 const mockLogAiOutcome = vi.hoisted(() => vi.fn());
+// db.select() is used for the connection queries. Two shapes are awaited:
+//   select().from(recordLinks).where().orderBy().limit()  → link rows
+//   select().from(records).where()                        → outside records
+// so `where` returns something both chainable and awaitable.
+const mockLinkRows = vi.hoisted(() => vi.fn());
+const mockOutsideRecordRows = vi.hoisted(() => vi.fn());
+const mockSelect = vi.hoisted(() =>
+  vi.fn(() => ({
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({ limit: mockLinkRows }),
+        then: (
+          resolve: (v: unknown) => unknown,
+          reject: (e: unknown) => unknown
+        ) => Promise.resolve(mockOutsideRecordRows()).then(resolve, reject),
+      }),
+    }),
+  }))
+);
 
 vi.mock("@/db", () => ({
   db: {
+    select: mockSelect,
     query: {
       reflections: {
         findFirst: mockFindExistingReflection,
@@ -84,6 +104,10 @@ describe("generateReflection", () => {
     // No previous reflections by default — the cross-week dedup query returns
     // empty so recommendations start fresh.
     mockFindPreviousReflections.mockResolvedValue([]);
+
+    // No manual connections by default.
+    mockLinkRows.mockResolvedValue([]);
+    mockOutsideRecordRows.mockResolvedValue([]);
 
     mockGenerateRecommendations.mockResolvedValue([
       {
@@ -273,6 +297,83 @@ describe("generateReflection", () => {
     // Article content is secondary → truncated to a 200-char preview.
     expect(prompt).not.toContain("ARTICLE_TAIL");
     expect(prompt).toContain("A".repeat(200) + "...");
+  });
+
+  it("includes the user's connections, giving outside records their own markers", async () => {
+    mockFindExistingReflection.mockResolvedValue(null);
+    mockFindPeriodRecords
+      .mockResolvedValueOnce([
+        {
+          id: "rec-1",
+          type: "quote",
+          title: "On attention",
+          content: "Attention is the rarest form of generosity.",
+          sourceAuthor: "Simone Weil",
+          note: null,
+          createdAt: new Date("2026-03-24T12:00:00Z"),
+          recordTags: [],
+        },
+        {
+          id: "rec-2",
+          type: "note",
+          title: "Phone-free mornings",
+          content: "Trying no phone before 10.",
+          sourceAuthor: null,
+          note: null,
+          createdAt: new Date("2026-03-25T12:00:00Z"),
+          recordTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    // One link inside the period, one (stored in the reverse direction) back
+    // to an older record, and one whose far side no longer resolves.
+    mockLinkRows.mockResolvedValue([
+      { recordId: "rec-1", relatedRecordId: "rec-2", note: "practice of the idea" },
+      { recordId: "rec-old", relatedRecordId: "rec-1", note: null },
+      { recordId: "rec-1", relatedRecordId: "rec-missing", note: "gone" },
+    ]);
+    mockOutsideRecordRows.mockResolvedValue([
+      {
+        id: "rec-old",
+        type: "article",
+        title: "The Attention Economy",
+        content: "An older essay.",
+        sourceAuthor: null,
+        createdAt: new Date("2026-01-10T12:00:00Z"),
+      },
+    ]);
+
+    mockChat.mockResolvedValueOnce("This echoes [an older essay](R3).");
+
+    await generateReflection("user-123");
+
+    const prompt = mockChat.mock.calls[0][0][0].content as string;
+    // Outside record gets the next marker after the period's R1, R2.
+    expect(prompt).toContain('R3 [article] (saved Jan 10, 2026) "The Attention Economy"');
+    expect(prompt).toContain("saved OUTSIDE this period");
+    expect(prompt).toContain('- R1 ↔ R2: "practice of the idea"');
+    expect(prompt).toContain("- R3 ↔ R1 (no note)");
+    // Unresolvable link is dropped, not sent half-resolved.
+    expect(prompt).not.toContain("gone");
+    expect(prompt).toContain("Start from the connections the user drew");
+
+    // Links to the outside record resolve like any other marker.
+    const saved = mockInsertValues.mock.calls[0][0];
+    expect(saved.content).toContain("[an older essay](/records/rec-old)");
+  });
+
+  it("leaves the connections sections out when there are no links", async () => {
+    oneRecordPeriod();
+
+    await generateReflection("user-123");
+
+    const prompt = mockChat.mock.calls[0][0][0].content as string;
+    expect(prompt).not.toContain("Connections the user has drawn");
+    expect(prompt).not.toContain("saved OUTSIDE this period");
+    expect(prompt).toContain("Find links between records that might not be obvious");
+    // No links → no second query for outside records.
+    expect(mockOutsideRecordRows).not.toHaveBeenCalled();
   });
 
   it("still saves the reflection when recommendations come back empty", async () => {
