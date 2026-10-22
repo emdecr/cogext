@@ -64,6 +64,16 @@ write_files:
       # CogExt nightly backup — see DEPLOY.md → "Automated backups"
       0 2 * * * deploy /opt/cogext/scripts/backup.sh >> /var/log/cogext-backup.log 2>&1
 
+  # AI failure alerts — every 6 hours. Asks the app whether any AI call failed
+  # in the last 6h and pings the cogext-ai-health healthchecks.io check (email
+  # on failure). Does nothing until AI_HEALTHCHECK_URL is set in .env. The
+  # interval must match AI_ALERT_WINDOW_HOURS (default 6).
+  - path: /etc/cron.d/cogext-ai-health
+    permissions: '0644'
+    content: |
+      # CogExt AI failure alerts — see DEPLOY.md → "AI failure alerts"
+      0 */6 * * * deploy /opt/cogext/scripts/ai-health-check.sh >> /var/log/cogext-ai-health.log 2>&1
+
 # --- Run commands after package install ---
 runcmd:
   # -- Enable Docker --
@@ -126,3 +136,6 @@ runcmd:
   # backup.sh runs — a silent no-backup. Create it once here.
   - touch /var/log/cogext-backup.log
   - chown deploy:deploy /var/log/cogext-backup.log
+  # Same for the AI health check's log.
+  - touch /var/log/cogext-ai-health.log
+  - chown deploy:deploy /var/log/cogext-ai-health.log

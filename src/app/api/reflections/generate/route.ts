@@ -17,9 +17,8 @@
 // ============================================================================
 
 import { NextRequest } from "next/server";
-import { timingSafeEqual, createHash } from "crypto";
 import { generateReflection, type ReflectionDateRange } from "@/lib/ai/reflection";
-import { config } from "@/lib/config";
+import { isCronAuthorized } from "@/lib/auth/cron-secret";
 import { logger } from "@/lib/logger";
 import { db } from "@/db";
 
@@ -28,12 +27,7 @@ export async function POST(request: NextRequest) {
   // Only cron callers are valid. The secret is set in CRON_SECRET env var —
   // include it as a Bearer token:
   //   Authorization: Bearer <CRON_SECRET>
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : null;
-
-  if (!verifyCronSecret(bearerToken)) {
+  if (!isCronAuthorized(request)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -118,28 +112,4 @@ export async function POST(request: NextRequest) {
     }),
     { status: errors > 0 ? 207 : 200, headers: { "Content-Type": "application/json" } }
   );
-}
-
-// ============================================================================
-// TIMING-SAFE SECRET VERIFICATION
-// ============================================================================
-// Uses crypto.timingSafeEqual to prevent timing attacks. A naive === comparison
-// leaks information about how many characters matched — an attacker can probe
-// the secret character-by-character by measuring response times.
-//
-// timingSafeEqual always compares the full length in constant time, regardless
-// of where the strings differ. Both buffers must be the same length, so we
-// compare SHA-256 hashes (always 32 bytes) instead of raw strings.
-
-function verifyCronSecret(token: string | null): boolean {
-  const secret = config.app.cronSecret;
-  if (!secret || !token) return false;
-
-  // Hash both values to normalize length for timingSafeEqual.
-  // Even if the token and secret are different lengths, the hashes
-  // are always 32 bytes, so the comparison doesn't leak length info.
-  const secretHash = createHash("sha256").update(secret).digest();
-  const tokenHash = createHash("sha256").update(token).digest();
-
-  return timingSafeEqual(secretHash, tokenHash);
 }

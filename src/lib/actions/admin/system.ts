@@ -18,6 +18,13 @@ import { config } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { runReadinessChecks, type ReadinessReport } from "@/lib/health";
 import { getModelAssignments, type ModelAssignment } from "@/lib/ai";
+import { getAiHealthData, type RecentAiError } from "@/lib/ai-health-data";
+import {
+  evaluateAiHealth,
+  summarizeByFeature,
+  type AiHealthVerdict,
+  type FeatureHealth,
+} from "@/lib/ai-health";
 
 export type LastUsed = { model: string; at: string };
 
@@ -35,6 +42,14 @@ export type SystemOverview = {
   // rather than claiming "never used".
   lastUsedAvailable: boolean;
   storage: { provider: string; bucket: string | null };
+  // AI call health card. null when the lookup failed — the card says so
+  // instead of showing a misleading all-clear.
+  aiHealth: {
+    verdict: AiHealthVerdict;
+    features: FeatureHealth[];
+    recentErrors: RecentAiError[];
+    windowHours: number;
+  } | null;
   generatedAt: string;
 };
 
@@ -62,12 +77,31 @@ async function getLastUsedByFeature(): Promise<Map<string, LastUsed> | null> {
   }
 }
 
+// Same data and rule as the Phase 5 alert check, so banner and email agree.
+// Never throws.
+async function getAiHealth(now: Date): Promise<SystemOverview["aiHealth"]> {
+  try {
+    const data = await getAiHealthData({ now, windowHours: config.aiAlerts.windowHours });
+    return {
+      verdict: evaluateAiHealth(data.rows, { minErrors: config.aiAlerts.minErrors }),
+      features: summarizeByFeature(data.rows),
+      recentErrors: data.recentErrors,
+      windowHours: data.windowHours,
+    };
+  } catch (error) {
+    logger.warn("Admin system: AI health lookup failed", { error });
+    return null;
+  }
+}
+
 export async function getSystemOverview(): Promise<SystemOverview> {
   await requireAdmin();
 
-  const [readiness, lastUsed] = await Promise.all([
+  const now = new Date();
+  const [readiness, lastUsed, aiHealth] = await Promise.all([
     runReadinessChecks(),
     getLastUsedByFeature(),
+    getAiHealth(now),
   ]);
 
   return {
@@ -88,6 +122,7 @@ export async function getSystemOverview(): Promise<SystemOverview> {
       provider: config.storage.provider,
       bucket: config.storage.provider === "minio" ? config.storage.bucket : null,
     },
-    generatedAt: new Date().toISOString(),
+    aiHealth,
+    generatedAt: now.toISOString(),
   };
 }

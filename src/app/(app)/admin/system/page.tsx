@@ -21,7 +21,9 @@ import {
   formatUptime,
   shortSha,
 } from "@/lib/system-info";
-import { Badge, When, TabHeading, card, cardTitle, muted, type Tone } from "../ui";
+import { clip } from "@/lib/auth-log-view";
+import type { SystemOverview } from "@/lib/actions/admin/system";
+import { Badge, When, TabHeading, card, cardTitle, muted, tone, type Tone } from "../ui";
 
 const STATUS: Record<CheckStatus, { label: string; color: Tone }> = {
   ok: { label: "OK", color: "green" },
@@ -54,6 +56,118 @@ function CheckRow({ label, check }: { label: string; check: CheckResult }) {
         )}
         {check.note && <div className={`mt-0.5 text-xs ${muted}`}>{check.note}</div>}
       </dd>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI call health — the same rule (evaluateAiHealth) the alert email uses
+// ---------------------------------------------------------------------------
+
+function Count({ n, color }: { n: number; color?: Tone }) {
+  if (n === 0) return <span className={muted}>0</span>;
+  return color ? <Badge color={color}>{n}</Badge> : <>{n}</>;
+}
+
+function AiHealthCard({
+  health,
+  labels,
+  now,
+}: {
+  health: SystemOverview["aiHealth"];
+  labels: Record<string, string>;
+  now: Date;
+}) {
+  if (!health) {
+    return (
+      <div className={`${card} mt-4`}>
+        <h3 className={cardTitle}>AI call health</h3>
+        <p className={`mt-2 ${muted}`}>Couldn&apos;t load AI call data.</p>
+      </div>
+    );
+  }
+  const { verdict, features, recentErrors, windowHours } = health;
+  const label = (feature: string) => labels[feature] ?? feature;
+
+  return (
+    <div className={`${card} mt-4 overflow-x-auto p-0`}>
+      <div className="px-4 pt-4">
+        <h3 className={cardTitle}>AI call health</h3>
+        {verdict.status === "alert" ? (
+          <p role="alert" className={`mt-2 rounded-md px-3 py-2 text-sm ${tone.red}`}>
+            {verdict.errorCount} AI error{verdict.errorCount === 1 ? "" : "s"} in the
+            last {windowHours} hours: {verdict.reasons.join("; ")}.
+          </p>
+        ) : (
+          <p className={`mt-1 text-xs ${muted}`}>
+            <Badge color="green">OK</Badge> No AI errors in the last {windowHours} hours.
+            Refusals and calls we cancelled (aborted) don&apos;t count.
+          </p>
+        )}
+      </div>
+
+      {features.length === 0 ? (
+        <p className={`px-4 pb-4 pt-2 ${muted}`}>No AI calls in the last 7 days.</p>
+      ) : (
+        <table className="mt-2 w-full text-left text-sm">
+          <thead className={muted}>
+            <tr className="border-b border-gray-200 dark:border-gray-800">
+              <th className="px-4 py-2 font-medium">Feature</th>
+              <th className="px-4 py-2 text-right font-medium">OK 24h</th>
+              <th className="px-4 py-2 text-right font-medium">Errors 24h</th>
+              <th className="px-4 py-2 text-right font-medium">OK 7d</th>
+              <th className="px-4 py-2 text-right font-medium">Errors 7d</th>
+              <th className="px-4 py-2 text-right font-medium">Refused / aborted 7d</th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums text-gray-900 dark:text-gray-100">
+            {features.map((f) => (
+              <tr
+                key={f.feature}
+                className="border-b border-gray-100 last:border-0 dark:border-gray-800/60"
+              >
+                <td className="whitespace-nowrap px-4 py-2">{label(f.feature)}</td>
+                <td className="px-4 py-2 text-right"><Count n={f.last24h.ok} /></td>
+                <td className="px-4 py-2 text-right"><Count n={f.last24h.error} color="red" /></td>
+                <td className="px-4 py-2 text-right"><Count n={f.last7d.ok} /></td>
+                <td className="px-4 py-2 text-right"><Count n={f.last7d.error} color="amber" /></td>
+                <td className="whitespace-nowrap px-4 py-2 text-right">
+                  <Count n={f.last7d.refusal} /> / <Count n={f.last7d.aborted} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {recentErrors.length > 0 && (
+        <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+          <h4 className={`${cardTitle} mb-2`}>Latest errors · 7d</h4>
+          <ul className="space-y-2 text-sm">
+            {recentErrors.map((e, i) => (
+              <li key={`${e.at}-${i}`}>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-gray-900 dark:text-gray-100">{label(e.feature)}</span>
+                  <Badge color={e.errorKind === "aborted" ? "gray" : "red"}>
+                    {e.errorKind ?? "unknown"}
+                  </Badge>
+                  <span className={`text-xs ${muted}`}>
+                    <When iso={e.at} now={now} /> · {e.provider} · <code>{e.model}</code>
+                  </span>
+                </div>
+                {e.errorMessage && (
+                  <p
+                    className={`mt-0.5 break-words font-mono text-xs ${muted}`}
+                    title={e.errorMessage}
+                  >
+                    {clip(e.errorMessage, 160)}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -188,6 +302,13 @@ export default async function AdminSystemPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ---- AI call health ---- */}
+      <AiHealthCard
+        health={o.aiHealth}
+        labels={Object.fromEntries(o.models.map((m) => [m.feature, m.label]))}
+        now={now}
+      />
 
       {/* ---- Caveats ---- */}
       <p className={`mt-4 ${muted}`}>

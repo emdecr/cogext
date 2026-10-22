@@ -126,6 +126,7 @@ jobs:
               - 'scripts/backup.sh'
               - 'scripts/restore.sh'
               - 'scripts/healthcheck.sh'
+              - 'scripts/ai-health-check.sh'
 
   lint-and-typecheck:
     name: Lint & Type Check
@@ -590,7 +591,7 @@ jobs:
       # disabled backup.sh before. `bash -n` parses without executing.
       - name: Syntax-check scripts
         run: |
-          for f in scripts/backup.sh scripts/restore.sh scripts/healthcheck.sh; do
+          for f in scripts/backup.sh scripts/restore.sh scripts/healthcheck.sh scripts/ai-health-check.sh; do
             bash -n "$f"
           done
 
@@ -606,6 +607,6 @@ jobs:
         run: |
           SSH_OPTS="-i $HOME/.ssh/id_deploy -o StrictHostKeyChecking=accept-new"
           rsync -az -e "ssh $SSH_OPTS" \
-            scripts/backup.sh scripts/restore.sh scripts/healthcheck.sh \
+            scripts/backup.sh scripts/restore.sh scripts/healthcheck.sh scripts/ai-health-check.sh \
             "deploy@${DEPLOY_HOST}:/opt/cogext/scripts/"
           ssh $SSH_OPTS "deploy@${DEPLOY_HOST}" 'chmod +x /opt/cogext/scripts/*.sh'

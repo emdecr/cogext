@@ -55,6 +55,25 @@ function optionalEnv(name: string, defaultValue: string): string {
 }
 
 // =============================================================================
+// HELPER: optional positive integer, failing loudly on a malformed value
+// =============================================================================
+// Unset/empty → default. Set to anything that isn't a positive integer
+// ("6h", "0", "-1") → throw at startup, same fail-fast stance as requireEnv:
+// a typo'd setting should stop the deploy (which then auto-rolls back), not
+// quietly run with a value you didn't choose.
+function positiveIntEnv(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (!raw) return defaultValue;
+  if (!/^[1-9]\d*$/.test(raw.trim())) {
+    throw new Error(
+      `${name} must be a positive integer (got "${raw}").\n` +
+        `Check your .env file.`
+    );
+  }
+  return Number(raw.trim());
+}
+
+// =============================================================================
 // AI MODEL SETTINGS (optional)
 // =============================================================================
 // Resolved before the config object so `chat.model` and `voyage.embedModel`
@@ -148,6 +167,16 @@ export const config = {
   // Backup status (admin → Backups tab). All optional: a missing value makes
   // that card render "not configured", it never blocks startup.
   // ---------------------------------------------------------------------------
+  aiAlerts: {
+    // Errors (excluding our own "aborted" cancellations) within the window
+    // that trip the alert. 1 = alert on any error (decided 2026-10-21).
+    minErrors: positiveIntEnv("AI_ALERT_MIN_ERRORS", 1),
+
+    // How far back the alert check looks. Must match the cron interval of
+    // scripts/ai-health-check.sh (every 6 hours) so windows don't overlap.
+    windowHours: positiveIntEnv("AI_ALERT_WINDOW_HOURS", 6),
+  },
+
   backups: {
     // healthchecks.io READ-ONLY API key (project settings → API keys). A
     // read-only key can only read check status — it can't pause, edit, or
