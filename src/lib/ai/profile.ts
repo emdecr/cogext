@@ -37,6 +37,7 @@ import { db } from "@/db";
 import { records, aiProfile } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
 import { logAiOutcome } from "@/lib/ai/usage";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // PROFILE SHAPE
@@ -172,7 +173,7 @@ Return ONLY the JSON object, no other text.`;
 
     return profile;
   } catch (error) {
-    console.error("Profile generation failed:", error);
+    logger.error("Profile generation failed", { feature: "profile", error });
 
     // Return a basic profile derived from the data we have,
     // even if the LLM call failed. Better than nothing.
@@ -223,7 +224,7 @@ function parseProfileResponse(
     };
   } catch {
     // If JSON parsing fails, create a minimal profile
-    console.warn("Failed to parse profile JSON:", jsonStr.slice(0, 200));
+    logger.warn("Failed to parse profile JSON", { feature: "profile", preview: jsonStr.slice(0, 200) });
     return {
       summary: "Profile generation partially succeeded.",
       topInterests: [],

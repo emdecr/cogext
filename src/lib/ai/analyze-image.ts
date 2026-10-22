@@ -79,7 +79,7 @@ async function readImageAsBuffer(imagePath: string): Promise<Buffer | null> {
       // We use the global fetch API available in Node.js 18+.
       const response = await fetch(imagePath);
       if (!response.ok) {
-        console.warn(`[analyze-image] Failed to fetch remote image: ${response.status} ${imagePath}`);
+        logger.warn("Failed to fetch remote image", { feature: "image_analysis", status: response.status, imagePath });
         return null;
       }
       // response.arrayBuffer() downloads the full image body.
@@ -98,7 +98,7 @@ async function readImageAsBuffer(imagePath: string): Promise<Buffer | null> {
       return await readFile(absolutePath);
     }
   } catch (error) {
-    console.warn(`[analyze-image] Could not read image at ${imagePath}:`, error);
+    logger.warn("Could not read image", { feature: "image_analysis", imagePath, error });
     return null;
   }
 }
@@ -155,7 +155,7 @@ export async function analyzeImage(
   // be as searchable.
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn("[analyze-image] ANTHROPIC_API_KEY not set, skipping analysis");
+    logger.warn("ANTHROPIC_API_KEY not set, skipping image analysis", { feature: "image_analysis" });
     return null;
   }
 
@@ -166,7 +166,7 @@ export async function analyzeImage(
   // ---- Get MIME type ----
   const mimeType = getMimeType(imagePath);
   if (!mimeType) {
-    console.warn(`[analyze-image] Unrecognized file extension: ${imagePath}`);
+    logger.warn("Unrecognized image file extension", { feature: "image_analysis", imagePath });
     return null;
   }
 

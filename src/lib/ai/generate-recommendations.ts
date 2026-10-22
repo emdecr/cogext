@@ -84,9 +84,9 @@ export async function generateRecommendations(
 ): Promise<Recommendation[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn(
-      "[generate-recommendations] ANTHROPIC_API_KEY not set, skipping recommendations"
-    );
+    logger.warn("ANTHROPIC_API_KEY not set, skipping recommendations", {
+      feature: "recommendation",
+    });
     return [];
   }
 

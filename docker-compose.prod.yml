@@ -31,6 +31,20 @@
 #   docker compose -f docker-compose.prod.yml pull        # pull latest images
 # =============================================================================
 
+# ---------------------------------------------------------------------------
+# Log rotation (shared by every service)
+# ---------------------------------------------------------------------------
+# Docker's default json-file driver keeps a container's logs forever (until
+# the container is recreated). These caps keep each service to at most
+# 5 × 10 MB = 50 MB of logs on disk, oldest rotated out first. Read them with
+# `docker compose -f docker-compose.prod.yml logs app`. Only applies to
+# containers created after this change — `up -d` recreates them.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
 
   # ===========================================================================
@@ -42,6 +56,7 @@ services:
     image: ghcr.io/emdecr/cogext:latest
 
     restart: unless-stopped
+    logging: *default-logging
 
     # Publish port 3000 on the host so Nginx can proxy to it.
     # Bound to 127.0.0.1 so only nginx (on the same host) can reach it.
@@ -96,6 +111,7 @@ services:
   db:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    logging: *default-logging
 
     # Tuned for a 2GB instance. Override default Postgres settings that
     # assume more RAM than we have.
@@ -140,6 +156,7 @@ services:
   minio:
     image: minio/minio:latest
     restart: unless-stopped
+    logging: *default-logging
 
     command: server /data --console-address ":9001"
 
