@@ -200,4 +200,30 @@ describe("config", () => {
     expect(config.storage.provider).toBe("minio");
     expect(config.storage.endpoint).toBe("http://minio:9000");
   });
+
+  // ---- AI alert settings (positive integers, fail fast) ----
+
+  it("defaults AI alert settings to any-error over 6 hours", async () => {
+    delete process.env.AI_ALERT_MIN_ERRORS;
+    delete process.env.AI_ALERT_WINDOW_HOURS;
+    const { config } = await import("@/lib/config");
+    expect(config.aiAlerts).toEqual({ minErrors: 1, windowHours: 6 });
+  });
+
+  it("reads valid AI alert overrides", async () => {
+    process.env.AI_ALERT_MIN_ERRORS = "3";
+    process.env.AI_ALERT_WINDOW_HOURS = " 12 ";
+    const { config } = await import("@/lib/config");
+    expect(config.aiAlerts).toEqual({ minErrors: 3, windowHours: 12 });
+  });
+
+  it.each(["6h", "0", "-1", "1.5"])(
+    "throws on a malformed AI_ALERT_WINDOW_HOURS (%s)",
+    async (value) => {
+      process.env.AI_ALERT_WINDOW_HOURS = value;
+      await expect(import("@/lib/config")).rejects.toThrow(
+        "AI_ALERT_WINDOW_HOURS must be a positive integer"
+      );
+    }
+  );
 });
