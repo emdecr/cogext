@@ -18,6 +18,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePreventWindowFileDrop } from "@/hooks/use-prevent-window-file-drop";
 
 // Kept in sync with the image-type dropzone in create-record-form.tsx.
 // (Server-side /api/upload re-validates type + magic bytes + size regardless.)
@@ -84,22 +85,8 @@ export function CoverImageInput({
   const [isDragging, setIsDragging] = useState(false);
   const dragDepthRef = useRef(0);
 
-  // The drop target is small, so a file released just outside it would hit the
-  // browser default and navigate away to the image, losing the unsaved form.
-  // Swallow file drops anywhere on the window while this input is mounted.
-  useEffect(() => {
-    function preventFileDrop(e: DragEvent) {
-      if (!e.dataTransfer?.types.includes("Files")) return;
-      e.preventDefault();
-    }
-
-    window.addEventListener("dragover", preventFileDrop);
-    window.addEventListener("drop", preventFileDrop);
-    return () => {
-      window.removeEventListener("dragover", preventFileDrop);
-      window.removeEventListener("drop", preventFileDrop);
-    };
-  }, []);
+  // A near-miss outside the small drop target would otherwise navigate away.
+  usePreventWindowFileDrop();
 
   function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
     if (disabled || !e.dataTransfer.types.includes("Files")) return;
