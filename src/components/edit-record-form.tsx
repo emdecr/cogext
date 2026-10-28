@@ -193,6 +193,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
   const noteField = (
     <MarkdownField
       id="edit-note"
+      recordId={record.id}
       label={
         <>
           Note{" "}
@@ -257,6 +258,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
 
             <MarkdownField
               id="edit-content"
+              recordId={record.id}
               label={record.type === "book" ? "Description" : "Content"}
               value={content}
               onChange={setContent}

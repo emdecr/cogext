@@ -8,7 +8,8 @@
 // the test.
 //
 // StarterKit v3 bundles bold/italic/strike/code, headings, lists, blockquote,
-// link, underline, and undo/redo, so the MVP toolbar needs nothing extra. The
+// link, underline, and undo/redo, so the MVP toolbar needs nothing extra.
+// RecordRef turns `/records/<id>` links into chips (record-ref-extension.ts). The
 // Markdown extension makes the editor parse markdown on input and serialize
 // back to markdown; `html: false` keeps that output pure markdown (no embedded
 // HTML), which is what keeps authored content safe to render.
@@ -17,12 +18,22 @@
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
 import type { Extensions } from "@tiptap/core";
+import { RecordRef, type RecordRefOptions } from "@/components/record-ref-extension";
 
-export const richTextExtensions: Extensions = [
-  StarterKit,
-  Markdown.configure({
-    html: false,
-    transformPastedText: true,
-    transformCopiedText: true,
-  }),
-];
+// The editor passes `recordRefSuggestion` to enable the `[[` picker; the test
+// uses the default (no picker) — parsing/serialization is identical either way.
+export function createRichTextExtensions(
+  opts: { recordRefSuggestion?: RecordRefOptions["suggestion"] } = {},
+): Extensions {
+  return [
+    StarterKit,
+    RecordRef.configure({ suggestion: opts.recordRefSuggestion ?? null }),
+    Markdown.configure({
+      html: false,
+      transformPastedText: true,
+      transformCopiedText: true,
+    }),
+  ];
+}
+
+export const richTextExtensions: Extensions = createRichTextExtensions();

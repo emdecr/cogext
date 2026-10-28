@@ -38,6 +38,8 @@ type Props = {
   disabled?: boolean;
   // Title shown in the RichTextDialog header, e.g. "Edit content".
   dialogTitle: string;
+  // The record being edited (edit form only) — hidden from the `[[` picker.
+  recordId?: string;
 };
 
 export default function MarkdownField({
@@ -50,6 +52,7 @@ export default function MarkdownField({
   rows = 8,
   disabled = false,
   dialogTitle,
+  recordId,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -98,6 +101,7 @@ export default function MarkdownField({
         value={value}
         onSave={onChange}
         placeholder={placeholder}
+        excludeRecordId={recordId}
       />
     </div>
   );

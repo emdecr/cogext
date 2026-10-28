@@ -23,7 +23,8 @@
 
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { type MarkdownStorage } from "tiptap-markdown";
-import { richTextExtensions } from "@/components/rich-text-extensions";
+import { createRichTextExtensions } from "@/components/rich-text-extensions";
+import { recordRefSuggestion } from "@/components/record-ref-picker";
 
 // tiptap-markdown adds a `markdown` storage bucket but doesn't augment Tiptap's
 // Storage type, so read it through this typed accessor.
@@ -40,6 +41,8 @@ type Props = {
   onReady: (markdown: string) => void;
   // Fires on every change with the current markdown.
   onChange: (markdown: string) => void;
+  // The record being edited, kept out of its own `[[` picker. Absent on create.
+  excludeRecordId?: string;
 };
 
 // A single toolbar button. `active` reflects the current selection's marks so
@@ -151,6 +154,12 @@ function Toolbar({ editor }: { editor: Editor }) {
       <ToolbarButton label="Link" active={editor.isActive("link")} onClick={toggleLink}>
         🔗
       </ToolbarButton>
+      <ToolbarButton
+        label="Link a record ([[ or ⌘⇧K)"
+        onClick={() => editor.commands.openRecordRefPicker()}
+      >
+        [[ ]]
+      </ToolbarButton>
 
       <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" />
 
@@ -172,12 +181,19 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-export default function RichTextEditor({ initialValue, onReady, onChange }: Props) {
+export default function RichTextEditor({
+  initialValue,
+  onReady,
+  onChange,
+  excludeRecordId,
+}: Props) {
   const editor = useEditor({
     // Client-only (loaded via ssr:false dynamic import), but false is the safe
     // default and avoids any hydration edge case.
     immediatelyRender: false,
-    extensions: richTextExtensions,
+    extensions: createRichTextExtensions({
+      recordRefSuggestion: recordRefSuggestion({ excludeId: excludeRecordId }),
+    }),
     content: initialValue, // parsed as markdown thanks to the Markdown extension
     editorProps: {
       attributes: {

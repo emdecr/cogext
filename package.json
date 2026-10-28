@@ -37,6 +37,7 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@tiptap/suggestion": "^3.31.3",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.1",
     "jose": "^6.2.1",
