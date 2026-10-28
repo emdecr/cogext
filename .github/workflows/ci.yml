@@ -273,7 +273,11 @@ jobs:
     name: E2E Tests
     needs: changes
     if: needs.changes.outputs.app == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest rolled to 26.04, which Playwright 1.58 has no
+    # Chromium build for ("does not support chromium on ubuntu26.04-x64").
+    # Move back to ubuntu-latest once Playwright is bumped to a release that
+    # supports it.
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
