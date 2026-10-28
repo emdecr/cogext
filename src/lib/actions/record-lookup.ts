@@ -67,9 +67,11 @@ export async function lookupRecords(
         ilike(records.content, contains),
       )!,
     );
+    // coalesce: an untitled record's `title ilike …` is NULL, and Postgres
+    // sorts NULLs FIRST under DESC — it would outrank real title matches.
     order.push(
-      sql`(${records.title} ilike ${prefix}) desc`,
-      sql`(${records.title} ilike ${contains}) desc`,
+      sql`coalesce(${records.title} ilike ${prefix}, false) desc`,
+      sql`coalesce(${records.title} ilike ${contains}, false) desc`,
     );
   }
 

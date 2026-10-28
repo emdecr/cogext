@@ -113,6 +113,18 @@ describe("lookupRecords (integration)", () => {
     ]);
   });
 
+  it("ranks titled matches above untitled records that match on content", async () => {
+    await seed(userAId, [
+      { title: "Dune notes", createdAt: new Date("2026-01-01") },
+      { content: "dune stuff", createdAt: new Date("2026-06-01") },
+    ]);
+
+    expect((await lookupRecords("dune")).map((r) => r.label)).toEqual([
+      "Dune notes",
+      "dune stuff",
+    ]);
+  });
+
   it("returns most recent records (books first) for an empty query", async () => {
     await seed(userAId, [
       { title: "Old note", createdAt: new Date("2026-01-01") },
