@@ -46,7 +46,16 @@ type Props = {
   value: string; // current markdown
   onSave: (markdown: string) => void;
   placeholder?: string; // reserved for Phase 2 (placeholder extension)
+  excludeRecordId?: string; // record being edited — hidden from the `[[` picker
 };
+
+// The `[[` record picker is portaled to <body>, outside Dialog.Content, so Radix
+// would read a click in it as "outside" and close the dialog. Let those through
+// to the picker instead. (The picker handles its own Escape — see
+// record-ref-picker.tsx.)
+function isInRecordPicker(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("[data-record-ref-picker]") !== null;
+}
 
 export default function RichTextDialog({
   open,
@@ -54,6 +63,7 @@ export default function RichTextDialog({
   title,
   value,
   onSave,
+  excludeRecordId,
 }: Props) {
   // `baseline` is the normalized initial markdown; `draft` is the live value.
   // Both are (re)seeded by the editor's onReady each time it mounts (which only
@@ -97,8 +107,14 @@ export default function RichTextDialog({
               handleOpenChange below. */}
           <Dialog.Content
             onEscapeKeyDown={(e) => e.stopPropagation()}
-            onPointerDownOutside={(e) => e.stopPropagation()}
-            onInteractOutside={(e) => e.stopPropagation()}
+            onPointerDownOutside={(e) => {
+              e.stopPropagation();
+              if (isInRecordPicker(e.target)) e.preventDefault();
+            }}
+            onInteractOutside={(e) => {
+              e.stopPropagation();
+              if (isInRecordPicker(e.target)) e.preventDefault();
+            }}
             className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl focus:outline-none animate-[scaleFadeIn_200ms_ease-out] dark:bg-gray-900 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:h-[85dvh] lg:w-[90vw] lg:max-w-3xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-xl"
           >
             {/* Header */}
@@ -135,6 +151,7 @@ export default function RichTextDialog({
                   setDraft(md);
                 }}
                 onChange={setDraft}
+                excludeRecordId={excludeRecordId}
               />
             )}
           </Dialog.Content>

@@ -10,6 +10,10 @@
 //
 // The link itself still navigates to the record (page or intercepting modal),
 // so the popover is a pure enhancement: no hover, no behavior lost.
+//
+// `variant="chip"` renders the link as a pill with a type icon — used for
+// references the user inserts in notes via the editor's `[[` picker
+// (plans/2026-10-28-inline-record-links.md). Reflections keep the inline look.
 // ============================================================================
 
 "use client";
@@ -17,6 +21,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import * as HoverCard from "@radix-ui/react-hover-card";
+import { RECORD_REF_CHIP_CLASS, recordRefIcon } from "@/lib/record-ref";
 
 type RecordPreview = {
   id: string;
@@ -49,9 +54,15 @@ type LoadState = "idle" | "loading" | "loaded" | "error";
 export default function RecordRefLink({
   href,
   children,
+  variant = "inline",
+  type = null,
 }: {
   href: string;
   children: React.ReactNode;
+  variant?: "inline" | "chip";
+  // Record type, when the link carries it (the `"book"` link title). Chips fall
+  // back to the preview's type once loaded, else a generic icon.
+  type?: string | null;
 }) {
   // href is always "/records/<id>" (guaranteed by the caller). Pull the id out
   // defensively in case of a trailing slash/query/hash.
@@ -84,12 +95,19 @@ export default function RecordRefLink({
       }}
     >
       <HoverCard.Trigger asChild>
-        <Link
-          href={href}
-          className="text-violet-600 underline decoration-violet-300 underline-offset-2 transition-colors hover:decoration-violet-500 dark:text-violet-400 dark:decoration-violet-700"
-        >
-          {children}
-        </Link>
+        {variant === "chip" ? (
+          <Link href={href} className={RECORD_REF_CHIP_CLASS}>
+            <span aria-hidden="true">{recordRefIcon(type ?? preview?.type)}</span>
+            <span className="truncate">{children}</span>
+          </Link>
+        ) : (
+          <Link
+            href={href}
+            className="text-violet-600 underline decoration-violet-300 underline-offset-2 transition-colors hover:decoration-violet-500 dark:text-violet-400 dark:decoration-violet-700"
+          >
+            {children}
+          </Link>
+        )}
       </HoverCard.Trigger>
 
       <HoverCard.Portal>

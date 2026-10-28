@@ -86,6 +86,16 @@ export type RecordConnection = {
   record: RelatedRecord;
 };
 
+// A row in the editor's `[[` record picker (lookupRecords). `label` is the
+// title, or a content excerpt for untitled records — it becomes the chip text.
+export type RecordLookupResult = {
+  id: string;
+  type: RecordType;
+  label: string;
+  sourceAuthor: string | null;
+  imagePath: string | null;
+};
+
 // ============================================================================
 // CREATE RECORD
 // ============================================================================
