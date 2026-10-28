@@ -24,6 +24,7 @@ import {
 } from "@/lib/validations/records";
 import TagInput from "@/components/tag-input";
 import { CoverImageInput } from "@/components/cover-image-input";
+import { usePreventWindowFileDrop } from "@/hooks/use-prevent-window-file-drop";
 import MarkdownField from "@/components/markdown-field";
 import ConnectionPicker, {
   type PendingConnection,
@@ -146,6 +147,10 @@ export default function CreateRecordForm() {
 
   const [isDragging, setIsDragging] = useState(false);
   const dragDepthRef = useRef(0);
+
+  // A near-miss outside the dropzone would otherwise navigate away and lose
+  // the form. Only while the image field is actually showing.
+  usePreventWindowFileDrop(isOpen && type === "image");
 
   function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
     if (!e.dataTransfer.types.includes("Files")) return;

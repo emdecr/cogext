@@ -17,7 +17,8 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePreventWindowFileDrop } from "@/hooks/use-prevent-window-file-drop";
 
 // Kept in sync with the image-type dropzone in create-record-form.tsx.
 // (Server-side /api/upload re-validates type + magic bytes + size regardless.)
@@ -58,11 +59,7 @@ export function CoverImageInput({
 
   const preview = objectUrl ?? existingUrl;
 
-  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0];
-    // Reset so picking the same file again still fires onChange.
-    e.target.value = "";
-    if (!selected) return;
+  function acceptFile(selected: File) {
     if (!ALLOWED_TYPES.includes(selected.type)) {
       onError("Please select a JPEG, PNG, GIF, or WebP image");
       return;
@@ -74,8 +71,59 @@ export function CoverImageInput({
     onSelect(selected);
   }
 
+  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0];
+    // Reset so picking the same file again still fires onChange.
+    e.target.value = "";
+    if (!selected) return;
+    acceptFile(selected);
+  }
+
+  // Drag-and-drop mirrors the image-type dropzone in create-record-form.tsx.
+  // dragenter/dragleave fire for every child element, so a depth counter keeps
+  // the highlight from flickering as the cursor crosses the preview/buttons.
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepthRef = useRef(0);
+
+  // A near-miss outside the small drop target would otherwise navigate away.
+  usePreventWindowFileDrop();
+
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (disabled || !e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (disabled || !e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    if (disabled) return;
+    const dropped = e.dataTransfer.files?.[0];
+    if (!dropped) return;
+    acceptFile(dropped);
+  }
+
   return (
-    <div>
+    <div
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <input
         ref={inputRef}
         type="file"
@@ -87,12 +135,23 @@ export function CoverImageInput({
 
       {preview ? (
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Cover preview"
-            className="max-h-56 rounded-md border border-gray-200 bg-gray-50 object-contain dark:border-gray-700 dark:bg-gray-800"
-          />
+          <div className="relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview}
+              alt="Cover preview"
+              className={`max-h-56 rounded-md border bg-gray-50 object-contain dark:bg-gray-800 ${
+                isDragging
+                  ? "border-blue-500 ring-2 ring-blue-500"
+                  : "border-gray-200 dark:border-gray-700"
+              }`}
+            />
+            {isDragging && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-blue-500/20 text-sm font-medium text-blue-900 dark:text-blue-100">
+                Drop to replace
+              </div>
+            )}
+          </div>
           <div className="mt-2 flex gap-3 text-xs">
             <button
               type="button"
@@ -117,9 +176,17 @@ export function CoverImageInput({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={disabled}
-          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-md -outline-offset-2 outline-2 outline-dashed outline-gray-300 px-4 py-8 text-center text-sm text-gray-500 transition-colors hover:text-gray-600 hover:outline-gray-400 disabled:opacity-50 dark:text-gray-400 dark:outline-gray-600 dark:hover:text-gray-500"
+          className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-md -outline-offset-2 outline-2 outline-dashed px-4 py-8 text-center text-sm transition-colors disabled:opacity-50 ${
+            isDragging
+              ? "bg-blue-50 text-blue-700 outline-blue-500 dark:bg-blue-950/30 dark:text-blue-300"
+              : "text-gray-500 outline-gray-300 hover:text-gray-600 hover:outline-gray-400 dark:text-gray-400 dark:outline-gray-600 dark:hover:text-gray-500"
+          }`}
         >
-          <span>Add a cover image</span>
+          <span>
+            {isDragging
+              ? "Drop cover image here"
+              : "Add a cover image, or drag and drop"}
+          </span>
           <span className="mt-1 text-xs text-gray-400">
             JPEG, PNG, GIF, or WebP • Max 5MB
           </span>
