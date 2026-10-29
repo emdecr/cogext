@@ -53,3 +53,11 @@ export const RECORD_REF_CHIP_CLASS =
   "bg-violet-50 px-1.5 py-px align-baseline text-[0.9em] font-medium leading-snug text-violet-700 " +
   "no-underline transition-colors hover:border-violet-300 hover:bg-violet-100 " +
   "dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/60";
+
+// Postgres regex (use with `~*`) matching any record ref to `id` inside
+// markdown text — used for "Mentioned in" backlinks. The id must end at a
+// boundary (`)`, space, `/`, `?`, `#`, end of text…) so `/records/<id>-extra`
+// doesn't count. Callers pass a validated uuid (no regex metacharacters).
+export function recordRefPgRegex(id: string): string {
+  return `/records/${id.toLowerCase()}([^0-9a-z_-]|$)`;
+}

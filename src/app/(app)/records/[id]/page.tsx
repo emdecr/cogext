@@ -17,6 +17,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { getRecord, getRelatedRecords } from "@/lib/actions/records";
 import { getRecordConnections } from "@/lib/actions/record-links";
+import { getRecordMentions } from "@/lib/actions/record-mentions";
 import RecordDetail from "@/components/record-detail";
 
 type Props = {
@@ -35,9 +36,10 @@ export default async function RecordDetailPage({ params }: Props) {
   // Emergent "Related" neighbors (Phase 4) + manual "Connections" (Phase 5),
   // computed here so RecordDetail stays presentational and both surfaces share
   // the same data.
-  const [related, connections] = await Promise.all([
+  const [related, connections, mentions] = await Promise.all([
     getRelatedRecords(id),
     getRecordConnections(id),
+    getRecordMentions(id),
   ]);
 
   return (
@@ -56,6 +58,7 @@ export default async function RecordDetailPage({ params }: Props) {
             record={record}
             related={related}
             connections={connections}
+            mentions={mentions}
           />
         </div>
       </div>
