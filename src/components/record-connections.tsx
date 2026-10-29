@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import RecordMiniCard from "@/components/record-mini-card";
 import RecordImagePreview from "@/components/record-image-preview";
+import ConfirmDialog from "@/components/confirm-dialog";
 import { searchRecords } from "@/lib/actions/search";
 import {
   addRecordLink,
@@ -106,6 +107,7 @@ function ConnectionItem({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(connection.note ?? "");
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function saveNote() {
@@ -123,6 +125,7 @@ function ConnectionItem({
   function remove() {
     startTransition(async () => {
       const result = await removeRecordLink(connection.linkId);
+      setConfirmRemove(false);
       if (!result.success) {
         alert(result.error || "Failed to remove connection");
         return;
@@ -138,7 +141,7 @@ function ConnectionItem({
         {/* Remove sits over the card corner; it's outside the card's <Link>. */}
         <button
           type="button"
-          onClick={remove}
+          onClick={() => setConfirmRemove(true)}
           disabled={pending}
           aria-label="Remove connection"
           className="absolute right-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-xs leading-none text-white hover:bg-black/70 disabled:opacity-50"
@@ -199,6 +202,22 @@ function ConnectionItem({
           + Add a note
         </button>
       )}
+
+      {/* Removing drops the link and its note — confirm first. */}
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        title="Remove connection?"
+        description={
+          connection.note
+            ? "This unlinks the records and deletes the note on this connection. The records themselves are kept."
+            : "This unlinks the records. The records themselves are kept."
+        }
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={remove}
+        isConfirming={pending}
+      />
     </div>
   );
 }

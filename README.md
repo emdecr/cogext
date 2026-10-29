@@ -10,9 +10,12 @@ Built as an alternative to tools like mymind.com or Pinterest, with full ownersh
 - **Semantic search** — find records by meaning, not just keywords, powered by pgvector embeddings
 - **RAG chat** — ask questions about your saved knowledge and get answers grounded in your own records
 - **Image analysis** — uploaded images are analyzed via Claude Vision and made searchable by their visual content
-- **Weekly reflections** — AI-generated digests that surface patterns, connections, and themes across your recent saves, with media recommendations for deeper exploration
+- **Weekly reflections** — AI-generated digests that surface patterns, connections, and themes across your recent saves, with media recommendations for deeper exploration. Connections you've drawn between records yourself are fed in first.
+- **Connections** — manually link related records, with an optional note on why they belong together
+- **Inline record links** — type `[[`, press ⌘/Ctrl+Shift+K, or use the toolbar button in the editor to link to another record. Links render as chips with a hover preview, and each record lists the records that mention it under **Mentioned in**.
 - **Collections** — manually curate and reorder groups of records with drag-and-drop
 - **Command palette** — keyboard-first navigation and search (⌘K)
+- **Admin panel** (`/admin`) — backup status, AI spend, auth log, system health (including AI call failures), and data stats. Restricted to the emails in `ADMIN_EMAILS`.
 
 ## Tech Stack
 
@@ -23,7 +26,7 @@ Built as an alternative to tools like mymind.com or Pinterest, with full ownersh
 | ORM | Drizzle | Type-safe queries, lightweight, generates raw SQL migrations |
 | Embeddings | Voyage AI (voyage-4-lite) | High-quality embeddings via API — no GPU or local model server needed. Swappable via provider interface (Ollama included as alternative) |
 | Tagging / Chat / Vision | Claude API (Anthropic) | Auto-tagging, RAG chat, image analysis, and weekly reflections. Swappable via provider interface (Ollama included as alternative) |
-| Object Storage | Local filesystem (dev) / MinIO (prod) | S3-compatible, self-hosted — provider pattern abstracts the switch |
+| Object Storage | MinIO (dev and prod) / local filesystem (fallback) | S3-compatible, self-hosted — provider pattern abstracts the switch |
 | Auth | Custom JWT + bcrypt | HTTP-only cookies, proxy-based route protection, no third-party auth dependency |
 | Styling | Tailwind CSS + Radix UI | Utility-first CSS with accessible, unstyled primitives |
 | Containerization | Docker + Docker Compose | Multi-stage build (~150MB image), single `docker compose up` for the full stack |
@@ -62,7 +65,7 @@ To switch to Ollama, change the imports in `src/lib/ai/index.ts` from the Voyage
 3. **Tag** — Claude generates 3–5 tags based on the content. All three steps run async after save.
 4. **Search** — queries are embedded with the same model, then matched against stored vectors via pgvector's HNSW index (cosine similarity). Keyword search runs in parallel.
 5. **Chat** — relevant records are retrieved via semantic search and injected as context into a Claude prompt (RAG). Responses stream back to the client.
-6. **Reflect** — a weekly job collects recent records, feeds them to Claude with the user's AI profile, and generates a reflection digest with themed media recommendations.
+6. **Reflect** — a weekly job collects recent records plus any manual connections touching them, feeds them to Claude with the user's AI profile, and generates a reflection digest with themed media recommendations.
 
 ## Getting Started
 
@@ -85,17 +88,21 @@ npm install
 cp .env.example .env
 # Edit .env — set ANTHROPIC_API_KEY and VOYAGE_API_KEY
 
-# 3. Start Postgres
+# 3. Start Postgres (host port 5435) and MinIO (API :9000, console :9001)
 docker compose up -d
 
 # 4. Run database migrations
-npx drizzle-kit migrate
+npm run db:migrate
 
 # 5. Start the dev server
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`. Register an account to get started.
+The app will be available at `http://localhost:3000`.
+
+**Creating your account:** registration is closed by default (`ALLOW_REGISTRATION=false`). Set it to `true` in `.env`, restart the dev server, register at `/register`, then set it back to `false`. To use the admin panel, add your email to `ADMIN_EMAILS`.
+
+**Storage in dev:** `.env.example` defaults to `STORAGE_PROVIDER=local` (files go to `public/uploads/`). To use the local MinIO that `docker compose` starts, which matches prod, set `STORAGE_PROVIDER=minio` with `minioadmin` / `minioadmin` credentials and the `cogext-uploads` bucket (created by `minio-init`). See the comments in `docker-compose.yml`. To load a prod backup locally, use `scripts/restore-local.sh` rather than `restore.sh`.
 
 ### Environment Variables
 
@@ -110,10 +117,18 @@ The app will be available at `http://localhost:3000`. Register an account to get
 | `TAGGING_MODEL` | No | `claude-haiku-5-5` | Claude model for auto-tagging on save |
 | `RECOMMENDATIONS_MODEL` | No | `claude-haiku-5-5` | Claude model for weekly media recommendations |
 | `IMAGE_ANALYSIS_MODEL` | No | `claude-haiku-5-5` | Claude model for describing uploaded images |
-| `STORAGE_PROVIDER` | No | `local` | `local` or `minio` |
+| `WEB_SEARCH_TOOL_VERSION` | No | `web_search_20250305` | Anthropic web search tool version |
+| `ALLOW_REGISTRATION` | No | `false` | Open `/register` for self-service sign-up. Turn on only while adding a user. |
+| `ADMIN_EMAILS` | No | — | Comma-separated emails allowed into `/admin`. Empty means nobody. |
+| `CRON_SECRET` | Prod | — | Bearer token for cron endpoints (reflections, AI health). ≥32 chars, checked at startup in production. |
+| `STORAGE_PROVIDER` | No | `local` | `local` or `minio` (`minio` makes the `STORAGE_*` vars required) |
 | `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Public-facing app URL |
+| `HEALTHCHECKS_API_KEY` / `HEALTHCHECKS_CHECK_ID` | No | — | Read-only healthchecks.io key and check ID for the admin Backups tab |
+| `AI_HEALTHCHECK_URL` | No | — | healthchecks.io ping URL for AI failure alerts (`scripts/ai-health-check.sh`) |
+| `HEALTHCHECK_URL` | No | — | healthchecks.io ping URL for backup notifications (`scripts/backup.sh`) |
+| `OFFSITE_ENABLED` / `OFFSITE_REMOTE` / `OFFSITE_RETAIN` | No | `false` | Upload backups to an rclone remote (`scripts/backup.sh`) |
 
-See `.env.example` for the full list, including MinIO and CRON configuration.
+See `.env.example` for the full list, including MinIO credentials and the alert window settings.
 
 ## Testing
 
@@ -232,7 +247,7 @@ All LLM prompts live in `src/lib/ai/`. If you want to adjust tone, format, or be
 | Auto-tagging | `src/lib/ai/claude-llm.ts` | System prompt in the `tag()` method |
 | Chat / RAG | `src/app/api/chat/route.ts` | System prompt built in the route handler |
 | Image analysis | `src/lib/ai/analyze-image.ts` | System prompt for Claude Vision |
-| Weekly reflections | `src/lib/ai/reflection.ts` | System prompt + `buildReflectionPrompt()` |
+| Weekly reflections | `src/lib/ai/reflection.ts` | System prompt + `buildReflectionPrompt()` (includes manual connections) |
 | Media recommendations | `src/lib/ai/generate-recommendations.ts` | System prompt + recommendation instructions |
 | User profile | `src/lib/ai/profile.ts` | System prompt for profile extraction |
 
@@ -259,16 +274,22 @@ cogext/
 ├── drizzle/               # Generated SQL migrations
 ├── e2e/                   # Playwright E2E tests
 ├── scripts/
-│   ├── backup.sh          # Database + storage backup
-│   ├── restore.sh         # Restore from backup
+│   ├── backup.sh          # Database + storage backup (optional offsite upload)
+│   ├── restore.sh         # Restore from backup (prod)
+│   ├── restore-local.sh   # Load a prod backup into local dev (rewrites image URLs)
+│   ├── download-backups.sh / download-minio-images.sh  # Pull backups/images from the server
+│   ├── healthcheck.sh     # Post-deploy/reboot smoke test (prod)
+│   ├── ai-health-check.sh # Cron: alert on AI call failures via healthchecks.io
+│   ├── re-embed-all.ts    # Regenerate missing embeddings
 │   └── migrate.mjs        # Standalone migration runner (used in Docker)
 ├── src/
 │   ├── app/               # Next.js routes, pages, and API routes
-│   │   └── api/           # REST endpoints (auth, chat, upload, health, reflections)
+│   │   ├── (app)/admin/   # Admin panel tabs (backups, AI spend, auth log, system, data)
+│   │   └── api/           # REST endpoints (auth, chat, upload, health, profile, records, reflections)
 │   ├── components/        # React components (forms, cards, command palette, etc.)
 │   ├── db/
 │   │   ├── index.ts       # Database connection pool
-│   │   └── schema.ts      # Drizzle schema (11 tables, pgvector index)
+│   │   └── schema.ts      # Drizzle schema (pgvector index)
 │   ├── lib/
 │   │   ├── actions/       # Server Actions (records, search, tags, collections, reflections)
 │   │   ├── ai/            # AI providers (embeddings, tagging, chat, image analysis, reflections)
@@ -280,7 +301,7 @@ cogext/
 │   ├── proxy.ts            # Auth proxy for route protection (Next 16 middleware)
 │   └── test/              # Test setup, helpers, and mocks
 ├── Dockerfile             # Multi-stage build (node:24-alpine, ~150MB)
-├── docker-compose.yml     # Dev services (Postgres)
+├── docker-compose.yml     # Dev services (Postgres, MinIO)
 ├── docker-compose.prod.yml # Production stack (app + db + minio)
 └── docker-entrypoint.sh   # Runs migrations, then starts the server
 ```

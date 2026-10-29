@@ -15,6 +15,7 @@
 import { useState } from "react";
 import { removeRecordFromCollection } from "@/lib/actions/collections";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import ConfirmDialog from "@/components/confirm-dialog";
 
 type CollectionRecord = {
   id: string;
@@ -46,6 +47,7 @@ type Props = {
 
 export default function CollectionRecordCard({ record, collectionId }: Props) {
   const [isRemoving, setIsRemoving] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   // Content is authored as markdown; strip it for plain-text previews/titles.
   const plainContent = stripMarkdown(record.content);
@@ -62,6 +64,7 @@ export default function CollectionRecordCard({ record, collectionId }: Props) {
   async function handleRemove() {
     setIsRemoving(true);
     await removeRecordFromCollection(collectionId, record.id);
+    setShowRemoveConfirm(false);
     // Page will refresh via revalidatePath — the card disappears
   }
 
@@ -69,7 +72,7 @@ export default function CollectionRecordCard({ record, collectionId }: Props) {
     <div className="group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
       {/* Remove button — shows on hover in the top-right corner */}
       <button
-        onClick={handleRemove}
+        onClick={() => setShowRemoveConfirm(true)}
         disabled={isRemoving}
         className="absolute right-2 top-2 z-10 rounded-md bg-white/80 px-2 py-1 text-xs text-gray-500 opacity-0 shadow-sm transition-opacity hover:text-red-500 group-hover:opacity-100 disabled:opacity-50 dark:bg-gray-800/80"
         title="Remove from collection"
@@ -134,6 +137,18 @@ export default function CollectionRecordCard({ record, collectionId }: Props) {
           </div>
         )}
       </div>
+
+      {/* Remove confirmation — the hover ✕ is easy to hit by accident */}
+      <ConfirmDialog
+        open={showRemoveConfirm}
+        onOpenChange={setShowRemoveConfirm}
+        title="Remove from collection?"
+        description="The record itself is kept — it just won't appear in this collection."
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={handleRemove}
+        isConfirming={isRemoving}
+      />
     </div>
   );
 }
