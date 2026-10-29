@@ -28,11 +28,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and, or, ne, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, ne, isNotNull, notExists, ilike, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { records, recordTags, collectionRecords, recordLinks } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
+import { recordRefLikePattern } from "@/lib/record-ref";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
@@ -349,6 +350,10 @@ export async function getRecord(id: string) {
 // FLOOR so a niche record shows nothing rather than noise, and de-dupe
 // near-identical neighbors (e.g. the same clip saved five times) so the list
 // isn't repetitive. Returns at most 5.
+//
+// Records already shown above Related — manual Connections and "Mentioned in"
+// backlinks — are excluded in SQL, so the list never repeats them and still
+// fills up to the limit.
 
 // Cosine-similarity floor below which a neighbor is considered unrelated.
 // TUNABLE: calibrated for voyage-4-lite embeddings; adjust after seeing real
@@ -377,6 +382,7 @@ export async function getRelatedRecords(
   // pgvector wants the vector as a bracketed string literal, same as search.ts.
   const embeddingStr = `[${target.embedding.join(",")}]`;
   const distance = sql`${records.embedding} <=> ${embeddingStr}::vector`;
+  const mentionPattern = recordRefLikePattern(recordId);
 
   // Over-fetch a little so the JS de-dupe below still leaves us up to
   // RELATED_LIMIT distinct neighbors.
@@ -395,6 +401,30 @@ export async function getRelatedRecords(
         eq(records.userId, userId),
         ne(records.id, recordId),
         isNotNull(records.embedding),
+        // Not already a manual connection (links are undirected).
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(recordLinks)
+            .where(
+              and(
+                eq(recordLinks.userId, userId),
+                or(
+                  and(
+                    eq(recordLinks.recordId, recordId),
+                    eq(recordLinks.relatedRecordId, records.id),
+                  ),
+                  and(
+                    eq(recordLinks.relatedRecordId, recordId),
+                    eq(recordLinks.recordId, records.id),
+                  ),
+                ),
+              ),
+            ),
+        ),
+        // Not already in "Mentioned in" (see record-mentions.ts). coalesce:
+        // a NULL note would make the whole NOT(...) NULL and drop the row.
+        sql`not coalesce(${ilike(records.content, mentionPattern)} or ${ilike(records.note, mentionPattern)}, false)`,
         // Apply the similarity floor in SQL so we never even rank noise.
         sql`1 - (${distance}) >= ${RELATED_SIMILARITY_FLOOR}`,
       ),

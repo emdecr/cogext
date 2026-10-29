@@ -53,3 +53,10 @@ export const RECORD_REF_CHIP_CLASS =
   "bg-violet-50 px-1.5 py-px align-baseline text-[0.9em] font-medium leading-snug text-violet-700 " +
   "no-underline transition-colors hover:border-violet-300 hover:bg-violet-100 " +
   "dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/60";
+
+// ILIKE pattern matching any record ref to `id` inside markdown text — used
+// for "Mentioned in" backlinks. Callers pass a validated uuid, which has no
+// LIKE wildcards to escape.
+export function recordRefLikePattern(id: string): string {
+  return `%/records/${id.toLowerCase()}%`;
+}
