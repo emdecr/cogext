@@ -54,9 +54,10 @@ export const RECORD_REF_CHIP_CLASS =
   "no-underline transition-colors hover:border-violet-300 hover:bg-violet-100 " +
   "dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/60";
 
-// ILIKE pattern matching any record ref to `id` inside markdown text — used
-// for "Mentioned in" backlinks. Callers pass a validated uuid, which has no
-// LIKE wildcards to escape.
-export function recordRefLikePattern(id: string): string {
-  return `%/records/${id.toLowerCase()}%`;
+// Postgres regex (use with `~*`) matching any record ref to `id` inside
+// markdown text — used for "Mentioned in" backlinks. The id must end at a
+// boundary (`)`, space, `/`, `?`, `#`, end of text…) so `/records/<id>-extra`
+// doesn't count. Callers pass a validated uuid (no regex metacharacters).
+export function recordRefPgRegex(id: string): string {
+  return `/records/${id.toLowerCase()}([^0-9a-z_-]|$)`;
 }

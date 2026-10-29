@@ -110,9 +110,19 @@ describe("getRecordMentions (integration)", () => {
       content: `[x](/records/${target.toUpperCase()})`,
     });
     await seed(userAId, { title: "Unrelated", content: "no refs here" });
+    // Id followed by more id-like text is a different path, not a ref.
+    await seed(userAId, {
+      title: "Suffixed",
+      content: `[x](/records/${target}-extra)`,
+    });
+    // Trailing path/query/hash still points at the target.
+    await seed(userAId, {
+      title: "With hash",
+      content: `[x](/records/${target}#notes)`,
+    });
 
     const titles = (await getRecordMentions(target)).map((r) => r.title).sort();
-    expect(titles).toEqual(["Hand typed", "In content", "In note"]);
+    expect(titles).toEqual(["Hand typed", "In content", "In note", "With hash"]);
   });
 
   it("excludes self-refs and other users' records", async () => {

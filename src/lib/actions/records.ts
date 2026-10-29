@@ -28,12 +28,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and, or, ne, isNotNull, notExists, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, or, ne, isNotNull, notExists, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { records, recordTags, collectionRecords, recordLinks } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
-import { recordRefLikePattern } from "@/lib/record-ref";
+import { recordRefPgRegex } from "@/lib/record-ref";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
@@ -382,7 +382,7 @@ export async function getRelatedRecords(
   // pgvector wants the vector as a bracketed string literal, same as search.ts.
   const embeddingStr = `[${target.embedding.join(",")}]`;
   const distance = sql`${records.embedding} <=> ${embeddingStr}::vector`;
-  const mentionPattern = recordRefLikePattern(recordId);
+  const mentionPattern = recordRefPgRegex(recordId);
 
   // Over-fetch a little so the JS de-dupe below still leaves us up to
   // RELATED_LIMIT distinct neighbors.
@@ -424,7 +424,7 @@ export async function getRelatedRecords(
         ),
         // Not already in "Mentioned in" (see record-mentions.ts). coalesce:
         // a NULL note would make the whole NOT(...) NULL and drop the row.
-        sql`not coalesce(${ilike(records.content, mentionPattern)} or ${ilike(records.note, mentionPattern)}, false)`,
+        sql`not coalesce(${records.content} ~* ${mentionPattern} or ${records.note} ~* ${mentionPattern}, false)`,
         // Apply the similarity floor in SQL so we never even rank noise.
         sql`1 - (${distance}) >= ${RELATED_SIMILARITY_FLOOR}`,
       ),
