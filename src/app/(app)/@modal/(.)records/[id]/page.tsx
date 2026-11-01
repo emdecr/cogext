@@ -16,7 +16,10 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getRecord, getRelatedRecords } from "@/lib/actions/records";
 import { getRecordConnections } from "@/lib/actions/record-links";
-import { getRecordMentions } from "@/lib/actions/record-mentions";
+import {
+  getOutgoingMentions,
+  getRecordMentions,
+} from "@/lib/actions/record-mentions";
 import RecordModal from "./record-modal";
 
 type Props = {
@@ -34,10 +37,11 @@ export default async function RecordModalPage({ params }: Props) {
 
   // Same "Related" + "Connections" data as the standalone page, so the modal
   // and the full page render identically.
-  const [related, connections, mentions] = await Promise.all([
+  const [related, connections, mentionsIn, mentionsOut] = await Promise.all([
     getRelatedRecords(id),
     getRecordConnections(id),
     getRecordMentions(id),
+    getOutgoingMentions(id),
   ]);
 
   return (
@@ -45,7 +49,8 @@ export default async function RecordModalPage({ params }: Props) {
       record={record}
       related={related}
       connections={connections}
-      mentions={mentions}
+      mentionsIn={mentionsIn}
+      mentionsOut={mentionsOut}
     />
   );
 }

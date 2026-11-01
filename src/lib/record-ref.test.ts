@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeRecordRefLabel,
+  extractRecordRefIds,
   isRecordType,
   parseRecordRefHref,
   recordRefIcon,
@@ -42,5 +43,24 @@ describe("record ref helpers", () => {
     expect(isRecordType("book")).toBe(true);
     expect(isRecordType("spaceship")).toBe(false);
     expect(isRecordType("toString")).toBe(false);
+  });
+});
+
+describe("extractRecordRefIds", () => {
+  const other = "a1b2c3d4-0000-4000-8000-000000000001";
+
+  it("returns ids in order of first appearance, deduped and lowercased", () => {
+    const text = `See [B](/records/${other} "note") and [A](/records/${id.toUpperCase()}), then [B again](/records/${other}).`;
+    expect(extractRecordRefIds(text)).toEqual([other, id]);
+  });
+
+  it("requires an id boundary", () => {
+    expect(extractRecordRefIds(`/records/${id}-extra`)).toEqual([]);
+    expect(extractRecordRefIds(`/records/${id}`)).toEqual([id]);
+  });
+
+  it("handles empty input", () => {
+    expect(extractRecordRefIds(null)).toEqual([]);
+    expect(extractRecordRefIds("")).toEqual([]);
   });
 });

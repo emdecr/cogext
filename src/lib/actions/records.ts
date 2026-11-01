@@ -28,12 +28,22 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and, or, ne, isNotNull, notExists, sql } from "drizzle-orm";
+import {
+  eq,
+  desc,
+  and,
+  or,
+  ne,
+  isNotNull,
+  notExists,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import { records, recordTags, collectionRecords, recordLinks } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
-import { recordRefPgRegex } from "@/lib/record-ref";
+import { extractRecordRefIds, recordRefPgRegex } from "@/lib/record-ref";
 import { embedRecord } from "@/lib/ai/embed-record";
 import { analyzeImage } from "@/lib/ai/analyze-image";
 import { getLLMProvider } from "@/lib/ai";
@@ -351,8 +361,8 @@ export async function getRecord(id: string) {
 // near-identical neighbors (e.g. the same clip saved five times) so the list
 // isn't repetitive. Returns at most 5.
 //
-// Records already shown above Related — manual Connections and "Mentioned in"
-// backlinks — are excluded in SQL, so the list never repeats them and still
+// Records already shown above Related — manual links and inline-ref mentions
+// in either direction (the unified Connections section) — are excluded in SQL, so the list never repeats them and still
 // fills up to the limit.
 
 // Cosine-similarity floor below which a neighbor is considered unrelated.
@@ -374,7 +384,7 @@ export async function getRelatedRecords(
   // before the voyage-4 re-embed — there's nothing to compare against.
   const target = await db.query.records.findFirst({
     where: and(eq(records.id, recordId), eq(records.userId, userId)),
-    columns: { embedding: true },
+    columns: { embedding: true, content: true, note: true },
   });
 
   if (!target?.embedding) return [];
@@ -383,6 +393,11 @@ export async function getRelatedRecords(
   const embeddingStr = `[${target.embedding.join(",")}]`;
   const distance = sql`${records.embedding} <=> ${embeddingStr}::vector`;
   const mentionPattern = recordRefPgRegex(recordId);
+  // Records this one refs ("Mentioned here", see getOutgoingMentions).
+  const outgoingIds = [
+    ...extractRecordRefIds(target.content),
+    ...extractRecordRefIds(target.note),
+  ];
 
   // Over-fetch a little so the JS de-dupe below still leaves us up to
   // RELATED_LIMIT distinct neighbors.
@@ -425,6 +440,8 @@ export async function getRelatedRecords(
         // Not already in "Mentioned in" (see record-mentions.ts). coalesce:
         // a NULL note would make the whole NOT(...) NULL and drop the row.
         sql`not coalesce(${records.content} ~* ${mentionPattern} or ${records.note} ~* ${mentionPattern}, false)`,
+        // Not one this record refs.
+        outgoingIds.length > 0 ? notInArray(records.id, outgoingIds) : undefined,
         // Apply the similarity floor in SQL so we never even rank noise.
         sql`1 - (${distance}) >= ${RELATED_SIMILARITY_FLOOR}`,
       ),
