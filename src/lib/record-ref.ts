@@ -61,3 +61,19 @@ export const RECORD_REF_CHIP_CLASS =
 export function recordRefPgRegex(id: string): string {
   return `/records/${id.toLowerCase()}([^0-9a-z_-]|$)`;
 }
+
+// Every record id referenced in markdown text, in order of first appearance,
+// lowercased and deduped — used for "Mentioned here" (outgoing refs). Same
+// boundary rule as recordRefPgRegex so incoming and outgoing agree on what
+// counts as a ref.
+export function extractRecordRefIds(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const ids = new Set<string>();
+  for (const match of text.matchAll(RECORD_REF_IN_TEXT_RE)) {
+    ids.add(match[1].toLowerCase());
+  }
+  return [...ids];
+}
+
+const RECORD_REF_IN_TEXT_RE =
+  /\/records\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-z_-])/gi;

@@ -77,7 +77,8 @@ export default function RecordDetail({
   record,
   related = [],
   connections = [],
-  mentions = [],
+  mentionsIn = [],
+  mentionsOut = [],
   onClose,
 }: {
   record: RecordWithTags;
@@ -88,9 +89,11 @@ export default function RecordDetail({
   // Manual user-authored connections (Phase 5), computed server-side and passed
   // in by both surfaces.
   connections?: RecordConnection[];
-  // "Mentioned in" backlinks: records whose content/note contains an inline
-  // ref to this one (getRecordMentions). Derived, not stored.
-  mentions?: RelatedRecord[];
+  // Inline-ref mentions, derived not stored: records whose content/note refs
+  // this one (getRecordMentions), and records this one refs
+  // (getOutgoingMentions). Shown inside Connections.
+  mentionsIn?: RelatedRecord[];
+  mentionsOut?: RelatedRecord[];
   // Provided when rendered inside the modal (closes it). Absent on the
   // standalone page, where no close button is rendered.
   onClose?: () => void;
@@ -406,23 +409,14 @@ export default function RecordDetail({
           </div>
         )}
 
-        {/* ---- Connections (manual, user-authored — Phase 5) ----
+        {/* ---- Connections (manual links + inline-ref mentions) ----
             Above Related: your deliberate links come before AI suggestions. */}
-        <RecordConnections recordId={record.id} connections={connections} />
-
-        {/* ---- Mentioned in (derived backlinks from inline record refs) ---- */}
-        {mentions.length > 0 && (
-          <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-800">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Mentioned in
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {mentions.map((r) => (
-                <RecordMiniCard key={r.id} record={r} />
-              ))}
-            </div>
-          </div>
-        )}
+        <RecordConnections
+          recordId={record.id}
+          connections={connections}
+          mentionsIn={mentionsIn}
+          mentionsOut={mentionsOut}
+        />
 
         {/* ---- Related (emergent nearest neighbors; excludes the sections
             above, see getRelatedRecords) ---- */}

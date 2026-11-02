@@ -2,9 +2,10 @@
 // RECORD MENTIONS + RELATED DE-DUPE — INTEGRATION TEST
 // ============================================================================
 //
-// getRecordMentions() finds "Mentioned in" backlinks with an ILIKE scan of
-// content/note, and getRelatedRecords() must leave out anything already shown
-// in Connections or "Mentioned in". Both live in SQL, so this runs against a
+// getRecordMentions() finds backlinks with a regex scan of content/note,
+// getOutgoingMentions() resolves the refs in this record's own text, and
+// getRelatedRecords() must leave out anything already shown in Connections
+// (links and mentions in either direction). Both live in SQL, so this runs against a
 // real Postgres + pgvector. Only the session (and the AI module that
 // records.ts imports) are mocked.
 
@@ -25,7 +26,10 @@ vi.mock("@/lib/ai", () => ({}));
 vi.mock("@/lib/ai/embed-record", () => ({ embedRecord: vi.fn() }));
 vi.mock("@/lib/ai/analyze-image", () => ({ analyzeImage: vi.fn() }));
 
-import { getRecordMentions } from "@/lib/actions/record-mentions";
+import {
+  getOutgoingMentions,
+  getRecordMentions,
+} from "@/lib/actions/record-mentions";
 import { getRelatedRecords } from "@/lib/actions/records";
 
 // Every seeded embedding is the same vector, so every record is a perfect
@@ -141,13 +145,45 @@ describe("getRecordMentions (integration)", () => {
   });
 });
 
+describe("getOutgoingMentions (integration)", () => {
+  it("resolves refs in content and note, in order, skipping missing and foreign ids", async () => {
+    const first = await seed(userAId, { title: "First" });
+    const second = await seed(userAId, { title: "Second" });
+    const foreign = await seed(userBId, { title: "Foreign" });
+    const missing = "00000000-0000-4000-8000-000000000000";
+    const source = await seed(userAId, {
+      title: "Source",
+      content: `${ref(second, "2")} ${ref(missing)} ${ref(foreign)} ${ref(second, "again")}`,
+      note: ref(first, "1"),
+    });
+    await db
+      .update(records)
+      .set({ note: `${ref(first, "1")} and me ${ref(source)}` })
+      .where(eq(records.id, source));
+
+    const titles = (await getOutgoingMentions(source)).map((r) => r.title);
+    expect(titles).toEqual(["Second", "First"]);
+  });
+
+  it("returns nothing for another user's record", async () => {
+    const target = await seed(userAId, { title: "Target" });
+    const source = await seed(userBId, { title: "Other", content: ref(target) });
+    expect(await getOutgoingMentions(source)).toEqual([]);
+  });
+});
+
 describe("getRelatedRecords de-dupe (integration)", () => {
-  it("leaves out connections (either direction) and mentions", async () => {
+  it("leaves out connections and mentions (either direction)", async () => {
     const target = await seed(userAId, { title: "Target" });
     const outgoing = await seed(userAId, { title: "Connected from target" });
     const incoming = await seed(userAId, { title: "Connected to target" });
     await seed(userAId, { title: "Mentions target", note: ref(target) });
+    const mentioned = await seed(userAId, { title: "Mentioned by target" });
     await seed(userAId, { title: "Just related" });
+    await db
+      .update(records)
+      .set({ content: `See ${ref(mentioned)}` })
+      .where(eq(records.id, target));
 
     await db.insert(recordLinks).values([
       { userId: userAId, recordId: target, relatedRecordId: outgoing },

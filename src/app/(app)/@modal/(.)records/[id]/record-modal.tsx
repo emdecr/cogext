@@ -50,12 +50,14 @@ export default function RecordModal({
   record,
   related,
   connections,
-  mentions,
+  mentionsIn,
+  mentionsOut,
 }: {
   record: RecordWithTags;
   related: RelatedRecord[];
   connections: RecordConnection[];
-  mentions: RelatedRecord[];
+  mentionsIn: RelatedRecord[];
+  mentionsOut: RelatedRecord[];
 }) {
   const router = useRouter();
 
@@ -81,7 +83,8 @@ export default function RecordModal({
             record={record}
             related={related}
             connections={connections}
-            mentions={mentions}
+            mentionsIn={mentionsIn}
+            mentionsOut={mentionsOut}
             onClose={() => router.back()}
           />
         </Dialog.Content>
