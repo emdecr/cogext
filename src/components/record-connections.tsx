@@ -98,7 +98,9 @@ export default function RecordConnections({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {items.map((c) => (
             <ConnectionItem
-              key={c.record.id}
+              // Keyed on the link too: adding/replacing a link remounts the
+              // item so its note draft starts from the current note.
+              key={`${c.record.id}:${c.link?.linkId ?? "mention"}`}
               connection={c}
               onConnect={() =>
                 openAdd({
