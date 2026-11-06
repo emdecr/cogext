@@ -25,51 +25,14 @@ import { getEmbeddingProvider } from "@/lib/ai";
 import { modelFor } from "@/lib/ai/model-settings";
 import { logAiOutcome } from "@/lib/ai/usage";
 import { logger } from "@/lib/logger";
+import { prepareTextForEmbedding } from "@/lib/ai/embed-text";
 
 // ============================================================================
 // PREPARE TEXT FOR EMBEDDING
 // ============================================================================
-// We combine all meaningful text fields into one string for embedding.
-// Why combine instead of embedding each field separately?
-//   - One embedding per record is simpler and cheaper
-//   - The embedding captures the OVERALL meaning of the record
-//   - Individual fields alone might lack context ("Untitled" tells us nothing,
-//     but "Untitled" + content about pasta recipes does)
-//
-// We prefix each section so the model understands the structure.
-// "Title: Quick Pasta" gives more signal than just "Quick Pasta".
-
-// Exported so unit tests can verify the text preparation logic directly.
-// This function is pure — no side effects, no I/O — making it ideal to
-// test in isolation without mocking the database or embedding provider.
-export function prepareTextForEmbedding(record: {
-  title: string | null;
-  content: string;
-  sourceAuthor: string | null;
-  note: string | null;
-  type: string;
-}): string {
-  const parts: string[] = [];
-
-  // Include the record type for context
-  parts.push(`Type: ${record.type}`);
-
-  if (record.title) {
-    parts.push(`Title: ${record.title}`);
-  }
-
-  parts.push(`Content: ${record.content}`);
-
-  if (record.sourceAuthor) {
-    parts.push(`Author: ${record.sourceAuthor}`);
-  }
-
-  if (record.note) {
-    parts.push(`Note: ${record.note}`);
-  }
-
-  return parts.join("\n");
-}
+// Pure text builder lives in embed-text.ts (shared with scripts/re-embed-all.ts).
+// Re-exported here so existing imports keep working.
+export { prepareTextForEmbedding };
 
 // ============================================================================
 // EMBED A SINGLE RECORD

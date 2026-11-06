@@ -20,7 +20,7 @@ import RecordCard from "@/components/record-card";
 import FilterBar from "@/components/filter-bar";
 import FilterDrawer from "@/components/filter-drawer";
 import EmptyState from "@/components/empty-state";
-import type { RecordType, ReadingStatus } from "@/lib/validations/records";
+import type { RecordType, ShelfStatus } from "@/lib/validations/records";
 
 // Type matches what getRecords() returns (with tags included)
 type Tag = {
@@ -39,8 +39,9 @@ type RecordWithTags = {
   imagePath: string | null;
   note: string | null;
   rating: number | null;
-  readingStatus: ReadingStatus | null;
-  dateRead: string | null;
+  shelfStatus: ShelfStatus | null;
+  dateFinished: string | null;
+  releaseYear: number | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };

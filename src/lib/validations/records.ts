@@ -33,6 +33,8 @@ export const RECORD_TYPES = [
   "link",
   "note",
   "book",
+  "movie",
+  "show",
 ] as const;
 
 // The single source of truth for a record's type across the app. Import this
@@ -47,18 +49,74 @@ export const CREATABLE_RECORD_TYPES = [
   "link",
   "image",
   "book",
+  "movie",
+  "show",
 ] as const satisfies readonly RecordType[];
 
-// Reading-shelf status values for book records — must match readingStatusEnum
-// in schema.ts.
-export const READING_STATUSES = ["want_to_read", "reading", "read"] as const;
-export type ReadingStatus = (typeof READING_STATUSES)[number];
+// ---- Shelf records (book, movie, show) ----
+// "Shelf" types share rating / status / date finished / release year and an
+// optional cover or poster. Behavior is shared; only the wording differs, and
+// that lives in SHELF_META. Add a medium (podcast, game…) by adding it here,
+// to RECORD_TYPES, and to SHELF_META.
+export const SHELF_TYPES = ["book", "movie", "show"] as const satisfies readonly RecordType[];
+export type ShelfType = (typeof SHELF_TYPES)[number];
 
-// Human-readable labels for the status dropdown.
-export const READING_STATUS_LABELS: Record<ReadingStatus, string> = {
-  want_to_read: "Want to read",
-  reading: "Currently reading",
-  read: "Read",
+export function isShelfType(type: string | null | undefined): type is ShelfType {
+  return (SHELF_TYPES as readonly string[]).includes(type ?? "");
+}
+
+// Medium-neutral shelf status — must match shelfStatusEnum in schema.ts.
+export const SHELF_STATUSES = ["want", "in_progress", "done"] as const;
+export type ShelfStatus = (typeof SHELF_STATUSES)[number];
+
+export type ShelfMeta = {
+  statusLabels: Record<ShelfStatus, string>;
+  // Form/detail label for dateFinished.
+  dateLabel: string;
+  // Card prefix before the date: "Read 3/4/2026", "Watched 3/4/2026".
+  doneVerb: string;
+  // Label for sourceAuthor.
+  creatorLabel: string;
+  creatorPlaceholder: string;
+  // What the optional image is called.
+  imageLabel: string;
+};
+
+const WATCH_STATUS_LABELS: Record<ShelfStatus, string> = {
+  want: "Want to watch",
+  in_progress: "Watching",
+  done: "Watched",
+};
+
+export const SHELF_META: Record<ShelfType, ShelfMeta> = {
+  book: {
+    statusLabels: {
+      want: "Want to read",
+      in_progress: "Currently reading",
+      done: "Read",
+    },
+    dateLabel: "Date read",
+    doneVerb: "Read",
+    creatorLabel: "Author",
+    creatorPlaceholder: "Who wrote this?",
+    imageLabel: "Cover",
+  },
+  movie: {
+    statusLabels: WATCH_STATUS_LABELS,
+    dateLabel: "Date watched",
+    doneVerb: "Watched",
+    creatorLabel: "Director",
+    creatorPlaceholder: "Who directed it?",
+    imageLabel: "Poster",
+  },
+  show: {
+    statusLabels: WATCH_STATUS_LABELS,
+    dateLabel: "Date finished",
+    doneVerb: "Finished",
+    creatorLabel: "Creator",
+    creatorPlaceholder: "Who created it?",
+    imageLabel: "Poster",
+  },
 };
 
 // Compact DTO for the emergent "Related" list (Phase 4). Lives here rather than
@@ -155,9 +213,9 @@ const recordFieldsSchema = z.object({
   // Optional because only image-type records have this.
   imagePath: z.string().optional(),
 
-  // ---- Book-only fields ----
-  // All optional; only book records send them. Validation stays permissive
-  // for non-book types (they simply omit these).
+  // ---- Shelf fields (book, movie, show) ----
+  // All optional; only shelf records send them. Validation stays permissive
+  // for other types (they simply omit these).
 
   // Star rating, 0–5 (decimal allowed, e.g. 4.5).
   rating: z
@@ -166,12 +224,20 @@ const recordFieldsSchema = z.object({
     .max(5, "Rating must be between 0 and 5")
     .optional(),
 
-  // Reading-shelf status.
-  readingStatus: z.enum(READING_STATUSES).optional(),
+  // Shelf status (want / in_progress / done).
+  shelfStatus: z.enum(SHELF_STATUSES).optional(),
 
-  // Date the book was finished (ISO "YYYY-MM-DD"). Empty string from an
+  // Date finished — read or watched (ISO "YYYY-MM-DD"). Empty string from an
   // unfilled form field is allowed and normalized to null in the action.
-  dateRead: z.iso.date().optional().or(z.literal("")),
+  dateFinished: z.iso.date().optional().or(z.literal("")),
+
+  // Release / publication year.
+  releaseYear: z
+    .number()
+    .int("Year must be a whole number")
+    .min(1, "Year must be between 1 and 9999")
+    .max(9999, "Year must be between 1 and 9999")
+    .optional(),
 });
 
 // Cross-field rule: a link record must carry a Source URL — the URL is the

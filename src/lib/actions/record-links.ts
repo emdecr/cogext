@@ -26,7 +26,10 @@ import { db } from "@/db";
 import { records, recordLinks } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { stripMarkdown } from "@/lib/strip-markdown";
-import type { RecordConnection } from "@/lib/validations/records";
+import {
+  isShelfType,
+  type RecordConnection,
+} from "@/lib/validations/records";
 
 type ActionResult = {
   success: boolean;
@@ -203,7 +206,7 @@ export type LinkCandidate = {
 export async function getLinkSuggestions(): Promise<LinkCandidate[]> {
   const userId = await requireUserId();
 
-  // Pull a recent slice, then partition so books lead. We over-fetch a little
+  // Pull a recent slice, then partition so shelf records lead. We over-fetch a little
   // (24) and trim to 12 after sorting, so a books-heavy or notes-heavy recent
   // history still yields a useful mix.
   const recent = await db
@@ -220,11 +223,12 @@ export async function getLinkSuggestions(): Promise<LinkCandidate[]> {
     .orderBy(desc(records.createdAt))
     .limit(24);
 
-  // Stable partition: books first (each group already newest-first from the
-  // query), then everything else. Drop createdAt from the returned shape.
-  const books = recent.filter((r) => r.type === "book");
-  const others = recent.filter((r) => r.type !== "book");
-  return [...books, ...others].slice(0, 12).map((r) => ({
+  // Stable partition: shelf records (books, movies, shows) first — each group
+  // already newest-first from the query — then everything else. Drop createdAt
+  // from the returned shape.
+  const shelf = recent.filter((r) => isShelfType(r.type));
+  const others = recent.filter((r) => !isShelfType(r.type));
+  return [...shelf, ...others].slice(0, 12).map((r) => ({
     id: r.id,
     type: r.type,
     title: r.title,
