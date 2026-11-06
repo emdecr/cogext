@@ -21,6 +21,7 @@ import FilterBar from "@/components/filter-bar";
 import FilterDrawer from "@/components/filter-drawer";
 import EmptyState from "@/components/empty-state";
 import type { RecordType, ShelfStatus } from "@/lib/validations/records";
+import { matchesTypeFilter, type TypeFilter } from "@/lib/type-filter";
 
 // Type matches what getRecords() returns (with tags included)
 type Tag = {
@@ -63,7 +64,7 @@ export default function RecordGrid({
   records: RecordWithTags[];
   collections?: CollectionSummary[];
 }) {
-  const [activeType, setActiveType] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<TypeFilter>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -91,7 +92,7 @@ export default function RecordGrid({
   // ---- Filter records ----
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
-      if (activeType && record.type !== activeType) return false;
+      if (!matchesTypeFilter(record.type, activeType)) return false;
 
       if (activeTag) {
         const hasTag = record.recordTags.some(

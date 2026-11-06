@@ -20,7 +20,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCollection } from "@/lib/actions/collections";
-import { CREATABLE_RECORD_TYPES } from "@/lib/validations/records";
+import {
+  INLINE_FILTER_TYPES,
+  SHELF_FILTER,
+  SHELF_FILTER_TYPES,
+  isShelfFilter,
+  type TypeFilter,
+} from "@/lib/type-filter";
+
+const PILL_ACTIVE =
+  "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+const PILL_INACTIVE =
+  "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700";
 
 type CollectionSummary = {
   id: string;
@@ -37,8 +48,8 @@ type FilterDrawerProps = {
 
   // Type filtering — rendered here only on mobile; on ≥sm the type pills live
   // inline in FilterBar, so this section is hidden there to avoid duplication.
-  activeType: string | null;
-  onTypeChange: (type: string | null) => void;
+  activeType: TypeFilter;
+  onTypeChange: (type: TypeFilter) => void;
 
   // Tag filtering
   activeTag: string | null;
@@ -136,31 +147,53 @@ export default function FilterDrawer({
             <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Type
             </h3>
+            {/* Same model as the bar: no "All" (tap the active pill to
+                clear), and one Shelf pill. When Shelf is active, a second row
+                narrows it to a single shelf type. */}
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => onTypeChange(null)}
-                className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-                  activeType === null
-                    ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-                }`}
-              >
-                All
-              </button>
-              {CREATABLE_RECORD_TYPES.map((type) => (
+              {INLINE_FILTER_TYPES.map((type) => (
                 <button
                   key={type}
                   onClick={() => onTypeChange(activeType === type ? null : type)}
+                  aria-pressed={activeType === type}
                   className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
-                    activeType === type
-                      ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                    activeType === type ? PILL_ACTIVE : PILL_INACTIVE
                   }`}
                 >
                   {type}
                 </button>
               ))}
+              <button
+                onClick={() =>
+                  onTypeChange(isShelfFilter(activeType) ? null : SHELF_FILTER)
+                }
+                aria-pressed={isShelfFilter(activeType)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  isShelfFilter(activeType) ? PILL_ACTIVE : PILL_INACTIVE
+                }`}
+              >
+                Shelf
+              </button>
             </div>
+            {isShelfFilter(activeType) && (
+              <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-gray-200 pl-3 dark:border-gray-700">
+                {SHELF_FILTER_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    // Tapping the selected shelf type widens back to all shelf.
+                    onClick={() =>
+                      onTypeChange(activeType === type ? SHELF_FILTER : type)
+                    }
+                    aria-pressed={activeType === type}
+                    className={`rounded-full px-3 py-1 text-xs capitalize transition-colors ${
+                      activeType === type ? PILL_ACTIVE : PILL_INACTIVE
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ---- Tags section ---- */}
