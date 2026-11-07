@@ -1,5 +1,5 @@
 {
-  "id": "75b9fe68-5c18-4841-bb9c-b82e2c6a8fe3",
+  "id": "ff95517a-6c9b-42a4-8155-e97ae1bb665d",
   "prevId": "c07370e5-c43a-4ed6-ab68-3168e216c393",
   "version": "7",
   "dialect": "postgresql",
@@ -41,15 +41,15 @@
         "ai_profile_user_id_users_id_fk": {
           "name": "ai_profile_user_id_users_id_fk",
           "tableFrom": "ai_profile",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -159,50 +159,50 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "ai_usage_user_id_users_id_fk": {
           "name": "ai_usage_user_id_users_id_fk",
           "tableFrom": "ai_usage",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "ai_usage_conversation_id_conversations_id_fk": {
           "name": "ai_usage_conversation_id_conversations_id_fk",
           "tableFrom": "ai_usage",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "ai_usage_reflection_id_reflections_id_fk": {
           "name": "ai_usage_reflection_id_reflections_id_fk",
           "tableFrom": "ai_usage",
+          "tableTo": "reflections",
           "columnsFrom": [
             "reflection_id"
           ],
-          "tableTo": "reflections",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -273,9 +273,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "auth_events_event_type_idx": {
           "name": "auth_events_event_type_idx",
@@ -288,9 +288,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -329,28 +329,28 @@
         "collection_records_collection_id_collections_id_fk": {
           "name": "collection_records_collection_id_collections_id_fk",
           "tableFrom": "collection_records",
+          "tableTo": "collections",
           "columnsFrom": [
             "collection_id"
           ],
-          "tableTo": "collections",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "collection_records_record_id_records_id_fk": {
           "name": "collection_records_record_id_records_id_fk",
           "tableFrom": "collection_records",
+          "tableTo": "records",
           "columnsFrom": [
             "record_id"
           ],
-          "tableTo": "records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -415,15 +415,15 @@
         "collections_user_id_users_id_fk": {
           "name": "collections_user_id_users_id_fk",
           "tableFrom": "collections",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -482,15 +482,15 @@
         "conversations_user_id_users_id_fk": {
           "name": "conversations_user_id_users_id_fk",
           "tableFrom": "conversations",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -542,15 +542,15 @@
         "messages_conversation_id_conversations_id_fk": {
           "name": "messages_conversation_id_conversations_id_fk",
           "tableFrom": "messages",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -608,62 +608,62 @@
           "columns": [
             {
               "expression": "least(\"record_id\", \"related_record_id\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             },
             {
               "expression": "greatest(\"record_id\", \"related_record_id\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "record_links_user_id_users_id_fk": {
           "name": "record_links_user_id_users_id_fk",
           "tableFrom": "record_links",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "record_links_record_id_records_id_fk": {
           "name": "record_links_record_id_records_id_fk",
           "tableFrom": "record_links",
+          "tableTo": "records",
           "columnsFrom": [
             "record_id"
           ],
-          "tableTo": "records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "record_links_related_record_id_records_id_fk": {
           "name": "record_links_related_record_id_records_id_fk",
           "tableFrom": "record_links",
+          "tableTo": "records",
           "columnsFrom": [
             "related_record_id"
           ],
-          "tableTo": "records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -699,28 +699,28 @@
         "record_tags_record_id_records_id_fk": {
           "name": "record_tags_record_id_records_id_fk",
           "tableFrom": "record_tags",
+          "tableTo": "records",
           "columnsFrom": [
             "record_id"
           ],
-          "tableTo": "records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "record_tags_tag_id_tags_id_fk": {
           "name": "record_tags_tag_id_tags_id_fk",
           "tableFrom": "record_tags",
+          "tableTo": "tags",
           "columnsFrom": [
             "tag_id"
           ],
-          "tableTo": "tags",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -822,6 +822,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "reading_status": {
+          "name": "reading_status",
+          "type": "reading_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_read": {
+          "name": "date_read",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
         "embedding": {
           "name": "embedding",
           "type": "vector(1024)",
@@ -862,24 +875,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "hnsw",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "records_user_id_users_id_fk": {
           "name": "records_user_id_users_id_fk",
           "tableFrom": "records",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -949,15 +962,15 @@
         "reflections_user_id_users_id_fk": {
           "name": "reflections_user_id_users_id_fk",
           "tableFrom": "reflections",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1004,10 +1017,10 @@
       "uniqueConstraints": {
         "tags_name_unique": {
           "name": "tags_name_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "name"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1051,10 +1064,10 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1113,6 +1126,15 @@
         "assistant"
       ]
     },
+    "public.reading_status": {
+      "name": "reading_status",
+      "schema": "public",
+      "values": [
+        "want_to_read",
+        "reading",
+        "read"
+      ]
+    },
     "public.record_type": {
       "name": "record_type",
       "schema": "public",
@@ -1148,10 +1170,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},
