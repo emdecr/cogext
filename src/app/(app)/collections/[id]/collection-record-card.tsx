@@ -16,6 +16,7 @@ import { useState } from "react";
 import { removeRecordFromCollection } from "@/lib/actions/collections";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import ConfirmDialog from "@/components/confirm-dialog";
+import { typeColor } from "@/lib/record-type-styles";
 
 type CollectionRecord = {
   id: string;
@@ -29,15 +30,6 @@ type CollectionRecord = {
   createdAt: Date;
   position: number;
   tags: { id: string; name: string; isAi: boolean }[];
-};
-
-// Color mapping — same as record-card.tsx
-const TYPE_COLORS: Record<string, string> = {
-  note: "bg-blue-100 text-blue-700",
-  quote: "bg-amber-100 text-amber-700",
-  article: "bg-green-100 text-green-700",
-  link: "bg-purple-100 text-purple-700",
-  image: "bg-pink-100 text-pink-700",
 };
 
 type Props = {
@@ -94,7 +86,7 @@ export default function CollectionRecordCard({ record, collectionId }: Props) {
         {/* Type badge */}
         <div className="mb-2">
           <span
-            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${TYPE_COLORS[record.type] || "bg-gray-100 text-gray-700"}`}
+            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${typeColor(record.type)}`}
           >
             {record.type}
           </span>

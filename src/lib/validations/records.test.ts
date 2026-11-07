@@ -21,6 +21,10 @@ import {
   createRecordSchema,
   updateRecordSchema,
   deleteRecordSchema,
+  isShelfType,
+  SHELF_META,
+  SHELF_STATUSES,
+  SHELF_TYPES,
 } from "@/lib/validations/records";
 
 // ============================================================================
@@ -49,6 +53,8 @@ describe("createRecordSchema", () => {
       "link",
       "note",
       "book",
+      "movie",
+      "show",
     ] as const;
 
     for (const type of types) {
@@ -64,20 +70,71 @@ describe("createRecordSchema", () => {
     }
   });
 
-  // ---- Book fields ----
+  // ---- Shelf fields (book, movie, show) ----
 
-  it("accepts a book record with rating, status, and date read", () => {
+  it("accepts a book record with rating, status, and date finished", () => {
     const result = createRecordSchema.safeParse({
       type: "book",
       content: "A great read",
       title: "Sum",
       sourceAuthor: "David Eagleman",
       rating: 4.5,
-      readingStatus: "read",
-      dateRead: "2009-02-07",
+      shelfStatus: "done",
+      dateFinished: "2009-02-07",
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a movie record with a release year", () => {
+    const result = createRecordSchema.safeParse({
+      type: "movie",
+      content: "Dune",
+      title: "Dune",
+      sourceAuthor: "Denis Villeneuve",
+      rating: 4,
+      shelfStatus: "done",
+      dateFinished: "2021-10-22",
+      releaseYear: 2021,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a show with an in-progress status", () => {
+    const result = createRecordSchema.safeParse({
+      type: "show",
+      content: "Severance",
+      shelfStatus: "in_progress",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a non-integer or out-of-range release year", () => {
+    for (const releaseYear of [2021.5, 0, 10000]) {
+      const result = createRecordSchema.safeParse({
+        type: "movie",
+        content: "some content",
+        releaseYear,
+      });
+      expect(result.success, `year ${releaseYear} should fail`).toBe(false);
+      if (!result.success) {
+        expect(result.error.flatten().fieldErrors.releaseYear).toBeDefined();
+      }
+    }
+  });
+
+  it("rejects the old book-only status values", () => {
+    // Renamed in migration 0013 (want_to_read/reading/read → want/in_progress/done).
+    for (const shelfStatus of ["want_to_read", "reading", "read"]) {
+      const result = createRecordSchema.safeParse({
+        type: "book",
+        content: "some content",
+        shelfStatus,
+      });
+      expect(result.success, `"${shelfStatus}" should fail`).toBe(false);
+    }
   });
 
   it("rejects a rating above 5", () => {
@@ -93,21 +150,21 @@ describe("createRecordSchema", () => {
     }
   });
 
-  it("rejects an invalid reading status", () => {
+  it("rejects an invalid shelf status", () => {
     const result = createRecordSchema.safeParse({
       type: "book",
       content: "some content",
-      readingStatus: "on-hold",
+      shelfStatus: "on-hold",
     });
 
     expect(result.success).toBe(false);
   });
 
-  it("accepts an empty string for dateRead (unfilled form field)", () => {
+  it("accepts an empty string for dateFinished (unfilled form field)", () => {
     const result = createRecordSchema.safeParse({
       type: "book",
       content: "some content",
-      dateRead: "",
+      dateFinished: "",
     });
 
     expect(result.success).toBe(true);
@@ -372,5 +429,35 @@ describe("deleteRecordSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// Shelf helpers
+// ============================================================================
+
+describe("shelf types", () => {
+  it("treats book, movie and show as shelf types and nothing else", () => {
+    expect(SHELF_TYPES).toEqual(["book", "movie", "show"]);
+    for (const t of ["book", "movie", "show"]) expect(isShelfType(t)).toBe(true);
+    for (const t of ["note", "quote", "link", "image", "article", "", null, undefined]) {
+      expect(isShelfType(t)).toBe(false);
+    }
+  });
+
+  it("has a label for every status on every shelf type", () => {
+    for (const type of SHELF_TYPES) {
+      for (const status of SHELF_STATUSES) {
+        expect(SHELF_META[type].statusLabels[status], `${type}/${status}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("words the shelf per medium", () => {
+    expect(SHELF_META.book.statusLabels.want).toBe("Want to read");
+    expect(SHELF_META.movie.statusLabels.want).toBe("Want to watch");
+    expect(SHELF_META.movie.creatorLabel).toBe("Director");
+    expect(SHELF_META.show.creatorLabel).toBe("Creator");
+    expect(SHELF_META.movie.imageLabel).toBe("Poster");
   });
 });

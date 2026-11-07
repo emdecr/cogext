@@ -20,16 +20,8 @@
 "use client";
 
 import Link from "next/link";
-import type { RelatedRecord } from "@/lib/validations/records";
-
-const TYPE_COLORS: Record<string, string> = {
-  note: "bg-blue-100 text-blue-700",
-  quote: "bg-amber-100 text-amber-700",
-  article: "bg-green-100 text-green-700",
-  link: "bg-purple-100 text-purple-700",
-  image: "bg-pink-100 text-pink-700",
-  book: "bg-indigo-100 text-indigo-700",
-};
+import { isShelfType, type RelatedRecord } from "@/lib/validations/records";
+import { typeColor } from "@/lib/record-type-styles";
 
 export default function RecordMiniCard({ record }: { record: RelatedRecord }) {
   return (
@@ -45,9 +37,9 @@ export default function RecordMiniCard({ record }: { record: RelatedRecord }) {
           alt={record.title ?? ""}
           className="aspect-square w-full object-cover"
         />
-      ) : record.type === "book" && record.imagePath ? (
-        // Book: cover + title (+ author). Portrait cover, contained on a
-        // neutral backer so it isn't cropped (matches the card).
+      ) : isShelfType(record.type) && record.imagePath ? (
+        // Shelf record: cover/poster + title (+ creator). Portrait image,
+        // contained on a neutral backer so it isn't cropped (matches the card).
         <div className="flex h-full flex-col">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -72,7 +64,7 @@ export default function RecordMiniCard({ record }: { record: RelatedRecord }) {
         // Everything else: a text card with the content truncated.
         <div className="flex h-full flex-col gap-1.5 p-3">
           <span
-            className={`inline-block w-fit rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${TYPE_COLORS[record.type] || "bg-gray-100 text-gray-700"}`}
+            className={`inline-block w-fit rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${typeColor(record.type)}`}
           >
             {record.type}
           </span>

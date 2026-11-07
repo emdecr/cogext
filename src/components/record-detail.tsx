@@ -31,11 +31,14 @@ import ConfirmDialog from "@/components/confirm-dialog";
 import RecordMiniCard from "@/components/record-mini-card";
 import RecordConnections from "@/components/record-connections";
 import { StarRating } from "@/components/star-rating";
+import { formatDateOnly } from "@/lib/date-only";
 import { getYouTubeVideoId, getYouTubeEmbedUrl } from "@/lib/youtube";
+import { SHELF_CHIP_COLORS, typeColor } from "@/lib/record-type-styles";
 import {
-  READING_STATUS_LABELS,
+  SHELF_META,
+  isShelfType,
   type RecordType,
-  type ReadingStatus,
+  type ShelfStatus,
   type RelatedRecord,
   type RecordConnection,
 } from "@/lib/validations/records";
@@ -56,21 +59,12 @@ type RecordWithTags = {
   imagePath: string | null;
   note: string | null;
   rating: number | null;
-  readingStatus: ReadingStatus | null;
-  dateRead: string | null;
+  shelfStatus: ShelfStatus | null;
+  dateFinished: string | null;
+  releaseYear: number | null;
   createdAt: Date;
   updatedAt: Date;
   recordTags: { tag: Tag }[];
-};
-
-// Color mapping for record type badges.
-const TYPE_COLORS: Record<string, string> = {
-  note: "bg-blue-100 text-blue-700",
-  quote: "bg-amber-100 text-amber-700",
-  article: "bg-green-100 text-green-700",
-  link: "bg-purple-100 text-purple-700",
-  image: "bg-pink-100 text-pink-700",
-  book: "bg-indigo-100 text-indigo-700",
 };
 
 export default function RecordDetail({
@@ -158,7 +152,7 @@ export default function RecordDetail({
             Record Details
           </h2>
           <span
-            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${TYPE_COLORS[record.type] || "bg-gray-100 text-gray-700"}`}
+            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${typeColor(record.type)}`}
           >
             {record.type}
           </span>
@@ -177,10 +171,11 @@ export default function RecordDetail({
 
       {/* ---- Scrollable body ---- */}
       <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-        {record.imagePath && record.type !== "book" ? (
-          /* Image type: image on left, meta on right. Books also have an
-             imagePath (cover) but use the normal layout below so their shelf
-             metadata still renders — the cover is drawn inside that layout. */
+        {record.imagePath && !isShelfType(record.type) ? (
+          /* Image type: image on left, meta on right. Shelf records also have
+             an imagePath (cover/poster) but use the normal layout below so
+             their shelf metadata still renders — the image is drawn inside
+             that layout. */
           <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -274,12 +269,16 @@ export default function RecordDetail({
                 </div>
               )}
 
-              {record.type === "book" && record.imagePath && (
+              {isShelfType(record.type) && record.imagePath && (
                 <div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={record.imagePath}
-                    alt={record.title ? `Cover of ${record.title}` : "Cover"}
+                    alt={
+                      record.title
+                        ? `${SHELF_META[record.type].imageLabel} of ${record.title}`
+                        : SHELF_META[record.type].imageLabel
+                    }
                     className="max-h-96 rounded-lg border border-gray-200 bg-gray-50 object-contain dark:border-gray-700 dark:bg-gray-800"
                   />
                 </div>
@@ -298,7 +297,7 @@ export default function RecordDetail({
 
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {record.type === "book" ? "Description" : "Content"}
+                  {isShelfType(record.type) ? "Description" : "Content"}
                 </p>
                 {record.type === "quote" ? (
                   // Quotes stay styled plain text (rarely markdown), with the
@@ -342,9 +341,11 @@ export default function RecordDetail({
               {record.sourceAuthor && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {record.type === "quote" || record.type === "book"
-                      ? "Author"
-                      : "Author / Source"}
+                    {isShelfType(record.type)
+                      ? SHELF_META[record.type].creatorLabel
+                      : record.type === "quote"
+                        ? "Author"
+                        : "Author / Source"}
                   </p>
                   <p className="text-sm text-gray-700 dark:text-gray-300">
                     {record.sourceAuthor}
@@ -352,7 +353,18 @@ export default function RecordDetail({
                 </div>
               )}
 
-              {record.type === "book" && record.rating !== null && (
+              {isShelfType(record.type) && record.releaseYear && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Year
+                  </p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {record.releaseYear}
+                  </p>
+                </div>
+              )}
+
+              {isShelfType(record.type) && record.rating !== null && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Rating
@@ -361,24 +373,26 @@ export default function RecordDetail({
                 </div>
               )}
 
-              {record.type === "book" && record.readingStatus && (
+              {isShelfType(record.type) && record.shelfStatus && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Status
                   </p>
-                  <span className="inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                    {READING_STATUS_LABELS[record.readingStatus]}
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-0.5 text-sm ${SHELF_CHIP_COLORS[record.type]}`}
+                  >
+                    {SHELF_META[record.type].statusLabels[record.shelfStatus]}
                   </span>
                 </div>
               )}
 
-              {record.type === "book" && record.dateRead && (
+              {isShelfType(record.type) && record.dateFinished && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    Date read
+                    {SHELF_META[record.type].dateLabel}
                   </p>
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {new Date(record.dateRead).toLocaleDateString()}
+                    {formatDateOnly(record.dateFinished)}
                   </p>
                 </div>
               )}

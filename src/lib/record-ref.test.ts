@@ -35,6 +35,8 @@ describe("record ref helpers", () => {
 
   it("maps types to icons with a generic fallback", () => {
     expect(recordRefIcon("book")).toBe("📖");
+    expect(recordRefIcon("movie")).toBe("🎬");
+    expect(recordRefIcon("show")).toBe("📺");
     expect(recordRefIcon(null)).toBe("↗");
     expect(recordRefIcon("spaceship")).toBe("↗");
   });

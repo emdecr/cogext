@@ -17,13 +17,12 @@ import { addRecordLink } from "@/lib/actions/record-links";
 import { fetchUrlMetadata } from "@/lib/actions/url-metadata";
 import {
   CREATABLE_RECORD_TYPES,
-  READING_STATUSES,
-  READING_STATUS_LABELS,
+  SHELF_META,
+  isShelfType,
   type RecordType,
-  type ReadingStatus,
 } from "@/lib/validations/records";
 import TagInput from "@/components/tag-input";
-import { CoverImageInput } from "@/components/cover-image-input";
+import ShelfFields, { type ShelfValues } from "@/components/shelf-fields";
 import { usePreventWindowFileDrop } from "@/hooks/use-prevent-window-file-drop";
 import MarkdownField from "@/components/markdown-field";
 import ConnectionPicker, {
@@ -36,6 +35,13 @@ const inputClass =
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
+const EMPTY_SHELF: ShelfValues = {
+  rating: null,
+  shelfStatus: "",
+  dateFinished: "",
+  releaseYear: null,
+};
+
 export default function CreateRecordForm() {
   const [type, setType] = useState<RecordType>("note");
   const [title, setTitle] = useState("");
@@ -44,10 +50,9 @@ export default function CreateRecordForm() {
   const [sourceAuthor, setSourceAuthor] = useState("");
   const [note, setNote] = useState("");
 
-  // Book-only fields.
-  const [rating, setRating] = useState<number | null>(null);
-  const [readingStatus, setReadingStatus] = useState<ReadingStatus | "">("");
-  const [dateRead, setDateRead] = useState("");
+  // Shelf fields (book, movie, show).
+  const [shelf, setShelf] = useState<ShelfValues>(EMPTY_SHELF);
+  const isShelf = isShelfType(type);
 
   const [pendingTags, setPendingTags] = useState<
     { id: string; name: string; isAi: boolean }[]
@@ -193,9 +198,7 @@ export default function CreateRecordForm() {
     setSourceUrl("");
     setSourceAuthor("");
     setNote("");
-    setRating(null);
-    setReadingStatus("");
-    setDateRead("");
+    setShelf(EMPTY_SHELF);
     setType("note");
     setPendingTags([]);
     setPendingConnections([]);
@@ -209,14 +212,23 @@ export default function CreateRecordForm() {
     e.preventDefault();
     setError(null);
     setFieldErrors(undefined);
+
+    // Shelf records fall back to the title when the (optional) description is
+    // blank, so they need one or the other. Say that on the Title field rather
+    // than letting "Content is required" land under an "(optional)" field.
+    if (isShelf && !title.trim() && !content.trim()) {
+      setFieldErrors({ title: ["Add a title or a description"] });
+      return;
+    }
+
     setIsSubmitting(true);
 
     let imagePath: string | undefined;
 
-    // Both image records and book covers upload through /api/upload. The route
-    // only stores the file; Claude Vision analysis runs later only for
-    // type === "image", so book covers are never analyzed.
-    if ((type === "image" || type === "book") && imageFile) {
+    // Image records and shelf covers/posters upload through /api/upload. The
+    // route only stores the file; Claude Vision analysis runs later only for
+    // type === "image", so covers and posters are never analyzed.
+    if ((type === "image" || isShelf) && imageFile) {
       setIsUploading(true);
 
       const formData = new FormData();
@@ -252,19 +264,24 @@ export default function CreateRecordForm() {
       type,
       title: title || undefined,
       // Content is required. For images we default to a placeholder (Vision
-      // fills it in later); for books with no review yet we fall back to the
-      // title so "want to read" entries save without writing a review.
+      // fills it in later); for shelf records with a blank (or whitespace-only)
+      // description we fall back to the title so "want to watch/read" entries
+      // save without one.
       content:
-        content ||
-        (type === "image" ? "Image" : type === "book" ? title : ""),
+        (isShelf && !content.trim() ? title : content) ||
+        (type === "image" ? "Image" : ""),
       sourceUrl: sourceUrl || undefined,
       sourceAuthor: sourceAuthor || undefined,
       note: note || undefined,
       imagePath,
-      rating: type === "book" && rating !== null ? rating : undefined,
-      readingStatus:
-        type === "book" && readingStatus ? readingStatus : undefined,
-      dateRead: type === "book" && dateRead ? dateRead : undefined,
+      ...(isShelf
+        ? {
+            rating: shelf.rating ?? undefined,
+            shelfStatus: shelf.shelfStatus || undefined,
+            dateFinished: shelf.dateFinished || undefined,
+            releaseYear: shelf.releaseYear ?? undefined,
+          }
+        : {}),
     });
 
     setIsSubmitting(false);
@@ -312,14 +329,12 @@ export default function CreateRecordForm() {
     type === "article" ||
     type === "quote" ||
     type === "image" ||
-    type === "book";
+    isShelf;
   const showAuthor =
-    type === "quote" ||
-    type === "article" ||
-    type === "link" ||
-    type === "book";
+    type === "quote" || type === "article" || type === "link" || isShelf;
 
-  // The note field is shared across types but placed differently: for books it
+  // The note field is shared across types but placed differently: for shelf
+  // records it
   // sits directly under the Description in the left column (the two read as one
   // thought); for every other type it stays in the right-hand metadata column.
   const noteField = (
@@ -447,8 +462,8 @@ export default function CreateRecordForm() {
                       id="content"
                       label={
                         <>
-                          {type === "book" ? "Description" : "Content"}
-                          {type === "book" && (
+                          {isShelf ? "Description" : "Content"}
+                          {isShelf && (
                             <span className="font-normal text-gray-400">
                               {" "}
                               (optional)
@@ -465,20 +480,20 @@ export default function CreateRecordForm() {
                             ? "What is this link about?"
                             : type === "article"
                               ? "Paste an excerpt or summary..."
-                              : type === "book"
+                              : isShelf
                                 ? "A short description or summary (leave blank to just log it)..."
                                 : "Write your note..."
                       }
-                      rows={type === "book" ? 6 : 12}
+                      rows={isShelf ? 6 : 12}
                       error={fieldErrors?.content?.[0]}
                       dialogTitle={
-                        type === "book" ? "Edit description" : "Edit content"
+                        isShelf ? "Edit description" : "Edit content"
                       }
                     />
                   )}
 
-                  {/* Books keep the note right under the description. */}
-                  {type === "book" && noteField}
+                  {/* Shelf records keep the note right under the description. */}
+                  {isShelf && noteField}
 
                   {type === "image" && (
                     <div
@@ -595,9 +610,11 @@ export default function CreateRecordForm() {
                   {showAuthor && (
                     <div>
                       <label htmlFor="sourceAuthor" className={labelClass}>
-                        {type === "quote" || type === "book"
-                          ? "Author"
-                          : "Author / Source"}{" "}
+                        {isShelf
+                          ? SHELF_META[type].creatorLabel
+                          : type === "quote"
+                            ? "Author"
+                            : "Author / Source"}{" "}
                         <span className="font-normal text-gray-400">
                           (optional)
                         </span>
@@ -608,115 +625,41 @@ export default function CreateRecordForm() {
                         value={sourceAuthor}
                         onChange={(e) => setSourceAuthor(e.target.value)}
                         placeholder={
-                          type === "quote"
-                            ? "Who said this?"
-                            : "Who wrote this?"
+                          isShelf
+                            ? SHELF_META[type].creatorPlaceholder
+                            : type === "quote"
+                              ? "Who said this?"
+                              : "Who wrote this?"
                         }
                         className={inputClass}
                       />
                     </div>
                   )}
 
-                  {type === "book" && (
-                    <div className="space-y-6 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-                      <div>
-                        <label htmlFor="rating" className={labelClass}>
-                          Rating{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional · 0–5)
-                          </span>
-                        </label>
-                        <input
-                          id="rating"
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          max={5}
-                          step="any"
-                          value={rating ?? ""}
-                          onChange={(e) =>
-                            setRating(
-                              e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                            )
-                          }
-                          placeholder="e.g. 4.25"
-                          className={inputClass}
-                        />
-                        {fieldErrors?.rating && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {fieldErrors.rating[0]}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label htmlFor="readingStatus" className={labelClass}>
-                          Status{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <select
-                          id="readingStatus"
-                          value={readingStatus}
-                          onChange={(e) =>
-                            setReadingStatus(
-                              e.target.value as ReadingStatus | "",
-                            )
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">—</option>
-                          {READING_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {READING_STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label htmlFor="dateRead" className={labelClass}>
-                          Date read{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <input
-                          id="dateRead"
-                          type="date"
-                          value={dateRead}
-                          onChange={(e) => setDateRead(e.target.value)}
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={labelClass}>
-                          Cover{" "}
-                          <span className="font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        </label>
-                        <CoverImageInput
-                          existingUrl={null}
-                          file={imageFile}
-                          onSelect={(f) => {
-                            setImageFile(f);
-                            setError(null);
-                          }}
-                          onClear={clearImage}
-                          onError={setError}
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                    </div>
+                  {isShelf && (
+                    <ShelfFields
+                      type={type}
+                      values={shelf}
+                      onChange={(patch) =>
+                        setShelf((prev) => ({ ...prev, ...patch }))
+                      }
+                      fieldErrors={fieldErrors}
+                      cover={{
+                        existingUrl: null,
+                        file: imageFile,
+                        onSelect: (f) => {
+                          setImageFile(f);
+                          setError(null);
+                        },
+                        onClear: clearImage,
+                        onError: setError,
+                        disabled: isSubmitting,
+                      }}
+                    />
                   )}
 
-                  {/* Non-book types keep the note here in the metadata column. */}
-                  {type !== "book" && noteField}
+                  {/* Other types keep the note here in the metadata column. */}
+                  {!isShelf && noteField}
 
                   <div>
                     <label className={labelClass}>

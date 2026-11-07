@@ -119,6 +119,27 @@ describe("prepareTextForEmbedding", () => {
     expect(text).toContain("Author: Shakespeare");
   });
 
+  it("labels the creator by role for movies and shows", () => {
+    const base = { title: "Dune", content: "Dune", note: null };
+    expect(
+      prepareTextForEmbedding({ ...base, type: "movie", sourceAuthor: "Denis Villeneuve" }),
+    ).toContain("Director: Denis Villeneuve");
+    expect(
+      prepareTextForEmbedding({ ...base, type: "show", sourceAuthor: "Dan Erickson" }),
+    ).toContain("Creator: Dan Erickson");
+    // Books keep "Author" so existing book embeddings don't drift.
+    expect(
+      prepareTextForEmbedding({ ...base, type: "book", sourceAuthor: "Frank Herbert" }),
+    ).toContain("Author: Frank Herbert");
+  });
+
+  it("includes the release year only when set", () => {
+    const base = { type: "movie", title: "Dune", content: "Dune", sourceAuthor: null, note: null };
+    expect(prepareTextForEmbedding({ ...base, releaseYear: 2021 })).toContain("Year: 2021");
+    expect(prepareTextForEmbedding({ ...base, releaseYear: null })).not.toContain("Year:");
+    expect(prepareTextForEmbedding(base)).not.toContain("Year:");
+  });
+
   it("omits author when null", () => {
     const text = prepareTextForEmbedding({
       type: "note",

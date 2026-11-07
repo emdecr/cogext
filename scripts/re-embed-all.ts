@@ -27,24 +27,9 @@ import postgres from "postgres";
 import { records } from "../src/db/schema";
 import { VoyageEmbeddingProvider } from "../src/lib/ai/voyage-embedding";
 
-// Inlined from src/lib/ai/embed-record.ts to avoid importing the app's
-// DB connection (src/db/index.ts), which throws if DATABASE_URL isn't
-// loaded via Next.js env handling. This script manages its own connection.
-function prepareTextForEmbedding(record: {
-  title: string | null;
-  content: string;
-  sourceAuthor: string | null;
-  note: string | null;
-  type: string;
-}): string {
-  const parts: string[] = [];
-  parts.push(`Type: ${record.type}`);
-  if (record.title) parts.push(`Title: ${record.title}`);
-  parts.push(`Content: ${record.content}`);
-  if (record.sourceAuthor) parts.push(`Author: ${record.sourceAuthor}`);
-  if (record.note) parts.push(`Note: ${record.note}`);
-  return parts.join("\n");
-}
+// Shared with the app; embed-text.ts has no DB import (src/db/index.ts throws
+// if DATABASE_URL isn't loaded via Next.js env handling), so it's safe here.
+import { prepareTextForEmbedding } from "../src/lib/ai/embed-text";
 
 const BATCH_SIZE = 20; // Voyage supports up to 128, but 20 is safe for rate limits
 
@@ -75,6 +60,7 @@ async function main() {
         sourceAuthor: records.sourceAuthor,
         note: records.note,
         type: records.type,
+        releaseYear: records.releaseYear,
       })
       .from(records)
       .where(isNull(records.embedding));

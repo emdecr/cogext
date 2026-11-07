@@ -16,14 +16,27 @@
 
 "use server";
 
-import { and, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
 import { stripMarkdown } from "@/lib/strip-markdown";
-import type { RecordLookupResult } from "@/lib/validations/records";
+import {
+  SHELF_TYPES,
+  type RecordLookupResult,
+} from "@/lib/validations/records";
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -55,7 +68,11 @@ export async function lookupRecords(
   const conditions: SQL[] = [eq(records.userId, session.userId)];
   if (opts.excludeId) conditions.push(ne(records.id, opts.excludeId));
 
-  const order: SQL[] = [sql`(${records.type} = 'book') desc`];
+  // Shelf records (books, movies, shows) lead — they're what notes most often
+  // reference.
+  const order: SQL[] = [
+    sql`(${inArray(records.type, [...SHELF_TYPES])}) desc`,
+  ];
 
   if (trimmed) {
     const contains = `%${escapeLike(trimmed)}%`;

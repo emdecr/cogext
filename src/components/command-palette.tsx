@@ -27,6 +27,7 @@ import { stripMarkdown } from "@/lib/strip-markdown";
 import Skeleton from "@/components/skeleton";
 import EmptyState from "@/components/empty-state";
 import type { RecordType } from "@/lib/validations/records";
+import { typeColor } from "@/lib/record-type-styles";
 
 // Type for search results (matches what the server action returns)
 type SearchResult = {
@@ -41,16 +42,6 @@ type SearchResult = {
   createdAt: Date;
   score: number;
   matchType: "semantic" | "keyword" | "both";
-};
-
-// Color mapping for type badges (same as record-card)
-const TYPE_COLORS: Record<string, string> = {
-  note: "bg-blue-100 text-blue-700",
-  quote: "bg-amber-100 text-amber-700",
-  article: "bg-green-100 text-green-700",
-  link: "bg-purple-100 text-purple-700",
-  image: "bg-pink-100 text-pink-700",
-  book: "bg-indigo-100 text-indigo-700",
 };
 
 // Match type labels for showing which search method found the result
@@ -245,7 +236,7 @@ export default function CommandPalette() {
                   {/* Title + type badge */}
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize ${TYPE_COLORS[result.type] || "bg-gray-100 text-gray-700"}`}
+                      className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize ${typeColor(result.type)}`}
                     >
                       {result.type}
                     </span>

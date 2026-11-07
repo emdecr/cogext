@@ -2,7 +2,8 @@
 // COVER IMAGE INPUT
 // ============================================================================
 //
-// A compact optional cover-image picker used by book records in the create and
+// A compact optional cover/poster picker used by shelf records (book, movie,
+// show) in the create and
 // edit forms. Unlike the full image-type dropzone (which owns the whole form),
 // this sits inside the book metadata block alongside the review/rating fields.
 //
@@ -11,8 +12,9 @@
 // selections back — the parent uploads on submit (POST /api/upload) and stores
 // the returned path as records.imagePath.
 //
-// Book covers deliberately skip Claude Vision: analysis only runs for
-// type === "image" in createRecord, so a book's imagePath is never analyzed.
+// Covers and posters deliberately skip Claude Vision: analysis only runs for
+// type === "image" in createRecord, so a shelf record's imagePath is never
+// analyzed.
 // ============================================================================
 
 "use client";
@@ -32,7 +34,10 @@ export function CoverImageInput({
   onClear,
   onError,
   disabled = false,
+  noun = "cover",
 }: {
+  // What the image is called in UI copy: "cover" (books) or "poster".
+  noun?: string;
   // A previously-saved cover URL (edit form). Null when creating or removed.
   existingUrl: string | null;
   // A newly-selected file not yet uploaded. Null when none picked.
@@ -58,6 +63,7 @@ export function CoverImageInput({
   }, [objectUrl]);
 
   const preview = objectUrl ?? existingUrl;
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
 
   function acceptFile(selected: File) {
     if (!ALLOWED_TYPES.includes(selected.type)) {
@@ -65,7 +71,7 @@ export function CoverImageInput({
       return;
     }
     if (selected.size > MAX_BYTES) {
-      onError("Cover image must be under 5MB");
+      onError(`${Noun} image must be under 5MB`);
       return;
     }
     onSelect(selected);
@@ -139,7 +145,7 @@ export function CoverImageInput({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={preview}
-              alt="Cover preview"
+              alt={`${Noun} preview`}
               className={`max-h-56 rounded-md border bg-gray-50 object-contain dark:bg-gray-800 ${
                 isDragging
                   ? "border-blue-500 ring-2 ring-blue-500"
@@ -184,8 +190,8 @@ export function CoverImageInput({
         >
           <span>
             {isDragging
-              ? "Drop cover image here"
-              : "Add a cover image, or drag and drop"}
+              ? `Drop ${noun} image here`
+              : `Add a ${noun} image, or drag and drop`}
           </span>
           <span className="mt-1 text-xs text-gray-400">
             JPEG, PNG, GIF, or WebP • Max 5MB

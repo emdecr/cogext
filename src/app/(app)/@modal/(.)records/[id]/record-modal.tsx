@@ -18,7 +18,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import RecordDetail from "@/components/record-detail";
 import type {
   RecordType,
-  ReadingStatus,
+  ShelfStatus,
   RelatedRecord,
   RecordConnection,
 } from "@/lib/validations/records";
@@ -39,8 +39,9 @@ type RecordWithTags = {
   imagePath: string | null;
   note: string | null;
   rating: number | null;
-  readingStatus: ReadingStatus | null;
-  dateRead: string | null;
+  shelfStatus: ShelfStatus | null;
+  dateFinished: string | null;
+  releaseYear: number | null;
   createdAt: Date;
   updatedAt: Date;
   recordTags: { tag: Tag }[];
