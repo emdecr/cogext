@@ -264,9 +264,12 @@ export default function CreateRecordForm() {
       type,
       title: title || undefined,
       // Content is required. For images we default to a placeholder (Vision
-      // fills it in later); for shelf records with no description we fall back
-      // to the title so "want to watch/read" entries save without one.
-      content: content || (type === "image" ? "Image" : isShelf ? title : ""),
+      // fills it in later); for shelf records with a blank (or whitespace-only)
+      // description we fall back to the title so "want to watch/read" entries
+      // save without one.
+      content:
+        (isShelf && !content.trim() ? title : content) ||
+        (type === "image" ? "Image" : ""),
       sourceUrl: sourceUrl || undefined,
       sourceAuthor: sourceAuthor || undefined,
       note: note || undefined,

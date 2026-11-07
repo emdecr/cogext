@@ -272,6 +272,33 @@ describe("CreateRecordForm", () => {
       });
     });
 
+    it("uses the title as content when a shelf description is only whitespace", async () => {
+      const user = await renderAndOpenForm();
+
+      await user.click(screen.getByRole("button", { name: "movie" }));
+      await user.type(screen.getByLabelText(/title/i), "Dune");
+      await user.type(screen.getByLabelText(/description/i), "   ");
+      await user.click(screen.getByRole("button", { name: "Save Record" }));
+
+      await waitFor(() => {
+        expect(mockCreateRecord).toHaveBeenCalledWith(
+          expect.objectContaining({ type: "movie", title: "Dune", content: "Dune" }),
+        );
+      });
+    });
+
+    it("asks for a title or description on an empty shelf record", async () => {
+      const user = await renderAndOpenForm();
+
+      await user.click(screen.getByRole("button", { name: "movie" }));
+      await user.click(screen.getByRole("button", { name: "Save Record" }));
+
+      expect(
+        await screen.findByText("Add a title or a description"),
+      ).toBeInTheDocument();
+      expect(mockCreateRecord).not.toHaveBeenCalled();
+    });
+
     it("closes the form after successful submission", async () => {
       const user = await renderAndOpenForm();
 
