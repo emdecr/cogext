@@ -212,6 +212,15 @@ export default function CreateRecordForm() {
     e.preventDefault();
     setError(null);
     setFieldErrors(undefined);
+
+    // Shelf records fall back to the title when the (optional) description is
+    // blank, so they need one or the other. Say that on the Title field rather
+    // than letting "Content is required" land under an "(optional)" field.
+    if (isShelf && !title.trim() && !content.trim()) {
+      setFieldErrors({ title: ["Add a title or a description"] });
+      return;
+    }
+
     setIsSubmitting(true);
 
     let imagePath: string | undefined;
