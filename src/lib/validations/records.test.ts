@@ -126,7 +126,7 @@ describe("createRecordSchema", () => {
   });
 
   it("rejects the old book-only status values", () => {
-    // Renamed in migration 0013 (want_to_read/reading/read → want/in_progress/done).
+    // The old book-only values; 0013 replaced them with want/in_progress/done.
     for (const shelfStatus of ["want_to_read", "reading", "read"]) {
       const result = createRecordSchema.safeParse({
         type: "book",
