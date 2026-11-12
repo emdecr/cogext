@@ -68,7 +68,7 @@ export async function lookupRecords(
   const conditions: SQL[] = [eq(records.userId, session.userId)];
   if (opts.excludeId) conditions.push(ne(records.id, opts.excludeId));
 
-  // Shelf records (books, movies, shows) lead — they're what notes most often
+  // Shelf records (books, movies, shows, music) lead — they're what notes most often
   // reference.
   const order: SQL[] = [
     sql`(${inArray(records.type, [...SHELF_TYPES])}) desc`,

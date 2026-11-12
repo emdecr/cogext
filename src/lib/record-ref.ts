@@ -34,6 +34,7 @@ export const RECORD_REF_ICONS: Record<RecordType, string> = {
   book: "📖",
   movie: "🎬",
   show: "📺",
+  music: "💿",
 };
 
 export function recordRefIcon(type: string | null | undefined): string {

@@ -62,6 +62,7 @@ type RecordWithTags = {
   shelfStatus: ShelfStatus | null;
   dateFinished: string | null;
   releaseYear: number | null;
+  subtitle: string | null;
   createdAt: Date;
   updatedAt: Date;
   recordTags: { tag: Tag }[];
@@ -292,6 +293,11 @@ export default function RecordDetail({
                   <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {record.title}
                   </p>
+                  {isShelfType(record.type) && record.subtitle && (
+                    <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                      {record.subtitle}
+                    </p>
+                  )}
                 </div>
               )}
 

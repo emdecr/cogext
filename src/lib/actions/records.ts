@@ -153,6 +153,7 @@ export async function createRecord(
         shelfStatus: parsed.data.shelfStatus || null,
         dateFinished: parsed.data.dateFinished || null,
         releaseYear: parsed.data.releaseYear ?? null,
+        subtitle: parsed.data.subtitle || null,
       })
       .returning();
 
@@ -535,6 +536,7 @@ export async function updateRecord(
         shelfStatus: updates.shelfStatus || null,
         dateFinished: updates.dateFinished || null,
         releaseYear: updates.releaseYear ?? null,
+        subtitle: updates.subtitle || null,
         // Cover image: ONLY touch it when the client actually sent imagePath
         // (a book cover add/replace/remove). "" clears it, a path sets it, and
         // absence leaves it untouched — otherwise a metadata-only edit would

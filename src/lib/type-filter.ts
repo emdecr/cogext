@@ -2,7 +2,7 @@
 // TYPE FILTER — dashboard type filtering, shared by bar, drawer and grid
 // ============================================================================
 // The filter value is either null (everything), a record type, or the
-// pseudo-type "shelf" (every shelf type at once: books, movies, shows). Shelf
+// pseudo-type "shelf" (every shelf type at once: books, movies, shows, music). Shelf
 // types share one "Shelf" pill instead of a pill each, so the bar doesn't grow
 // with every new medium.
 // ============================================================================

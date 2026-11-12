@@ -17,6 +17,7 @@ export const TYPE_COLORS: Record<RecordType, string> = {
   book: "bg-indigo-100 text-indigo-700",
   movie: "bg-rose-100 text-rose-700",
   show: "bg-teal-100 text-teal-700",
+  music: "bg-orange-100 text-orange-700",
 };
 
 const FALLBACK_TYPE_COLOR = "bg-gray-100 text-gray-700";
@@ -33,4 +34,5 @@ export const SHELF_CHIP_COLORS: Record<ShelfType, string> = {
   book: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
   movie: "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
   show: "bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+  music: "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
 };

@@ -287,6 +287,37 @@ describe("CreateRecordForm", () => {
       });
     });
 
+    it("offers a subtitle on books and sends it with the record", async () => {
+      const user = await renderAndOpenForm();
+
+      await user.click(screen.getByRole("button", { name: "book" }));
+      await user.type(screen.getByLabelText(/^title/i), "Sapiens");
+      await user.type(
+        screen.getByLabelText(/^subtitle/i),
+        "A Brief History of Humankind",
+      );
+      await user.click(screen.getByRole("button", { name: "Save Record" }));
+
+      await waitFor(() => {
+        expect(mockCreateRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "book",
+            title: "Sapiens",
+            subtitle: "A Brief History of Humankind",
+          }),
+        );
+      });
+    });
+
+    it("has no subtitle field for movies or music", async () => {
+      const user = await renderAndOpenForm();
+
+      for (const type of ["movie", "music"]) {
+        await user.click(screen.getByRole("button", { name: type }));
+        expect(screen.queryByLabelText(/^subtitle/i)).not.toBeInTheDocument();
+      }
+    });
+
     it("asks for a title or description on an empty shelf record", async () => {
       const user = await renderAndOpenForm();
 

@@ -35,6 +35,7 @@ export const RECORD_TYPES = [
   "book",
   "movie",
   "show",
+  "music",
 ] as const;
 
 // The single source of truth for a record's type across the app. Import this
@@ -51,14 +52,15 @@ export const CREATABLE_RECORD_TYPES = [
   "book",
   "movie",
   "show",
+  "music",
 ] as const satisfies readonly RecordType[];
 
-// ---- Shelf records (book, movie, show) ----
+// ---- Shelf records (book, movie, show, music) ----
 // "Shelf" types share rating / status / date finished / release year and an
 // optional cover or poster. Behavior is shared; only the wording differs, and
 // that lives in SHELF_META. Add a medium (podcast, game…) by adding it here,
 // to RECORD_TYPES, and to SHELF_META.
-export const SHELF_TYPES = ["book", "movie", "show"] as const satisfies readonly RecordType[];
+export const SHELF_TYPES = ["book", "movie", "show", "music"] as const satisfies readonly RecordType[];
 export type ShelfType = (typeof SHELF_TYPES)[number];
 
 export function isShelfType(type: string | null | undefined): type is ShelfType {
@@ -80,6 +82,8 @@ export type ShelfMeta = {
   creatorPlaceholder: string;
   // What the optional image is called.
   imageLabel: string;
+  // Whether the forms offer a Subtitle field (the column exists for all types).
+  hasSubtitle: boolean;
 };
 
 const WATCH_STATUS_LABELS: Record<ShelfStatus, string> = {
@@ -100,6 +104,7 @@ export const SHELF_META: Record<ShelfType, ShelfMeta> = {
     creatorLabel: "Author",
     creatorPlaceholder: "Who wrote this?",
     imageLabel: "Cover",
+    hasSubtitle: true,
   },
   movie: {
     statusLabels: WATCH_STATUS_LABELS,
@@ -108,6 +113,7 @@ export const SHELF_META: Record<ShelfType, ShelfMeta> = {
     creatorLabel: "Director",
     creatorPlaceholder: "Who directed it?",
     imageLabel: "Poster",
+    hasSubtitle: false,
   },
   show: {
     statusLabels: WATCH_STATUS_LABELS,
@@ -116,6 +122,23 @@ export const SHELF_META: Record<ShelfType, ShelfMeta> = {
     creatorLabel: "Creator",
     creatorPlaceholder: "Who created it?",
     imageLabel: "Poster",
+    hasSubtitle: false,
+  },
+  // One record per release: album, EP or single. Tracks go in the note.
+  // The shelf tracks owning the release (a record collection), not listening:
+  // in_progress is a placed order or pre-order, done is in hand.
+  music: {
+    statusLabels: {
+      want: "Want to own",
+      in_progress: "On order",
+      done: "Owned",
+    },
+    dateLabel: "Date acquired",
+    doneVerb: "Acquired",
+    creatorLabel: "Artist",
+    creatorPlaceholder: "Who made it?",
+    imageLabel: "Cover",
+    hasSubtitle: false,
   },
 };
 
@@ -213,7 +236,7 @@ const recordFieldsSchema = z.object({
   // Optional because only image-type records have this.
   imagePath: z.string().optional(),
 
-  // ---- Shelf fields (book, movie, show) ----
+  // ---- Shelf fields (book, movie, show, music) ----
   // All optional; only shelf records send them. Validation stays permissive
   // for other types (they simply omit these).
 
@@ -238,6 +261,9 @@ const recordFieldsSchema = z.object({
     .min(1, "Year must be between 1 and 9999")
     .max(9999, "Year must be between 1 and 9999")
     .optional(),
+
+  // Subtitle (books today; see SHELF_META.hasSubtitle).
+  subtitle: z.string().trim().max(500, "Subtitle is too long").optional(),
 });
 
 // Cross-field rule: a link record must carry a Source URL — the URL is the
