@@ -40,6 +40,7 @@ const EMPTY_SHELF: ShelfValues = {
   shelfStatus: "",
   dateFinished: "",
   releaseYear: null,
+  subtitle: "",
 };
 
 export default function CreateRecordForm() {
@@ -50,7 +51,7 @@ export default function CreateRecordForm() {
   const [sourceAuthor, setSourceAuthor] = useState("");
   const [note, setNote] = useState("");
 
-  // Shelf fields (book, movie, show).
+  // Shelf fields (book, movie, show, music).
   const [shelf, setShelf] = useState<ShelfValues>(EMPTY_SHELF);
   const isShelf = isShelfType(type);
 
@@ -280,6 +281,12 @@ export default function CreateRecordForm() {
             shelfStatus: shelf.shelfStatus || undefined,
             dateFinished: shelf.dateFinished || undefined,
             releaseYear: shelf.releaseYear ?? undefined,
+            // Only types that show the field. Shelf state survives a type
+            // switch, so a subtitle typed for a book would otherwise ride along
+            // on a movie or music record with no field to clear it.
+            subtitle: SHELF_META[type].hasSubtitle
+              ? shelf.subtitle || undefined
+              : undefined,
           }
         : {}),
     });
@@ -456,6 +463,29 @@ export default function CreateRecordForm() {
                       </p>
                     )}
                   </div>
+
+                  {isShelf && SHELF_META[type].hasSubtitle && (
+                    <div>
+                      <label htmlFor="subtitle" className={labelClass}>
+                        Subtitle{" "}
+                        <span className="font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <input
+                        id="subtitle"
+                        type="text"
+                        value={shelf.subtitle}
+                        onChange={(e) =>
+                          setShelf((s) => ({ ...s, subtitle: e.target.value }))
+                        }
+                        className={inputClass}
+                      />
+                      {fieldErrors?.subtitle && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {fieldErrors.subtitle[0]}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {type !== "image" && (
                     <MarkdownField

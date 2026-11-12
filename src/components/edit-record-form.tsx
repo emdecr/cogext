@@ -44,6 +44,7 @@ type RecordWithTags = {
   shelfStatus: ShelfStatus | null;
   dateFinished: string | null;
   releaseYear: number | null;
+  subtitle: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };
@@ -66,13 +67,14 @@ export default function EditRecordForm({ record, onClose }: Props) {
   const [sourceAuthor, setSourceAuthor] = useState(record.sourceAuthor ?? "");
   const [note, setNote] = useState(record.note ?? "");
 
-  // Shelf fields (book, movie, show).
+  // Shelf fields (book, movie, show, music).
   const isShelf = isShelfType(record.type);
   const [shelf, setShelf] = useState<ShelfValues>({
     rating: record.rating,
     shelfStatus: record.shelfStatus ?? "",
     dateFinished: record.dateFinished ?? "",
     releaseYear: record.releaseYear,
+    subtitle: record.subtitle ?? "",
   });
 
   // Cover / poster (shelf records). `coverFile` is a newly-picked file (not yet uploaded);
@@ -144,6 +146,7 @@ export default function EditRecordForm({ record, onClose }: Props) {
             shelfStatus: shelf.shelfStatus || undefined,
             dateFinished: shelf.dateFinished || undefined,
             releaseYear: shelf.releaseYear ?? undefined,
+            subtitle: shelf.subtitle || undefined,
           }
         : {}),
       // Only include when the cover actually changed, so the action leaves an
@@ -263,6 +266,29 @@ export default function EditRecordForm({ record, onClose }: Props) {
                 </p>
               )}
             </div>
+
+            {isShelfType(record.type) && SHELF_META[record.type].hasSubtitle && (
+              <div>
+                <label htmlFor="edit-subtitle" className={labelClass}>
+                  Subtitle{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <input
+                  id="edit-subtitle"
+                  type="text"
+                  value={shelf.subtitle}
+                  onChange={(e) =>
+                    setShelf((s) => ({ ...s, subtitle: e.target.value }))
+                  }
+                  className={inputClass}
+                />
+                {fieldErrors?.subtitle && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {fieldErrors.subtitle[0]}
+                  </p>
+                )}
+              </div>
+            )}
 
             <MarkdownField
               id="edit-content"

@@ -37,6 +37,7 @@ describe("record ref helpers", () => {
     expect(recordRefIcon("book")).toBe("📖");
     expect(recordRefIcon("movie")).toBe("🎬");
     expect(recordRefIcon("show")).toBe("📺");
+    expect(recordRefIcon("music")).toBe("💿");
     expect(recordRefIcon(null)).toBe("↗");
     expect(recordRefIcon("spaceship")).toBe("↗");
   });

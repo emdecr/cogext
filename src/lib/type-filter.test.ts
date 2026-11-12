@@ -9,7 +9,7 @@ import {
 describe("type filter", () => {
   it("splits creatable types into inline pills and the Shelf menu", () => {
     expect(INLINE_FILTER_TYPES).toEqual(["note", "quote", "link", "image"]);
-    expect(SHELF_FILTER_TYPES).toEqual(["book", "movie", "show"]);
+    expect(SHELF_FILTER_TYPES).toEqual(["book", "movie", "show", "music"]);
   });
 
   it("null matches everything", () => {
@@ -18,7 +18,7 @@ describe("type filter", () => {
   });
 
   it("'shelf' matches every shelf type and nothing else", () => {
-    for (const t of ["book", "movie", "show"]) {
+    for (const t of ["book", "movie", "show", "music"]) {
       expect(matchesTypeFilter(t, SHELF_FILTER)).toBe(true);
     }
     for (const t of ["note", "quote", "link", "image", "article"]) {

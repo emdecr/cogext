@@ -44,6 +44,7 @@ type RecordWithTags = {
   shelfStatus: ShelfStatus | null;
   dateFinished: string | null;
   releaseYear: number | null;
+  subtitle: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };
@@ -76,6 +77,8 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
     record.title ||
     plainContent.slice(0, titleLimit) +
     (plainContent.length > titleLimit ? "..." : "");
+  // Book subtitle, under a real title only (not under a content fallback).
+  const showSubtitle = isShelf && !!record.title && !!record.subtitle;
 
   return (
     <Link
@@ -118,9 +121,14 @@ export default function RecordCard({ record }: { record: RecordWithTags }) {
         {/* An untitled quote shows the quote text here, so it stays italic;
             a titled quote reads like any other heading. */}
         {(!record.imagePath || isShelf) && (
-          <h3 className={`mb-4 text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) || (record.type === "quote" && record.title) ? "font-bold" : "font-medium"} ${record.type === "quote" && !record.title ? "italic" : ""}`}>
+          <h3 className={`${showSubtitle ? "mb-1" : "mb-4"} text-sm text-gray-900 dark:text-gray-100 ${["link", "note"].includes(record.type) || (record.type === "quote" && record.title) ? "font-bold" : "font-medium"} ${record.type === "quote" && !record.title ? "italic" : ""}`}>
             {displayTitle}
           </h3>
+        )}
+        {showSubtitle && (
+          <p className="mb-4 text-xs text-gray-600 dark:text-gray-400">
+            {record.subtitle}
+          </p>
         )}
 
         {/* Content preview */}

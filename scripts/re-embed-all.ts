@@ -61,6 +61,7 @@ async function main() {
         note: records.note,
         type: records.type,
         releaseYear: records.releaseYear,
+        subtitle: records.subtitle,
       })
       .from(records)
       .where(isNull(records.embedding));

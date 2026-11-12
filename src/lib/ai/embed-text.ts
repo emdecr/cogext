@@ -25,6 +25,7 @@ export function prepareTextForEmbedding(record: {
   note: string | null;
   type: string;
   releaseYear?: number | null;
+  subtitle?: string | null;
 }): string {
   const parts: string[] = [];
 
@@ -35,9 +36,13 @@ export function prepareTextForEmbedding(record: {
     parts.push(`Title: ${record.title}`);
   }
 
+  if (record.subtitle) {
+    parts.push(`Subtitle: ${record.subtitle}`);
+  }
+
   parts.push(`Content: ${record.content}`);
 
-  // Movies and shows label the creator by role; everything else (books,
+  // Movies, shows and music label the creator by role; everything else (books,
   // quotes, links…) keeps "Author" so existing embedding text is unchanged.
   if (record.sourceAuthor) {
     const creatorLabel =
@@ -45,7 +50,9 @@ export function prepareTextForEmbedding(record: {
         ? "Director"
         : record.type === "show"
           ? "Creator"
-          : "Author";
+          : record.type === "music"
+            ? "Artist"
+            : "Author";
     parts.push(`${creatorLabel}: ${record.sourceAuthor}`);
   }
 

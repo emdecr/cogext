@@ -2,7 +2,7 @@
 // SHELF FIELDS
 // ============================================================================
 //
-// The metadata block shared by shelf records (book, movie, show) in both the
+// The metadata block shared by shelf records (book, movie, show, music) in both the
 // create and edit forms: rating, status, date finished, release year, and the
 // optional cover/poster. Fully controlled — the parent form owns the state and
 // does the upload on submit. Wording comes from SHELF_META per type.
@@ -31,6 +31,9 @@ export type ShelfValues = {
   shelfStatus: ShelfStatus | "";
   dateFinished: string;
   releaseYear: number | null;
+  // Rendered by the parent form next to Title (books only, see
+  // SHELF_META.hasSubtitle), but held here so it travels with the shelf state.
+  subtitle: string;
 };
 
 // Turns a number input's raw value into number | null ("" → null).

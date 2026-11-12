@@ -223,7 +223,7 @@ export async function getLinkSuggestions(): Promise<LinkCandidate[]> {
     .orderBy(desc(records.createdAt))
     .limit(24);
 
-  // Stable partition: shelf records (books, movies, shows) first — each group
+  // Stable partition: shelf records (books, movies, shows, music) first — each group
   // already newest-first from the query — then everything else. Drop createdAt
   // from the returned shape.
   const shelf = recent.filter((r) => isShelfType(r.type));

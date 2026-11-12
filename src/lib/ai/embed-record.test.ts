@@ -119,7 +119,7 @@ describe("prepareTextForEmbedding", () => {
     expect(text).toContain("Author: Shakespeare");
   });
 
-  it("labels the creator by role for movies and shows", () => {
+  it("labels the creator by role for movies, shows and music", () => {
     const base = { title: "Dune", content: "Dune", note: null };
     expect(
       prepareTextForEmbedding({ ...base, type: "movie", sourceAuthor: "Denis Villeneuve" }),
@@ -127,10 +127,22 @@ describe("prepareTextForEmbedding", () => {
     expect(
       prepareTextForEmbedding({ ...base, type: "show", sourceAuthor: "Dan Erickson" }),
     ).toContain("Creator: Dan Erickson");
+    expect(
+      prepareTextForEmbedding({ ...base, type: "music", sourceAuthor: "Radiohead" }),
+    ).toContain("Artist: Radiohead");
     // Books keep "Author" so existing book embeddings don't drift.
     expect(
       prepareTextForEmbedding({ ...base, type: "book", sourceAuthor: "Frank Herbert" }),
     ).toContain("Author: Frank Herbert");
+  });
+
+  it("includes the subtitle after the title only when set", () => {
+    const base = { type: "book", title: "Sapiens", content: "Sapiens", sourceAuthor: null, note: null };
+    expect(
+      prepareTextForEmbedding({ ...base, subtitle: "A Brief History of Humankind" }),
+    ).toContain("Title: Sapiens\nSubtitle: A Brief History of Humankind");
+    expect(prepareTextForEmbedding({ ...base, subtitle: null })).not.toContain("Subtitle:");
+    expect(prepareTextForEmbedding(base)).not.toContain("Subtitle:");
   });
 
   it("includes the release year only when set", () => {

@@ -43,6 +43,7 @@ type RecordWithTags = {
   shelfStatus: ShelfStatus | null;
   dateFinished: string | null;
   releaseYear: number | null;
+  subtitle: string | null;
   createdAt: Date;
   recordTags: { tag: Tag }[];
 };

@@ -55,6 +55,7 @@ describe("createRecordSchema", () => {
       "book",
       "movie",
       "show",
+      "music",
     ] as const;
 
     for (const type of types) {
@@ -70,7 +71,7 @@ describe("createRecordSchema", () => {
     }
   });
 
-  // ---- Shelf fields (book, movie, show) ----
+  // ---- Shelf fields (book, movie, show, music) ----
 
   it("accepts a book record with rating, status, and date finished", () => {
     const result = createRecordSchema.safeParse({
@@ -99,6 +100,34 @@ describe("createRecordSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a music record with an owned status", () => {
+    const result = createRecordSchema.safeParse({
+      type: "music",
+      content: "In Rainbows",
+      sourceAuthor: "Radiohead",
+      shelfStatus: "done",
+      releaseYear: 2007,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("trims a subtitle and rejects one over 500 characters", () => {
+    const ok = createRecordSchema.safeParse({
+      type: "book",
+      content: "The Overstory",
+      subtitle: "  A Novel  ",
+    });
+    expect(ok.success && ok.data.subtitle).toBe("A Novel");
+
+    const tooLong = createRecordSchema.safeParse({
+      type: "book",
+      content: "The Overstory",
+      subtitle: "x".repeat(501),
+    });
+    expect(tooLong.success).toBe(false);
   });
 
   it("accepts a show with an in-progress status", () => {
@@ -437,9 +466,9 @@ describe("deleteRecordSchema", () => {
 // ============================================================================
 
 describe("shelf types", () => {
-  it("treats book, movie and show as shelf types and nothing else", () => {
-    expect(SHELF_TYPES).toEqual(["book", "movie", "show"]);
-    for (const t of ["book", "movie", "show"]) expect(isShelfType(t)).toBe(true);
+  it("treats book, movie, show and music as shelf types and nothing else", () => {
+    expect(SHELF_TYPES).toEqual(["book", "movie", "show", "music"]);
+    for (const t of ["book", "movie", "show", "music"]) expect(isShelfType(t)).toBe(true);
     for (const t of ["note", "quote", "link", "image", "article", "", null, undefined]) {
       expect(isShelfType(t)).toBe(false);
     }
@@ -459,5 +488,16 @@ describe("shelf types", () => {
     expect(SHELF_META.movie.creatorLabel).toBe("Director");
     expect(SHELF_META.show.creatorLabel).toBe("Creator");
     expect(SHELF_META.movie.imageLabel).toBe("Poster");
+    expect(SHELF_META.music.statusLabels).toEqual({
+      want: "Want to own",
+      in_progress: "On order",
+      done: "Owned",
+    });
+    expect(SHELF_META.music.creatorLabel).toBe("Artist");
+    expect(SHELF_META.music.imageLabel).toBe("Cover");
+  });
+
+  it("offers a subtitle on books only", () => {
+    expect(SHELF_TYPES.filter((t) => SHELF_META[t].hasSubtitle)).toEqual(["book"]);
   });
 });
