@@ -492,6 +492,7 @@ export async function getRelatedRecords(
 //   3. Verify the record exists AND belongs to this user
 //   4. Update only the provided fields
 //   5. Revalidate the dashboard
+//   6. Re-embed in the background, so edited text reaches semantic search
 
 export async function updateRecord(
   input: Record<string, unknown>,
@@ -565,6 +566,14 @@ export async function updateRecord(
   }
 
   revalidatePath("/dashboard");
+
+  // Re-embed so edits to the title, subtitle, content or note reach semantic
+  // search; the stored vector otherwise keeps the text from creation.
+  // Fire-and-forget like createRecord: embedRecord re-fetches the saved row
+  // and never calls revalidatePath. One embedding call per successful edit.
+  embedRecord(id).catch((err) =>
+    logger.error("Background embed failed", { feature: "embedding", recordId: id, error: err }),
+  );
 
   return { success: true };
 }
