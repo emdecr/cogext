@@ -32,6 +32,7 @@ type SeedRecord = {
   title?: string | null;
   content?: string;
   sourceAuthor?: string;
+  subtitle?: string;
   createdAt?: Date;
 };
 
@@ -46,6 +47,7 @@ async function seed(userId: string, rows: SeedRecord[]): Promise<string[]> {
         title: r.title ?? null,
         content: r.content ?? "",
         sourceAuthor: r.sourceAuthor ?? null,
+        subtitle: r.subtitle ?? null,
         ...(r.createdAt ? { createdAt: r.createdAt } : {}),
       })
       .returning({ id: records.id });
@@ -96,6 +98,17 @@ describe("lookupRecords (integration)", () => {
     ]);
     expect((await lookupRecords("le guin")).map((r) => r.label)).toEqual([
       "The Dispossessed",
+    ]);
+  });
+
+  it("matches a book by its subtitle", async () => {
+    await seed(userAId, [
+      { type: "book", title: "Sapiens", subtitle: "A Brief History of Humankind" },
+      { title: "Groceries", content: "eggs, milk" },
+    ]);
+
+    expect((await lookupRecords("humankind")).map((r) => r.label)).toEqual([
+      "Sapiens",
     ]);
   });
 

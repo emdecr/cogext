@@ -281,7 +281,12 @@ export default function CreateRecordForm() {
             shelfStatus: shelf.shelfStatus || undefined,
             dateFinished: shelf.dateFinished || undefined,
             releaseYear: shelf.releaseYear ?? undefined,
-            subtitle: shelf.subtitle || undefined,
+            // Only types that show the field. Shelf state survives a type
+            // switch, so a subtitle typed for a book would otherwise ride along
+            // on a movie or music record with no field to clear it.
+            subtitle: SHELF_META[type].hasSubtitle
+              ? shelf.subtitle || undefined
+              : undefined,
           }
         : {}),
     });

@@ -309,6 +309,21 @@ describe("CreateRecordForm", () => {
       });
     });
 
+    it("drops a book subtitle when the type changes to one without the field", async () => {
+      const user = await renderAndOpenForm();
+
+      await user.click(screen.getByRole("button", { name: "book" }));
+      await user.type(screen.getByLabelText(/^title/i), "In Rainbows");
+      await user.type(screen.getByLabelText(/^subtitle/i), "Typed by mistake");
+      await user.click(screen.getByRole("button", { name: "music" }));
+      await user.click(screen.getByRole("button", { name: "Save Record" }));
+
+      await waitFor(() => expect(mockCreateRecord).toHaveBeenCalled());
+      const payload = mockCreateRecord.mock.calls[0][0];
+      expect(payload.type).toBe("music");
+      expect(payload.subtitle).toBeUndefined();
+    });
+
     it("has no subtitle field for movies or music", async () => {
       const user = await renderAndOpenForm();
 

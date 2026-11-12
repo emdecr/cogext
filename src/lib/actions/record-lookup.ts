@@ -80,6 +80,7 @@ export async function lookupRecords(
     conditions.push(
       or(
         ilike(records.title, contains),
+        ilike(records.subtitle, contains),
         ilike(records.sourceAuthor, contains),
         ilike(records.content, contains),
       )!,
