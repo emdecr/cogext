@@ -44,6 +44,7 @@ import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import { chatLimiter, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { logAiOutcome } from "@/lib/ai/usage";
+import { resolveRecordMarkersInStream } from "@/lib/ai/record-markers";
 
 // ============================================================================
 // INPUT VALIDATION
@@ -201,6 +202,16 @@ export async function POST(request: NextRequest) {
   // while retrieved records give it the "trees" (specific details).
   const systemPrompt = buildSystemPrompt(relevantRecords, userProfile);
 
+  // Records are shown to the model as R1…Rn (matching their order in the
+  // prompt). The model cites them inline as `[text](R3)`; we rewrite those to
+  // real `/records/<uuid>` links as the reply streams — same scheme as
+  // reflections (src/lib/ai/record-markers.ts). Markers are per-turn: each
+  // message's retrieval gets its own R1…Rn, and earlier replies were saved
+  // already resolved.
+  const markerToId = new Map(
+    relevantRecords.map((record, index) => [`R${index + 1}`, record.id])
+  );
+
   // ---- Step 6: GENERATE + STREAM — call Claude and pipe the response ----
   // This is the "G" in RAG. We send everything to Claude and stream
   // the response back to the client.
@@ -221,7 +232,7 @@ export async function POST(request: NextRequest) {
           // Consume the AsyncGenerator chunk by chunk.
           // Each chunk is a few tokens of text from Claude.
           // We encode it to bytes and enqueue it into the stream.
-          for await (const chunk of chatProvider.chatStream(
+          const modelStream = chatProvider.chatStream(
             history,
             systemPrompt,
             // Outcome callback — fires once, when the stream completes or
@@ -229,6 +240,11 @@ export async function POST(request: NextRequest) {
             // already sent; this is fire-and-forget bookkeeping.
             (outcome) =>
               logAiOutcome({ userId, feature: "chat", conversationId }, outcome)
+          );
+
+          for await (const chunk of resolveRecordMarkersInStream(
+            modelStream,
+            markerToId
           )) {
             controller.enqueue(encoder.encode(chunk));
           }
@@ -448,7 +464,8 @@ function buildSystemPrompt(
 
 IMPORTANT RULES:
 - Base your answers on the retrieved records provided below. These are the user's own saved content.
-- When referencing a specific record, mention its title or a brief description so the user knows which one you mean.
+- When you mention a specific retrieved record, link it inline as a markdown link using its marker as the URL — e.g. [that essay on focus](R2) or [the Didion quote](R5). The link text should read naturally in the sentence (a title or short description); don't put the marker in the visible text.
+- Only use markers that appear in the retrieved records below. Never invent one. Link a record once or twice, not every time it comes up.
 - If the retrieved records don't contain enough information to answer the question, say so honestly. Don't make things up.
 - Be conversational but concise. The user is chatting, not reading an essay.
 - You can make connections between records that the user might not have noticed — that's one of your key values.`;
@@ -504,7 +521,8 @@ IMPORTANT RULES:
           ? record.content.slice(0, MAX_CONTENT_LENGTH) + "..."
           : record.content;
 
-      prompt += `[Record ${index + 1}]\n`;
+      // The marker doubles as the link target the model cites (see markerToId).
+      prompt += `[R${index + 1}]\n`;
       prompt += `Type: ${record.type}\n`;
 
       if (record.title) {

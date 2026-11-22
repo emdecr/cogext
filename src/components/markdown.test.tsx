@@ -2,7 +2,7 @@
 // links stay plain anchors, and a caller's own `a` override still wins.
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import Markdown from "@/components/markdown";
+import Markdown, { citationComponents } from "@/components/markdown";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -37,5 +37,21 @@ describe("<Markdown> record refs", () => {
       </Markdown>,
     );
     expect(screen.getByTestId("custom")).toHaveTextContent("x");
+  });
+
+  it("renders record links as inline citations with citationComponents", () => {
+    render(
+      <Markdown components={citationComponents}>
+        {`Like [that essay](/records/${id}) and [a site](https://example.com).`}
+      </Markdown>,
+    );
+    const record = screen.getByRole("link", { name: "that essay" });
+    expect(record).toHaveAttribute("href", `/records/${id}`);
+    expect(record.className).not.toContain("rounded-md");
+    expect(record.className).toContain("underline");
+
+    const external = screen.getByRole("link", { name: "a site" });
+    expect(external).toHaveAttribute("target", "_blank");
+    expect(external).toHaveAttribute("rel", "noopener noreferrer");
   });
 });
