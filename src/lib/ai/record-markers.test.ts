@@ -69,4 +69,29 @@ describe("resolveRecordMarkersInStream", () => {
     const out = await collect([`[${long}`, " tail"]);
     expect(out[0]).toBe(`[${long}`);
   });
+
+  it("still resolves a link whose text outgrows the hold limit", async () => {
+    const label = "y".repeat(300);
+    const out = await collect([`[${label}`, "](R1) after"]);
+    expect(out[0]).toBe(`[${label}`);
+    expect(out.join("")).toBe(`[${label}](/records/${A}) after`);
+  });
+
+  it("resolves an overlong link split again after the bracket", async () => {
+    const label = "y".repeat(350);
+    const out = await collect([`Hi [${label}`, " more", "](", "R2)."]);
+    expect(out.join("")).toBe(`Hi [${label} more](/records/${B}).`);
+    expect(out.some((piece) => piece.includes("(R"))).toBe(false);
+  });
+
+  it("closes an overlong hallucinated link as plain bracketed text", async () => {
+    const label = "y".repeat(310);
+    expect((await collect([`[${label}`, "](R9) end"])).join("")).toBe(`[${label}] end`);
+  });
+
+  it("drops the open-link state when the overlong bracket isn't a link", async () => {
+    const label = "y".repeat(310);
+    const out = await collect([`[${label}`, "] and [x](R1)"]);
+    expect(out.join("")).toBe(`[${label}] and [x](/records/${A})`);
+  });
 });

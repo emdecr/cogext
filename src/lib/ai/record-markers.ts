@@ -41,25 +41,83 @@ export function resolveRecordMarkers(
 // Streaming version for chat. Resolves markers as chunks arrive, holding back
 // only a trailing fragment that might be a marker link split across chunks —
 // so the client never sees a raw `(R3)` and never has to re-render a link.
+//
+// If a link's text runs past MAX_PENDING_LENGTH we stream the `[text` part
+// anyway (so a stray `[` can't stall the reply) but remember the link is still
+// open: `pending` restarts with CONTINUATION, a stand-in for the text already
+// sent, so a `](R3)` that arrives later still resolves.
+const CONTINUATION = "[…";
+const CONTINUED_LINK_RE = /^\[…([^[\]\n]*)\]\((R\d+)\)/;
+
 export async function* resolveRecordMarkersInStream(
   chunks: AsyncIterable<string>,
   markerToId: Map<string, string>
 ): AsyncGenerator<string> {
   let pending = "";
+  let continuing = false;
+
+  const drain = (final: boolean): string => {
+    let out = "";
+
+    if (continuing) {
+      const closed = CONTINUED_LINK_RE.exec(pending);
+      if (closed) {
+        // The `[text` is already on the client, so a hallucinated marker can't
+        // have its bracket removed — close it as plain `[text]` instead.
+        const id = markerToId.get(closed[2]);
+        out += closed[1] + (id ? `](/records/${id})` : "]");
+        pending = pending.slice(closed[0].length);
+        continuing = false;
+      } else if (!final && PARTIAL_MARKER_LINK_RE.exec(pending)?.index === 0) {
+        // Still inside the open link. Keep holding unless the text keeps
+        // running long, in which case stream it and stay open.
+        if (pending.length <= MAX_PENDING_LENGTH) return out;
+        const tail = pending.slice(CONTINUATION.length);
+        const labelEnd = tail.includes("]") ? tail.indexOf("]") : tail.length;
+        out += tail.slice(0, labelEnd);
+        pending = CONTINUATION + tail.slice(labelEnd);
+        return out;
+      } else {
+        // Not a marker link after all — drop the stand-in and carry on.
+        pending = pending.slice(CONTINUATION.length);
+        continuing = false;
+      }
+    }
+
+    if (final) {
+      out += resolveRecordMarkers(pending, markerToId);
+      pending = "";
+      return out;
+    }
+
+    const partial = PARTIAL_MARKER_LINK_RE.exec(pending);
+    if (!partial) {
+      out += resolveRecordMarkers(pending, markerToId);
+      pending = "";
+      return out;
+    }
+
+    out += resolveRecordMarkers(pending.slice(0, partial.index), markerToId);
+    const tail = pending.slice(partial.index);
+
+    if (tail.length <= MAX_PENDING_LENGTH) {
+      pending = tail;
+    } else {
+      // Overlong: stream the `[text`, hold whatever follows it, stay open.
+      const labelEnd = tail.includes("]") ? tail.indexOf("]") : tail.length;
+      out += tail.slice(0, labelEnd);
+      pending = CONTINUATION + tail.slice(labelEnd);
+      continuing = true;
+    }
+    return out;
+  };
 
   for await (const chunk of chunks) {
     pending += chunk;
-
-    const partial = PARTIAL_MARKER_LINK_RE.exec(pending);
-    const holdFrom =
-      partial && pending.length - partial.index <= MAX_PENDING_LENGTH
-        ? partial.index
-        : pending.length;
-
-    const ready = pending.slice(0, holdFrom);
-    pending = pending.slice(holdFrom);
-    if (ready) yield resolveRecordMarkers(ready, markerToId);
+    const out = drain(false);
+    if (out) yield out;
   }
 
-  if (pending) yield resolveRecordMarkers(pending, markerToId);
+  const out = drain(true);
+  if (out) yield out;
 }
