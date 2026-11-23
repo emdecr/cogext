@@ -26,7 +26,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Markdown from "@/components/markdown";
+import Markdown, { citationComponents } from "@/components/markdown";
 import {
   addMessage,
   type ConversationWithMessages,
@@ -315,7 +315,13 @@ function MessageBubble({
           // Assistant messages: render markdown so bold, lists, code, etc.
           // show up formatted. The shared <Markdown> wrapper owns the prose
           // container; we pass the prose-sm flavor so it fits the bubble.
-          <Markdown className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+          // Record citations (`/records/<id>`, resolved server-side from the
+          // model's R-markers) render inline with a hover preview, like
+          // reflections.
+          <Markdown
+            className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+            components={citationComponents}
+          >
             {content}
           </Markdown>
         )}

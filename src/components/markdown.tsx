@@ -17,9 +17,10 @@
 //     hover preview (RecordRefLink) — these are what the editor's `[[` picker
 //     inserts (plans/2026-10-28-inline-record-links.md). Other links render
 //     as plain anchors.
-//   - `components` is merged over that default. The reflection view overrides
-//     `a` to keep its inline citation style and open external links in a new
-//     tab — see plans/2026-07-24-record-urls-and-reflection-refs.md (Phase 3).
+//   - `components` is merged over that default. AI prose (reflections, chat)
+//     passes `citationComponents` to keep record links as inline citations and
+//     open external links in a new tab — see
+//     plans/2026-07-24-record-urls-and-reflection-refs.md (Phase 3).
 //   - SECURITY: no `rehype-raw`. react-markdown does not render embedded raw
 //     HTML by default, which is what keeps user-authored markdown safe to
 //     render. Do not add it. (See plans/2026-09-05-wysiwyg-editor.md, Chunk 6.)
@@ -49,6 +50,23 @@ const defaultComponents: Components = {
     }
     return (
       <a href={href} title={title}>
+        {children}
+      </a>
+    );
+  },
+};
+
+// Inline-citation flavor for AI prose (reflections, chat). Record links render
+// as underlined text with a hover preview instead of chips — the model writes
+// them mid-sentence ("[that essay on focus](/records/…)"), so a pill would be
+// heavy. External links open in a new tab.
+export const citationComponents: Components = {
+  a({ href, children }) {
+    if (parseRecordRefHref(href)) {
+      return <RecordRefLink href={href!}>{children}</RecordRefLink>;
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     );

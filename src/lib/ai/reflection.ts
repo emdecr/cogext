@@ -36,6 +36,7 @@ import { eq, and, or, gte, lte, lt, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { records, recordLinks, reflections } from "@/db/schema";
 import { getChatProvider } from "@/lib/ai";
+import { resolveRecordMarkers } from "@/lib/ai/record-markers";
 import { getProfile, type UserProfile } from "@/lib/ai/profile";
 import {
   generateRecommendations,
@@ -339,30 +340,6 @@ function buildReflectionRecordSummaries(
   });
 
   return { summaries, markerToId };
-}
-
-// ============================================================================
-// RESOLVE RECORD MARKERS
-// ============================================================================
-// The model is told to link records inline using their marker as the URL, e.g.
-// `[that essay on focus](R7)`. This turns each such link into a real record URL
-// (`](/records/<uuid>)`). Any marker not in the map is a hallucination — we
-// strip the link wrapper but keep the visible text so the sentence still reads.
-// Links are stored already resolved, so Phase 3 (hover popovers) is a pure
-// rendering change with no regeneration needed.
-
-function resolveRecordMarkers(
-  markdown: string,
-  markerToId: Map<string, string>
-): string {
-  // Matches a markdown link whose URL is exactly a record marker: [text](R12)
-  return markdown.replace(
-    /\[([^\]]+)\]\((R\d+)\)/g,
-    (_full, text: string, marker: string) => {
-      const id = markerToId.get(marker);
-      return id ? `[${text}](/records/${id})` : text;
-    }
-  );
 }
 
 // ============================================================================
