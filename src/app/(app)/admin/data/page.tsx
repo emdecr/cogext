@@ -9,7 +9,8 @@
 //   - which models produced the stored embeddings, vs the current EMBED_MODEL
 //   - the newest problem records, linked so they can be fixed
 //   - when reflections and the AI profile last ran
-// Instance-wide (all users). See src/lib/actions/admin/data.ts.
+// Instance-wide (all users). See src/lib/actions/admin/data.ts, and
+// src/lib/actions/admin/maintenance.ts for the "Retag" button's action.
 // ============================================================================
 
 import Link from "next/link";
@@ -17,6 +18,7 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { getDataOverview, type RecordRef } from "@/lib/actions/admin/data";
 import { percentOf } from "@/lib/data-health";
 import { Badge, When, TabHeading, card, cardTitle, muted, tone } from "../ui";
+import RetagButton from "./retag-button";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -34,11 +36,14 @@ function ProblemList({
   items,
   total,
   now,
+  children,
 }: {
   title: string;
   items: RecordRef[];
   total: number;
   now: Date;
+  // Optional fix-it control rendered under the list.
+  children?: React.ReactNode;
 }) {
   if (items.length === 0) return null;
   return (
@@ -67,6 +72,7 @@ function ProblemList({
           </li>
         ))}
       </ul>
+      {children}
     </div>
   );
 }
@@ -217,7 +223,9 @@ export default async function AdminDataPage() {
             items={d.recentUntagged}
             total={r.untagged}
             now={now}
-          />
+          >
+            <RetagButton />
+          </ProblemList>
         </div>
       )}
 
@@ -232,6 +240,15 @@ export default async function AdminDataPage() {
             run <code>scripts/re-embed-all.ts</code> (see its header for local
             and prod usage). It only embeds records that have none. Records on
             an older model need their embedding cleared first.
+          </li>
+          <li>
+            <span className="text-gray-900 dark:text-gray-100">
+              Fill in missing tags:
+            </span>{" "}
+            use <em>Retag next 10</em> under &ldquo;No tags&rdquo; above, or{" "}
+            <em>Generate tags</em> on a single record. Tags are added, never
+            removed. Image records still showing the &ldquo;Image&rdquo;
+            placeholder are analysed first.
           </li>
           <li>
             <span className="text-gray-900 dark:text-gray-100">Export:</span>{" "}

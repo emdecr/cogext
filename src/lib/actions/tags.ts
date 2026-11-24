@@ -25,6 +25,9 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { tags, recordTags, records } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
+import { tagRecord } from "@/lib/ai/tag-record";
+import { logger } from "@/lib/logger";
+import { linkTagByName, normalizeTagName } from "@/lib/tag-link";
 
 // ---- Auth helper (same pattern as records.ts) ----
 async function requireUserId(): Promise<string> {
@@ -54,12 +57,9 @@ export async function addTagToRecord(
 ) {
   const userId = await requireUserId();
 
-  // Normalize the tag name: lowercase, trimmed, no extra spaces.
-  // This prevents "Recipes", "recipes", and " recipes " from being
-  // treated as different tags.
-  const normalized = tagName.trim().toLowerCase();
-
-  if (!normalized) {
+  // Normalize the tag name: lowercase, trimmed. This prevents "Recipes",
+  // "recipes", and " recipes " from being treated as different tags.
+  if (!normalizeTagName(tagName)) {
     return { success: false, error: "Tag name is required" };
   }
 
@@ -73,30 +73,9 @@ export async function addTagToRecord(
   }
 
   try {
-    // Step 1: Find or create the tag.
-    // We try to find it first. If it doesn't exist, we create it.
-    let tag = await db.query.tags.findFirst({
-      where: eq(tags.name, normalized),
-    });
-
-    if (!tag) {
-      // Create the tag. .returning() gives us back the inserted row
-      // so we don't need a separate SELECT query.
-      const [newTag] = await db
-        .insert(tags)
-        .values({ name: normalized, isAi })
-        .returning();
-      tag = newTag;
-    }
-
-    // Step 2: Link the tag to the record.
-    // onConflictDoNothing() prevents errors if the tag is already
-    // linked to this record (the composite PK would otherwise throw
-    // a unique constraint violation).
-    await db
-      .insert(recordTags)
-      .values({ recordId, tagId: tag.id })
-      .onConflictDoNothing();
+    // Find or create the tag, then link it. Both steps are conflict-safe:
+    // re-adding a tag the record already has is a no-op. See tag-link.ts.
+    const tag = await linkTagByName(recordId, tagName, isAi);
 
     if (!skipRevalidate) {
       revalidatePath("/dashboard");
@@ -106,6 +85,55 @@ export async function addTagToRecord(
   } catch (error) {
     console.error("Failed to add tag:", error);
     return { success: false, error: "Failed to add tag" };
+  }
+}
+
+// ============================================================================
+// REGENERATE AI TAGS
+// ============================================================================
+// Re-runs auto-tagging for one record: the retry for when the background
+// tagging in createRecord failed. Awaited (unlike createRecord's), so the UI
+// can say what happened and revalidatePath is allowed. Adds to existing tags;
+// never removes any. See src/lib/ai/tag-record.ts.
+
+export type RegenerateTagsResult =
+  | { success: true; tags: string[] }
+  | { success: false; error: string };
+
+export async function regenerateTags(
+  recordId: string,
+): Promise<RegenerateTagsResult> {
+  const userId = await requireUserId();
+
+  try {
+    const record = await db.query.records.findFirst({
+      where: and(eq(records.id, recordId), eq(records.userId, userId)),
+      columns: { id: true },
+    });
+    if (!record) return { success: false, error: "Record not found" };
+
+    const result = await tagRecord(recordId);
+    switch (result.status) {
+      case "tagged":
+        revalidatePath("/dashboard");
+        revalidatePath(`/records/${recordId}`);
+        return { success: true, tags: result.tags };
+      case "no_description":
+        return {
+          success: false,
+          error: "Couldn't describe the image, so there's nothing to tag from. Try again later.",
+        };
+      case "no_tags":
+        return {
+          success: false,
+          error: "The AI didn't return any tags. Try again later.",
+        };
+      case "not_found":
+        return { success: false, error: "Record not found" };
+    }
+  } catch (error) {
+    logger.error("Regenerate tags failed", { feature: "tagging", recordId, error });
+    return { success: false, error: "Failed to generate tags" };
   }
 }
 

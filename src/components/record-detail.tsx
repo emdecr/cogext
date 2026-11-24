@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { deleteRecord } from "@/lib/actions/records";
 import { addTagToRecord, removeTagFromRecord } from "@/lib/actions/tags";
 import TagInput from "@/components/tag-input";
+import RegenerateTagsButton from "@/components/regenerate-tags-button";
 import Markdown from "@/components/markdown";
 import EditRecordForm from "@/components/edit-record-form";
 import AddToCollection from "@/components/add-to-collection";
@@ -241,9 +242,12 @@ export default function RecordDetail({
               )}
 
               <div>
-                <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Tags
-                </p>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Tags
+                  </p>
+                  <RegenerateTagsButton recordId={record.id} />
+                </div>
                 <TagInput
                   tags={tags}
                   onAdd={handleAddTag}
@@ -415,9 +419,12 @@ export default function RecordDetail({
               )}
 
               <div>
-                <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Tags
-                </p>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Tags
+                  </p>
+                  <RegenerateTagsButton recordId={record.id} />
+                </div>
                 <TagInput
                   tags={tags}
                   onAdd={handleAddTag}
