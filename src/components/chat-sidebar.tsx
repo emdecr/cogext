@@ -170,6 +170,18 @@ export default function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
     // sidebar, they'll see the same conversation (less disorienting).
   }, [onClose]);
 
+  // ---- Flag open state on <body> ----
+  // The floating "+" create button shares z-50 with this panel and sits
+  // in the bottom-right corner, right over the chat input. It hides itself
+  // via `in-data-chat-open:hidden` while this attribute is present.
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.dataset.chatOpen = "";
+    return () => {
+      delete document.body.dataset.chatOpen;
+    };
+  }, [isOpen]);
+
   // ---- Keyboard shortcut: Escape to close ----
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

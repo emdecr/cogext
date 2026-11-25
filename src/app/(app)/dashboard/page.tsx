@@ -198,8 +198,10 @@ export default async function DashboardPage() {
 
         {/* ---- Create Record Form ---- */}
         {/* Fixed position in the bottom-right corner of the screen.
-            Starts as a "+" button, expands into the full form on click. */}
-        <div className="fixed bottom-4 right-4 z-50 md:bottom-8 md:right-8">
+            Starts as a "+" button, expands into the full form on click.
+            Hidden while the chat sidebar is open (it sets data-chat-open
+            on <body>) so it doesn't cover the chat input. */}
+        <div className="fixed bottom-4 right-4 z-50 md:bottom-8 md:right-8 in-data-chat-open:hidden">
           <CreateRecordForm />
         </div>
 
